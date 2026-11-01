@@ -16,8 +16,8 @@
 ;; defparameter, not defvar: a reload must replace the nav in a live image.
 (defparameter *nav* '(("Fields" . "/fields"))
   "Top-bar links, (label . href).")
-(defvar *ask-href* "/fields"
-  "Where the nav's Ask button goes. Pages with an ask box bind it to \"#ask\".")
+(defvar *focus* nil
+  "Where the learner is in a field: \"\" the field, a group id, an idea id. NIL off a field's pages; set, it puts the Claude dock on the page.")
 (defvar *nav-extra* nil "Already-rendered HTML for the right of the nav (a field's subtitle and view buttons).")
 (defvar *page-class* nil "Class on <body>; \"field\" makes the content fill the window.")
 (defvar *crumbs* '()
@@ -69,7 +69,7 @@
       (when best
         ;; *map* and the page-shell state are rebound per request so two tabs never clash.
         (let ((fn (route-fn best)) (bindings best-bindings))
-          (lambda () (let ((*map* *map*) (*ask-href* *ask-href*) (*crumbs* *crumbs*))
+          (lambda () (let ((*map* *map*) (*focus* *focus*) (*crumbs* *crumbs*))
                        (funcall fn bindings))))))))
 
 ;; Path bindings win; then query/form parameters of the same name.
@@ -105,6 +105,29 @@
   (setf (ht:return-code*) ht:+http-not-found+)
   (layout "Not found" (html (:h1 "No such " what) (:p (:a :href "/fields" "Back to your fields")))))
 
+;; A response that is not a page: TYPE and the exact bytes of BODY.
+(defun raw-response (type body)
+  (setf (ht:content-type*) type)
+  body)
+
+;; Stream server-sent events to the browser. FN is called with an emit function
+;; (name data) — data is anything jzon can write — and the stream ends with `done`.
+;; Each event is flushed as it is sent, so the browser sees it at once.
+(defun sse-response (fn)
+  (setf (ht:content-type*) "text/event-stream; charset=utf-8"
+        (ht:header-out "Cache-Control") "no-cache"
+        (ht:header-out "X-Accel-Buffering") "no")
+  (let ((out (ht:send-headers)))
+    (flet ((emit (name data)
+             (write-sequence (flex:string-to-octets
+                              (str "event: " name #\Newline "data: " (jzon:stringify data) #\Newline #\Newline)
+                              :external-format :utf-8)
+                             out)
+             (finish-output out)))
+      (funcall fn #'emit)
+      (emit "done" (obj)))
+    nil))
+
 ;;; ---- The page shell ----------------------------------------------------
 
 ;; (static-url "style.css") → "/static/style.css?v=3969000000" — the file's write time,
@@ -120,7 +143,8 @@
       (:head (:meta :charset "utf-8")
              (:meta :name "viewport" :content "width=device-width, initial-scale=1")
              (:title title " · StudyBuddy")
-             (:link :rel "stylesheet" :href (static-url "style.css")))
+             (:link :rel "stylesheet" :href (static-url "style.css"))
+             (when *focus* (html (:link :rel "stylesheet" :href (static-url "dock.css")))))
       (:body :class *page-class*
         (:nav :class "top"
           (:a :class "brand" :href "/" "StudyBuddy")
@@ -132,8 +156,11 @@
                 do (html (:span :class "sep" "/")
                          (if href (html (:a :href href label)) (html (:span :class "current" label)))))
           (when *nav-extra* (html (:raw *nav-extra*))))
-        (:main (dolist (p parts) (html (:raw p))))
-        (:script :src (static-url "map.js"))))))
+        (:main (dolist (p parts) (html (:raw p)))
+               (when *focus* (claude-dock *focus*)))
+        (:script :src (static-url "map.js"))
+        (when *focus* (html (:script :src (static-url "md.js"))
+                            (:script :src (static-url "dock.js"))))))))
 
 ;;; ---- Server ------------------------------------------------------------
 

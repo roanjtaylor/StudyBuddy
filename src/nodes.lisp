@@ -11,10 +11,11 @@
 
 (in-package :studybuddy)
 
-(defstore attempt (:file "attempts.lisp" :key :id :append t))
-(defstore message (:file "messages.lisp" :key :id :append t))
-(defstore level   (:file "levels.lisp"   :key :ref))
-(defstore setting (:file "settings.lisp" :key :key))
+(defstore attempt  (:file "attempts.lisp"  :key :id :append t))
+(defstore message  (:file "messages.lisp"  :key :id :append t))
+(defstore level    (:file "levels.lisp"    :key :ref))
+(defstore setting  (:file "settings.lisp"  :key :key))
+(defstore artifact (:file "artifacts.lisp" :key :id))
 
 (defvar *map* nil "The current field: (:id :title :compression :groups :nodes). Bound per request.")
 (defvar *default-map* "computers")
@@ -235,10 +236,53 @@
                                   (or (null node) (equal (getf m :node) node))))
                  (messages)))
 
-(defun add-message! (role text &key node changes)
+(defun add-message! (role text &key node changes artifacts sources)
   (put-message! (list :id (str (now-iso) "#" (length (messages)))
                       :map (map-id) :node node :role role :at (now-iso)
-                      :text text :changes changes)))
+                      :text text :changes changes :artifacts artifacts :sources sources)))
+
+;;; ---- Artifacts: things the model makes that are not prose ----------------
+;;; What claude.ai calls an artifact: a page, a diagram, a deck of cards, a quiz, a
+;;; document, a program — made in the conversation, kept beside the map, opened on
+;;; its own. :type is one of *artifact-types*; :content is the text (html, svg,
+;;; mermaid, markdown, code) or, for flashcards and quiz, the cards/questions as a
+;;; list of plists. An artifact may be about one node.
+
+(defparameter *artifact-types* '("html" "svg" "mermaid" "markdown" "code" "flashcards" "quiz"))
+
+(defun map-artifacts (&optional node)
+  (remove-if-not (lambda (a) (and (equal (getf a :map) (map-id))
+                                  (or (null node) (equal (getf a :node) node))))
+                 (artifacts)))
+
+;; (new-artifact-id "RAM flashcards") → "ram-flashcards", or "ram-flashcards-2" if taken.
+(defun new-artifact-id (title)
+  (let ((base (let ((s (slugify (or title "artifact")))) (if (blankp s) "artifact" s))))
+    (loop for i from 1
+          for id = (if (= i 1) base (str base "-" i))
+          unless (find-artifact id) return id)))
+
+(defun add-artifact! (&key title type content node language)
+  (let ((a (list :id (new-artifact-id title) :map (map-id) :node node
+                 :type type :title (trim (or title "Untitled")) :language language
+                 :content content :at (now-iso) :version 1)))
+    (put-artifact! a)))
+
+(defun update-artifact! (id &key title content)
+  (let ((old (find-artifact id)))
+    (when old
+      (let ((new (copy-list old)))
+        (when (and title (not (blankp title))) (setf (getf new :title) (trim title)))
+        (when content (setf (getf new :content) content))
+        (setf (getf new :at) (now-iso)
+              (getf new :version) (1+ (getf* old :version 1)))
+        (put-artifact! new)))))
+
+(defun remove-artifact! (id)
+  (when (find-artifact id)
+    (setf *artifacts* (remove id *artifacts* :key (lambda (a) (getf a :id)) :test #'equal))
+    (save-artifacts)
+    id))
 
 ;;; ---- Settings ----------------------------------------------------------
 

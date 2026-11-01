@@ -1,7 +1,7 @@
-// Pan/zoom for the SVG, the chat scrolled to its newest message, and a "thinking…"
-// state while a form that talks to the model is in flight (Ctrl/Cmd+Enter submits).
+// Pan/zoom for the SVG, and a "thinking…" state while a form that talks to the model
+// is in flight (Ctrl/Cmd+Enter submits). The Claude dock is dock.js.
 (function () {
-  document.querySelectorAll('form').forEach(function (form) {
+  document.querySelectorAll('form:not(.dock-form)').forEach(function (form) {
     form.addEventListener('submit', function () { form.classList.add('pending'); });
     form.querySelectorAll('textarea').forEach(function (ta) {
       ta.addEventListener('keydown', function (e) {
@@ -10,13 +10,12 @@
     });
   });
 
-  var log = document.querySelector('.chat-log');
-  if (log) log.scrollTop = log.scrollHeight;
+  document.querySelectorAll('.map-wrap.pan').forEach(function (wrap) {
+    panZoom(wrap.querySelector('svg.map'), wrap.querySelector('.viewport'));
+  });
 
-  var svg = document.getElementById('map');
-  var view = document.getElementById('viewport');
-  if (!svg || !view || svg.closest('.view-timeline')) return;
-
+  function panZoom(svg, view) {
+  if (!svg || !view) return;
   var tx = 0, ty = 0, scale = 1;
   var dragging = false, moved = false, lastX = 0, lastY = 0;
 
@@ -64,4 +63,5 @@
     scale = next;
     apply();
   }, { passive: false });
+  }
 })();

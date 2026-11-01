@@ -1,9 +1,9 @@
-Understanding core ideas is 80% of being a field expert.
+About 80% of being a field expert is understanding the core ideas.
 
-Use this to create fields, map breadth-first, and study depth-first.
+To do this, map them breadth-first then study depth-first.
 
-Write lots to pin ideas with words, with LLM feedback.
+Write in my own words to hone understanding, with LLM feedback.
 
-Expand the map, pin useful resources, make it your own.
+Explore grey areas, add topics and pin resources.
 
 Shape the environment to suit my learning.

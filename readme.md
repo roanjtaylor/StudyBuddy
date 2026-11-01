@@ -5,11 +5,11 @@ Study the core ideas of a field, not the infinite examples of them. A map of eac
 ## The workflow
 
 1. **Create a field** (`/fields`). Name it, say what you know and why you want it. The model researches it with web search and lays out the core ideas breadth first, in prerequisite order.
-2. **See the whole field** (`/computers`), or one group of it (`/computers/switches`). Three tabs: **Map** (groups as boxes in prerequisite order), **Timeline** (years along the x axis, a lane per group) and **Interact** (the map in the left half, a chat with the model in the right). A **Breadth / Depth** switch sets how far in you look: breadth is the groups, depth is every idea. It is in the URL (`?view=timeline&depth=depth`); a whole field opens at breadth, a group at depth. Your levels colour the ideas.
-3. **Interact** — the one channel to the model. Your words go with the map, where you are, your attempts and the recent conversation. The model answers in markdown *and* may change the map: add ideas, replace them (notes grow here), remove, regroup. What it changed is shown under its reply. Idea pages have their own ask box.
+2. **See the whole field** (`/computers`), or one group of it (`/computers/switches`). One page shows it all as a 2x2 grid: **Timeline** (years along the x axis, a lane per group) and **Map** (groups as boxes in prerequisite order) side by side on top at breadth, and the depth view (every idea, as a map and a timeline) merged across the bottom. Your levels colour the ideas.
+3. **Ask Claude** — the one channel to the model. The orange button bottom-right of every field page opens the dock: a chat with a "Looking at" chip for where you are (the field, a group or one idea). Your words go with the map, that focus, your attempts and the conversation so far. The reply streams in as it is written, and the model acts through tools, the way claude.ai does: it can change the map (add, update, remove, regroup; notes grow here) and it can **make things** — a flashcard deck, a scored quiz, a diagram (SVG or Mermaid), a document, a program, or an interactive HTML page. Each thing is an **artifact**: a card under the reply that opens on a stage beside the chat, and a page of its own (`/artifact/<id>`). What it did on the way (searched the web, added ideas) is listed above the reply; "web" turns search on, "think" sets the reasoning effort, Stop aborts. A changed map redraws the page.
 4. **Go deep** (`/computers/switches/ram`). Write your explanation cold, get right / missing / wrong, rate yourself by hand. Edit or remove the idea by hand if you prefer.
 
-URLs are a directory, shown as a path under the nav: `studybuddy / fields / computers / switches / ram`. Pages: `/`, `/fields`, `/:field`, `/:field/:group`, `/:field/:group/:idea`; `/:field?around=<idea>` shows one idea with what it builds on and leads to. Actions: ask, attempt, rate, edit-node, add-node, remove-node, about, seed.
+URLs are a directory, shown as a path under the nav: `studybuddy / fields / computers / switches / ram`. Pages: `/`, `/fields`, `/:field`, `/:field/:group`, `/:field/:group/:idea`; `/:field?around=<idea>` shows one idea with what it builds on and leads to; `/artifact/:id` is an artifact on its own page and `/artifact/:id/view` the thing itself (what the frames load). Actions: ask, attempt, rate, edit-node, add-node, remove-node, remove-artifact, about, seed.
 
 ## Layers
 
@@ -21,18 +21,18 @@ Built bottom-up, one small language per layer, each live-editable from the REPL:
 | L1 | `src/html.lisp` | the `html` macro: s-expressions in, escaped HTML out; `defcomponent`; `markdown->html` for the small subset the model writes |
 | L2 | `src/web.lisp` | `defpage`, `defaction`, `layout`, `redirect`; routes are a table so a re-evaluated form is live |
 | L3 | `src/store.lisp` | `defstore`: a list of plists in memory, mirrored to a file on every `put!` |
-| L4 | `src/llm.lisp` | `defprompt`, `ask`, `ask-structured`, `ask-with-search` — structured answers as plists, never prose |
-| L5 | `src/nodes.lisp`, `src/pages.lisp`, `src/actions.lisp` | Field, Node, Level, Attempt, Message; the pages; the `converse` prompt and `apply-changes!` |
+| L4 | `src/llm.lisp` | `defprompt`, `ask`, `ask-structured`, `ask-with-search` — structured answers as plists, never prose; `deftool` and `converse` — a streamed conversation in which the model calls the app's tools |
+| L5 | `src/nodes.lisp`, `src/pages.lisp`, `src/actions.lisp` | Field, Node, Level, Attempt, Message, Artifact; the pages and the artifact viewers; the `converse` prompt, the tools (`add_nodes` … `create_quiz`) and the streaming `ask` action |
+
+In the browser: `static/dock.js` runs the dock and the stage, `static/md.js` renders markdown while a reply streams (the same subset as `markdown->html`), `static/artifact.js` is the flashcard and quiz viewer.
 
 ## Data
 
-Lisp data in files you can read and edit by hand. `data/maps/<field>.lisp` is the map: one `(:map …)`, then `(:group …)` and `(:node …)` forms, one per line; nodes carry `:notes` for depth grown over time. The model's edits rewrite this file. Everything that is yours lives beside it, keyed by `"<field>/<node-id>"`: `levels.lisp`, `attempts.lisp` (append-only), `messages.lisp` (the conversation per field, append-only), `settings.lisp`. `data/about.md` is the home page. Back it all up by copying the folder.
-
-`data/library.json` and `data/cards.lisp` are the v1 export and its hunted sources; nothing reads them any more.
+Lisp data in files you can read and edit by hand. `data/maps/<field>.lisp` is the map: one `(:map …)`, then `(:group …)` and `(:node …)` forms, one per line; nodes carry `:notes` for depth grown over time. The model's edits rewrite this file. Everything that is yours lives beside it, keyed by `"<field>/<node-id>"`: `levels.lisp`, `attempts.lisp` (append-only), `messages.lisp` (the conversation per field, append-only), `settings.lisp`, and `artifacts.lisp` — what the model made (`:type` html, svg, mermaid, markdown, code, flashcards or quiz; `:content` the text, or the cards/questions as data), each optionally about one idea. `data/about.md` is the home page. Back it all up by copying the folder.
 
 ## Claude via the subscription relay
 
-The app never holds an API key. Every model call is a POST to the ClaudeSubscription relay (`../hf-space`, deployed on Hugging Face Spaces), which runs the Claude Agent SDK on the Claude Code subscription. Structured output is enforced by the engine (`outputFormat: json_schema`) and comes back in a `structured` SSE event. Set in the environment SBCL starts from:
+The app never holds an API key. Every model call is a POST to the ClaudeSubscription relay (`../hf-space`, deployed on Hugging Face Spaces), which runs the Claude Agent SDK on the Claude Code subscription. Checking an explanation and seeding a field use structured output, enforced by the engine (`outputFormat: json_schema`) and returned in a `structured` SSE event. The conversation uses the relay's streaming and caller-tool support instead: the app sends a tool manifest (`deftool`), the relay streams `delta` text and `tool_request` events, the app runs each tool and posts the answer to `/api/agent/tool-result`, and the run carries on. The relay needed no change for any of this. One Windows detail: dexador's WinHTTP backend reads a whole response before returning it, so `stream-post` in `llm.lisp` makes the WinHTTP calls itself, asking how much has arrived before each read, which is what makes the stream a stream. Set in the environment SBCL starts from:
 
 ```
 STUDYBUDDY_SERVER_URL=https://roanjtaylor-claudesubscription.hf.space   # default; or http://localhost:5174 when running hf-space locally

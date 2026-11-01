@@ -1,7 +1,8 @@
 (asdf:defsystem "studybuddy"
   :description "StudyBuddy: a map of each field's core ideas, with Claude inside it to answer, quiz and reshape the map as you learn."
   :author "Roan Taylor"
-  :depends-on ("hunchentoot" "dexador" "com.inuoe.jzon" "uiop")
+  :depends-on ("hunchentoot" "dexador" "com.inuoe.jzon" "flexi-streams" "quri" "uiop"
+               (:feature :windows "winhttp"))
   :serial t
   :pathname "src/"
   :components ((:file "package")

@@ -1,0 +1,124 @@
+/* ---- The Claude dock (the tastetrainer dock: warm wall, ink, one orange) ----------- */
+:root {
+  --tt-wall: #f4f1ea; --tt-wall-soft: #efe9dd; --tt-card: #faf8f3;
+  --tt-ink: #1f1c18; --tt-muted: #6c655b; --tt-line: #e0d8c8;
+  --tt-accent: #b0552f; --tt-claude: #d97757;
+  /* How far in from the window's right edge the content ends: the dock sits inside it. */
+  --gutter: max(1rem, calc((100vw - 72rem) / 2 + 1rem));
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tt-wall: #1b1916; --tt-wall-soft: #26231f; --tt-card: #201e1a;
+    --tt-ink: #ede8df; --tt-muted: #a39b8d; --tt-line: #38342d; --tt-accent: #e08a62;
+  }
+}
+body.field { --gutter: calc(200px + 1rem); }
+@media (max-width: 1100px) { body.field { --gutter: 1rem; } }
+
+.dock-launcher {
+  position: fixed; bottom: 1.25rem; right: var(--gutter); z-index: 55;
+  display: grid; place-items: center; width: 3.25rem; height: 3.25rem; padding: 0;
+  border: 0; border-radius: 50%; background: var(--tt-claude); color: #fff;
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,.2), 0 4px 6px -4px rgba(0,0,0,.2);
+  transition: transform .15s;
+}
+.dock-launcher:hover { transform: scale(1.05); border: 0; }
+.dock-launcher[hidden], .dock[hidden] { display: none; }
+.mark { width: .75rem; height: .75rem; }
+.mark.big { width: 1.5rem; height: 1.5rem; }
+
+.dock {
+  position: fixed; bottom: 1rem; right: var(--gutter); z-index: 55;
+  display: flex; flex-direction: column; width: 27rem; height: min(46rem, calc(100dvh - 5rem));
+  background: var(--tt-wall); color: var(--tt-ink); border: 1px solid var(--tt-line); border-radius: .75rem;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,.3);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+.dock.wide { width: min(60rem, calc(100vw - 2rem)); height: calc(100dvh - 5rem); }
+/* With an artifact open the dock splits: the chat keeps its width, the stage takes the rest. */
+.dock.staged { width: min(84rem, calc(100vw - 2rem)); height: calc(100dvh - 5rem); }
+.dock-body { flex: 1; min-height: 0; display: flex; }
+.dock-chat { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dock.staged .dock-chat { flex: 0 0 26rem; }
+.dock-stage { flex: 1; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid var(--tt-line); background: var(--tt-card); }
+.dock-stage[hidden] { display: none; }
+.dock-stage header { border-bottom: 1px solid var(--tt-line); }
+.stage-title { flex: 1; padding-left: .25rem; font-size: .8rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dock-stage a.dock-btn { display: grid; place-items: center; text-decoration: none; font-size: .9rem; }
+.stage-frame { flex: 1; width: 100%; border: 0; background: var(--bg); border-radius: 0 0 .75rem 0; }
+@media (max-width: 900px) {
+  .dock.staged .dock-body { flex-direction: column; }
+  .dock.staged .dock-chat { flex: 0 0 45%; }
+  .dock-stage { border-left: 0; border-top: 1px solid var(--tt-line); }
+}
+@media (max-width: 640px) {
+  .dock, .dock.wide, .dock.staged { left: .5rem; right: .5rem; bottom: .5rem; width: auto; }
+  #dock-wide { display: none; }
+}
+.dock button { font-size: inherit; background: none; border: 0; color: inherit; padding: 0; }
+.dock header { display: flex; align-items: center; gap: .375rem; padding: .5rem; border-bottom: 1px solid var(--tt-line); }
+.dock-badge { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--tt-claude); color: #fff; }
+.dock-title { flex: 1; font-size: .875rem; font-weight: 600; }
+.dock-btn { width: 1.75rem; height: 1.75rem; border-radius: 50%; color: var(--tt-muted); font-size: 1.1rem; line-height: 1; }
+.dock-btn:hover, .dock #dock-drop:hover { background: var(--tt-wall-soft); }
+
+.dock-log {
+  flex: 1; min-height: 0; overflow-y: auto; padding: .75rem; display: flex; flex-direction: column; gap: 1rem;
+  scrollbar-width: thin; scrollbar-color: var(--tt-line) transparent;
+}
+.dock-empty { margin: 1.5rem 0 0; text-align: center; color: var(--tt-muted); font-size: .875rem; }
+.dock-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: .375rem; }
+.dock .chip { border: 1px solid var(--tt-line); border-radius: 999px; background: var(--tt-wall); padding: .25rem .75rem; font-size: .75rem; }
+.dock .chip:hover { border-color: var(--tt-claude); }
+
+.msg { font-size: .875rem; }
+.msg p { margin: 0; }
+.msg-you { margin-left: 2rem; padding: .5rem .75rem; border-radius: .5rem; background: var(--tt-wall-soft); }
+.msg-you p { white-space: pre-wrap; }
+.msg-about { display: block; margin-top: .25rem; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--tt-muted); text-decoration: none; }
+.msg-buddy { padding: 0 .375rem; line-height: 1.6; }
+.msg-buddy .md > :first-child { margin-top: 0; }
+.msg-buddy .md > :last-child { margin-bottom: 0; }
+.msg-buddy .md p { margin: .375rem 0; }
+.msg-buddy .md a { color: var(--tt-accent); }
+.msg-buddy .md pre, .msg-buddy .md code { background: var(--tt-wall-soft); }
+.msg-buddy .md table { font-size: .8rem; }
+.msg .changes { margin: .375rem 0 0; font: 11px ui-monospace, Menlo, Consolas, monospace; color: var(--tt-muted); }
+/* What the model did on the way to its answer, one line each, as claude.ai lists them. */
+.msg .activity:empty { display: none; }
+.msg .did { margin: .125rem 0; font: 11px ui-monospace, Menlo, Consolas, monospace; color: var(--tt-muted); }
+.msg .did::before { content: "✓ "; color: var(--tt-claude); }
+.msg details.thinking { margin: 0 0 .5rem; font-size: .75rem; color: var(--tt-muted); }
+.msg details.thinking summary { cursor: pointer; }
+.msg .thinking-text { white-space: pre-wrap; margin-top: .25rem; padding-left: .5rem; border-left: 2px solid var(--tt-line); max-height: 12rem; overflow: auto; }
+.msg details.sources { margin-top: .375rem; font-size: 11px; color: var(--tt-muted); }
+.msg details.sources summary { cursor: pointer; }
+.msg details.sources ul { margin: .25rem 0; padding-left: 1rem; }
+.msg details.sources a { color: var(--tt-accent); }
+.msg-artifacts { display: flex; flex-direction: column; gap: .375rem; margin: .5rem 0 0; }
+.msg-artifacts[hidden] { display: none; }
+.msg-error { padding: .375rem .5rem; border: 1px solid #fecaca; border-radius: .25rem; background: #fef2f2; color: #991b1b; font-size: .75rem; }
+@media (prefers-color-scheme: dark) { .msg-error { background: #2a1513; border-color: #5c2420; color: #fca5a5; } }
+.dock-status { margin: 0; padding: 0 .25rem; font: 11px ui-monospace, Menlo, Consolas, monospace; color: var(--tt-muted); }
+.dock-status .spin { display: inline-block; width: .75rem; text-align: center; color: var(--tt-claude); }
+
+.dock-form { position: relative; padding: .625rem; border-top: 1px solid var(--tt-line); border-radius: 0 0 .75rem .75rem; background: var(--tt-card); }
+.dock-form.busy .dock-send { opacity: .4; pointer-events: none; }
+.dock-ctx { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; margin-bottom: .375rem; font-size: 11px; }
+.dock-ctx .quiet { color: var(--tt-muted); }
+.dock .pill { display: inline-flex; align-items: center; gap: .25rem; max-width: 18rem; padding: .125rem .25rem .125rem .5rem; border: 1px solid var(--tt-line); border-radius: 999px; background: var(--tt-wall); }
+.dock .pill-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dock .pill-gap { width: .25rem; }
+.dock #dock-drop { width: 1rem; height: 1rem; border-radius: 50%; line-height: 1; color: var(--tt-muted); }
+.dock-form textarea {
+  display: block; width: 100%; resize: none; padding: .5rem .75rem; font: inherit; font-size: .875rem; line-height: 1.5;
+  background: var(--tt-wall); color: var(--tt-ink); border: 1px solid var(--tt-line); border-radius: .5rem; outline: none;
+}
+.dock-form textarea:focus { border-color: var(--tt-claude); }
+.dock-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .375rem; }
+.dock-opts { display: flex; align-items: center; gap: .75rem; }
+.dock-row label.check { margin: 0; font-size: 11px; color: var(--tt-muted); }
+.dock-row select { font: inherit; font-size: 11px; color: var(--tt-ink); background: var(--tt-wall); border: 1px solid var(--tt-line); border-radius: .25rem; padding: .05rem .25rem; }
+.dock .dock-send { padding: .375rem 1rem; border-radius: .25rem; background: var(--tt-claude); color: #fff; font-size: .75rem; font-weight: 500; }
+.dock .dock-stop { background: var(--tt-muted); }
+.dock .dock-send[hidden] { display: none; }

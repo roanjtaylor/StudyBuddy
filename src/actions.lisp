@@ -86,74 +86,264 @@
                               (or (getf (getf (latest-attempt id) :feedback) :verdict) "no attempt"))))
                      (map-nodes)))))
 
-(defun conversation-context (&optional (limit 10))
-  (let* ((ms (remove "error" (map-messages) :key (lambda (m) (getf m :role)) :test #'equal))
-         (recent (last ms limit)))
-    (if recent
-        (str "Recent conversation, oldest first:" #\Newline
-             (join #\Newline
-                   (mapcar (lambda (m)
-                             (str (if (equal (getf m :role) "you") "Learner" "You")
-                                  (when (getf m :node) (str " (about " (getf m :node) ")")) ": "
+(defun artifacts-context ()
+  (let ((as (map-artifacts)))
+    (if as
+        (str "Artifacts already made in this field (id | type | title | about):" #\Newline
+             (join #\Newline (mapcar (lambda (a) (str "  " (getf a :id) " | " (getf a :type) " | " (getf a :title)
+                                                     " | " (or (getf a :node) "the field")))
+                                     as)))
+        "No artifacts made in this field yet.")))
+
+;; The conversation so far as proper turns for the model, newest last. A buddy turn
+;; carries, after its text, what it did (map changes, artifacts) so later turns can
+;; refer to them by id.
+(defun conversation-messages (&optional (limit 20))
+  (let ((ms (last (remove "error" (map-messages) :key (lambda (m) (getf m :role)) :test #'equal) limit)))
+    (mapcar (lambda (m)
+              (list :role (if (equal (getf m :role) "you") "user" "assistant")
+                    :content (str (when (and (getf m :node) (equal (getf m :role) "you"))
+                                    (str "(looking at " (getf m :node) ") "))
                                   (getf m :text)
-                                  (when (getf m :changes) (str #\Newline "  [map changed: " (getf m :changes) "]"))))
-                           recent)))
-        "No conversation yet.")))
+                                  (when (getf m :changes) (str #\Newline "[map changed: " (getf m :changes) "]"))
+                                  (when (getf m :artifacts)
+                                    (str #\Newline "[artifacts: " (join ", " (getf m :artifacts)) "]")))))
+            ms)))
 
 ;;; ---- Ask: the one channel --------------------------------------------------
+;;; The learner's words go to the model with the map and the focus; the reply streams
+;;; back; and the model acts on the map and makes artifacts through the tools below,
+;;; the way claude.ai does. *run* holds what one ask did so the reply can say so.
+
+(defvar *run* nil "Per-ask state: (:node :changes :artifacts :sources :emit).")
+
+;; Send one event to the browser (nil emit = a plain post, nothing to send to).
+(defun emit-event (name &rest kvs)
+  (let ((f (getf *run* :emit)))
+    (when f (funcall f name (apply #'obj kvs)))))
+
+(defun note-change! (text) (push text (getf *run* :changes)))
+
+(defun run-changes () (when (getf *run* :changes) (join ", " (reverse (getf *run* :changes)))))
+
+;;; -- Map tools --
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *node-patch-schema*
+    '(:object (:id :string "id of the idea to change")
+              (:title (:maybe :string))
+              (:compression (:maybe :string) "one sentence")
+              (:why (:maybe :string))
+              (:notes (:maybe :string) "deeper notes in markdown; replaces the old notes wholesale")
+              (:group (:maybe :string))
+              (:prereqs (:maybe (:array :string)))
+              (:era (:maybe :integer) "year; 0 if unknown"))))
+
+(deftool add-nodes
+  "Add new ideas to the map. Ids are lowercase slugs; group ids must exist or be added with add_groups first; prereqs are ids that exist or that you are adding in this call."
+  (:object (:nodes (:array #.*node-schema*)))
+  (input)
+  (let ((added '()) (skipped '()))
+    (dolist (n (getf input :nodes))
+      (if (add-node! n) (push (getf n :title) added) (push (getf* n :id "?") skipped)))
+    (dolist (title (reverse added)) (note-change! (str "+ " title)))
+    (emit-event "status" "text" (str "Added " (length added) " idea" (if (= 1 (length added)) "" "s")))
+    (str "Added " (length added) " ideas: " (join ", " (reverse added)) "."
+         (when skipped (str " Skipped (id blank or already in the map): " (join ", " skipped) "."))
+         " The map now has " (length (map-nodes)) " ideas.")))
+
+(deftool update-nodes
+  "Change existing ideas. Give the id and only the fields you are changing; the rest keep their current values. Use notes for depth the learner has earned: a longer explanation in markdown, the distinctions that matter, what to remember."
+  (:object (:nodes (:array #.*node-patch-schema*)))
+  (input)
+  (let ((done '()) (missing '()))
+    (dolist (p (getf input :nodes))
+      (let ((old (find-node (getf p :id))))
+        (if old
+            (let ((n (copy-list old)))
+              (loop for (k v) on p by #'cddr
+                    when (and v (not (eq k :id))) do (setf (getf n k) v))
+              (update-node! n)
+              (push (getf n :title) done))
+            (push (getf p :id) missing))))
+    (dolist (title (reverse done)) (note-change! (str "~ " title)))
+    (emit-event "status" "text" (str "Updated " (join ", " (reverse done))))
+    (str "Updated: " (join ", " (reverse done)) "."
+         (when missing (str " No idea with id: " (join ", " missing) ".")))))
+
+(deftool remove-nodes
+  "Remove ideas from the map by id. Other ideas' prerequisites on them are dropped too."
+  (:object (:ids (:array :string)))
+  (input)
+  (let ((done (remove nil (mapcar #'remove-node! (getf input :ids)))))
+    (dolist (id done) (note-change! (str "- " id)))
+    (emit-event "status" "text" (str "Removed " (join ", " done)))
+    (str "Removed: " (join ", " done) ".")))
+
+(deftool add-groups
+  "Add groups to the map, each a lowercase-slug id and a one-sentence compression."
+  (:object (:groups (:array (:object (:id :string) (:compression :string)))))
+  (input)
+  (let ((done (remove nil (mapcar #'add-group! (getf input :groups)))))
+    (dolist (id done) (note-change! (str "group " id)))
+    (str "Added groups: " (join ", " done) ".")))
+
+(deftool read-node
+  "Read one idea in full, including its notes and the learner's written attempts at it."
+  (:object (:id :string))
+  (input)
+  (let ((id (getf input :id)))
+    (if (find-node id)
+        (str (node-context id) #\Newline (attempts-context id))
+        (str "No idea with id " id "."))))
+
+;;; -- Artifact tools: what the model makes that is not prose --
+
+(deftool create-artifact
+  "Make something the learner opens beside the chat: a self-contained web page (html: a complete document; scripts from CDNs are fine; interactive explorations, simulations, visualisers, drills), a diagram (svg: a complete <svg> element with viewBox; or mermaid: a diagram definition), a document (markdown), or a program (code, with language). Returns the artifact's id. Mention the artifact in your reply by title; do not repeat its content there."
+  (:object (:type (:enum "html" "svg" "mermaid" "markdown" "code"))
+           (:title :string "short, specific; five words or fewer")
+           (:content :string "the whole thing")
+           (:language (:maybe :string) "for code: the language"))
+  (input)
+  (let ((a (add-artifact! :title (getf input :title) :type (getf input :type)
+                          :content (getf input :content) :language (getf input :language)
+                          :node (getf *run* :node))))
+    (push (getf a :id) (getf *run* :artifacts))
+    (emit-event "artifact" "html" (artifact-card a))
+    (str "Created artifact " (getf a :id) " (" (getf a :type) "): " (getf a :title))))
+
+(deftool update-artifact
+  "Replace an artifact's content (and optionally its title). Read it first with read_artifact if you do not have its current content."
+  (:object (:id :string) (:content :string "the whole new content") (:title (:maybe :string)))
+  (input)
+  (let ((a (update-artifact! (getf input :id) :content (getf input :content) :title (getf input :title))))
+    (cond (a (pushnew (getf a :id) (getf *run* :artifacts) :test #'equal)
+             (emit-event "artifact" "html" (artifact-card a))
+             (str "Updated artifact " (getf a :id) " to version " (getf a :version) "."))
+          (t (str "No artifact with id " (getf input :id) ".")))))
+
+(deftool read-artifact
+  "Read an artifact's current content by id."
+  (:object (:id :string))
+  (input)
+  (let ((a (find-artifact (getf input :id))))
+    (if a
+        (str "Artifact " (getf a :id) " (" (getf a :type) "): " (getf a :title) #\Newline
+             (artifact-text a))
+        (str "No artifact with id " (getf input :id) "."))))
+
+(deftool create-flashcards
+  "Make a deck of flashcards the learner drills beside the chat (flip, mark known, shuffle). Front is a question or cue, back the answer; both markdown, short. Give each card the id of the idea it tests when there is one."
+  (:object (:title :string)
+           (:cards (:array (:object (:front :string) (:back :string) (:node (:maybe :string) "idea id")))))
+  (input)
+  (let ((a (add-artifact! :title (getf input :title) :type "flashcards"
+                          :content (getf input :cards) :node (getf *run* :node))))
+    (push (getf a :id) (getf *run* :artifacts))
+    (emit-event "artifact" "html" (artifact-card a))
+    (str "Created flashcards " (getf a :id) " with " (length (getf input :cards)) " cards.")))
+
+(deftool create-quiz
+  "Make a multiple-choice quiz the learner takes beside the chat, scored at the end. Three to five options per question, one correct (answer is its 0-based index), and a one-sentence explanation of why."
+  (:object (:title :string)
+           (:questions (:array (:object (:question :string)
+                                        (:options (:array :string))
+                                        (:answer :integer "0-based index of the correct option")
+                                        (:explanation :string)
+                                        (:node (:maybe :string) "idea id")))))
+  (input)
+  (let ((a (add-artifact! :title (getf input :title) :type "quiz"
+                          :content (getf input :questions) :node (getf *run* :node))))
+    (push (getf a :id) (getf *run* :artifacts))
+    (emit-event "artifact" "html" (artifact-card a))
+    (str "Created quiz " (getf a :id) " with " (length (getf input :questions)) " questions.")))
+
+(defparameter *buddy-tools*
+  '(add-nodes update-nodes remove-nodes add-groups read-node
+    create-artifact update-artifact read-artifact create-flashcards create-quiz))
+
+;;; -- The prompt --
 
 (defprompt converse
   :system (str "You are the learner's study buddy, living inside their knowledge map of one field. "
                "The map is the shared object: groups of ideas; each idea has a one-sentence compression, why it matters, prerequisites, optional deeper notes, and the learner's self-rated level 0-3 with the verdict on their latest written explanation."
                #\Newline *rules* #\Newline
-               "The learner writes to you to learn and to reshape the map. Do both through the output fields:" #\Newline
-               "- reply: markdown, concise, no preamble, no sign-off. Teach mechanism over vocabulary. Quizzes, questions, comparisons, study plans and answers all go here. Refer to ideas by title. "
-               "When you changed the map, say what you changed in one line at the end." #\Newline
-               "- When the learner asks to change the map, change it: fill gaps, go deeper on one idea (breadth first: three to six sub-ideas one level down, each listing the parent among its prereqs), remove, merge, regroup, rename, or record what they have learned. "
-               "Use add-nodes, update-nodes, remove-node-ids and add-groups. Never describe a change you could make." #\Newline
-               "- update-nodes replaces a node wholesale, so copy every field you are not changing. Use notes for depth the learner has earned: a longer explanation, the distinctions that matter, what to remember. Keep compression one sentence." #\Newline
-               "- Ids are lowercase slugs. Group ids must exist in the map or in add-groups. Prereqs must be ids that exist or that you are adding. Era is a year, 0 if unknown." #\Newline
-               "- Never set the learner's level. If asked where they are weak, say so in the reply with reasons.")
-  :schema (:object (:reply :string "markdown for the learner")
-                   (:add-nodes (:array #.*node-schema*) "new ideas; empty when none")
-                   (:update-nodes (:array #.*node-schema*) "full replacements of existing ideas, same id; empty when none")
-                   (:remove-node-ids (:array :string) "ids to remove; empty when none")
-                   (:add-groups (:array (:object (:id :string) (:compression :string))) "new groups; empty when none")))
+               "The learner writes to you to learn, to reshape the map, and to have things made. You have tools for the last two; use them, do not describe what you could do." #\Newline
+               "Reply in markdown: concise, no preamble, no sign-off, mechanism over vocabulary. Headings, lists, tables and code fences all render. Refer to ideas by title. When you used a tool, say what you did in one line at the end." #\Newline
+               "Changing the map: when asked, fill gaps, go deeper on one idea (breadth first: three to six sub-ideas one level down, each listing the parent among its prereqs), remove, merge, regroup, rename, or record what they have learned in notes. "
+               "Ids are lowercase slugs. Group ids must exist in the map or be added with add_groups first. Prereqs must be ids that exist or that you are adding. Era is a year, 0 if unknown. Keep compression one sentence. Never set the learner's level; if asked where they are weak, say so with reasons." #\Newline
+               "Making things: when a flashcard deck, a quiz, a diagram, a document, a program, or anything interactive would teach better than prose, make it with create_flashcards, create_quiz or create_artifact, then refer to it by title in a short reply — never paste its content into the reply as well. "
+               "Diagrams: svg for anything spatial (an architecture, a data path, a timeline, a mechanism), mermaid for flows, sequences and state machines. "
+               "Interactive: html, a complete document, self-contained, with its own styles; it may load libraries from a CDN. Good for simulators, step-through visualisers, calculators, drills. "
+               "Quizzes from a chip or a quick 'quiz me' can stay in the reply as questions with answers under a heading at the end; a quiz to be scored is create_quiz. "
+               "To change an artifact, read it if you do not have its content, then update_artifact with the whole new content." #\Newline
+               "You may use web search when it is on; cite primary sources when you cite."))
 
-;; Apply what the model asked for → one-line summary, or NIL when nothing changed.
-(defun apply-changes! (r)
-  (let ((done '()))
-    (dolist (g (getf r :add-groups))
-      (when (add-group! g) (push (str "group " (getf g :id)) done)))
-    (dolist (n (getf r :add-nodes))
-      (when (add-node! n) (push (str "+ " (getf n :title)) done)))
-    (dolist (n (getf r :update-nodes))
-      (when (update-node! n) (push (str "~ " (getf n :title)) done)))
-    (dolist (id (getf r :remove-node-ids))
-      (when (remove-node! id) (push (str "- " id) done)))
-    (when done (join ", " (nreverse done)))))
+;; The learner's turn: the map and where they are, then their words.
+(defun ask-turn (text node group)
+  (str (map-context) #\Newline #\Newline
+       (artifacts-context) #\Newline #\Newline
+       (when group (str "The learner is looking at group: " group #\Newline #\Newline))
+       (when node (str (node-context node) #\Newline (attempts-context node) #\Newline #\Newline))
+       "Learner says:" #\Newline (trim text)))
+
+;; What the relay streams, turned into what the browser shows.
+(defun relay-event (name data)
+  (cond ((equal name "delta") (emit-event "delta" "text" (gethash "text" data)))
+        ((equal name "thinking") (emit-event "thinking" "text" (gethash "text" data)))
+        ((equal name "tool_call")
+         (let ((tool (gethash "name" data)) (input (gethash "input" data)))
+           (cond ((equal tool "WebSearch")
+                  (emit-event "status" "text" (str "Searched the web: " (and (hash-table-p input) (gethash "query" input)))))
+                 ((equal tool "WebFetch")
+                  (emit-event "status" "text" (str "Read " (and (hash-table-p input) (gethash "url" input))))))))
+        ((equal name "sources")
+         (setf (getf *run* :sources)
+               (mapcar (lambda (s) (list :url (gethash "url" s) :title (gethash "title" s)))
+                       (coerce (gethash "sources" data) 'list))))
+        ((equal name "warning") (emit-event "status" "text" (gethash "message" data)))))
+
+;; One ask, start to finish: store the learner's message, run the conversation with
+;; tools, store the reply. EMIT, when given, is where the live events go.
+(defun run-ask (text &key node group search effort emit)
+  (add-message! "you" (trim text) :node node)
+  (let ((*run* (list :node node :changes '() :artifacts '() :sources '() :emit emit)))
+    (handler-case
+        (let* ((reply (converse (append (conversation-messages)
+                                        (list (list :role "user" :content (ask-turn text node group))))
+                                :system (getf (prompt 'converse) :system)
+                                :tools *buddy-tools*
+                                :search search
+                                :effort (if (member effort '("low" "medium" "high") :test #'equal) effort *effort*)
+                                :on-event #'relay-event))
+               (changed (run-changes))
+               (m (add-message! "buddy" (strip-quotes (trim reply)) :node node :changes changed
+                                :artifacts (reverse (getf *run* :artifacts))
+                                :sources (getf *run* :sources))))
+          (emit-event "message" "html" (message-view m) "changed" (and changed t))
+          m)
+      (llm-error (e)
+        (let ((m (add-message! "error" (llm-error-message e) :node node)))
+          (emit-event "message" "html" (message-view m) "changed" (and (run-changes) t))
+          m)))))
 
 ;; `here` is the focus the learner asked from: "" (whole field), a group id, or an
-;; idea id. `view` is the tab to land back on.
-(defaction ask-buddy "/action/ask" (map-name here text search view)
+;; idea id. From the dock (`dock` set) the answer streams as server-sent events; a
+;; plain post waits and redirects back to `view`, the tab to land on.
+(defaction ask-buddy "/action/ask" (map-name here text search effort view dock)
   (unless (select-map map-name) (return-from ask-buddy (not-found "field")))
   (let* ((node (and (not (blankp here)) (find-node here) here))
-         (group (and (not (blankp here)) (not node) (find-group here) here)))
-    (unless (blankp text)
-      (add-message! "you" (trim text) :node node)
-      (handler-case
-          (let* ((context (str (map-context) #\Newline #\Newline
-                               (when group (str "The learner is looking at group: " group #\Newline #\Newline))
-                               (when node (str (node-context node) #\Newline (attempts-context node) #\Newline #\Newline))
-                               (conversation-context) #\Newline #\Newline
-                               "Learner says:" #\Newline (trim text)))
-                 (r (ask-structured 'converse context :search (not (blankp search)))))
-            (add-message! "buddy" (strip-quotes (getf r :reply)) :node node :changes (apply-changes! r)))
-        (llm-error (e)
-          (add-message! "error" (llm-error-message e) :node node))))
-    (redirect (str (focus-url here)
-                   (when (member view '("map" "timeline" "interact") :test #'equal)
-                     (str "?view=" view))))))
+         (group (and (not (blankp here)) (not node) (find-group here) here))
+         (search (not (blankp search))))
+    (cond ((blankp dock)
+           (unless (blankp text) (run-ask text :node node :group group :search search :effort effort))
+           (redirect (str (focus-url here)
+                          (when (member view *views* :test #'equal)
+                            (str "?view=" view)))))
+          ((blankp text) "")
+          (t (sse-response (lambda (emit)
+                             (run-ask text :node node :group group :search search :effort effort :emit emit)))))))
 
 ;;; ---- Write: check an explanation ---------------------------------------
 
@@ -214,6 +404,13 @@
   (let ((group (getf (find-node node-id) :group)))
     (remove-node! node-id)
     (redirect (if group (group-url group) (field-url)))))
+
+(defaction remove-artifact "/action/remove-artifact" (id)
+  (let ((a (find-artifact id)))
+    (remove-artifact! id)
+    (redirect (cond ((and a (getf a :node) (select-map (getf a :map))) (node-url (getf a :node)))
+                    (a (field-url (getf a :map)))
+                    (t "/fields")))))
 
 (defaction about "/action/about" (text)
   (set-about-text! (or text ""))
