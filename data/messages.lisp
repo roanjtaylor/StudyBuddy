@@ -138,3 +138,40 @@ Made one artifact: the SVG **D flip-flop: chip and innards**."
 
 If you want the timeline view instead (the thing you're working on), say so and I'll build a diagram with one bar per group across the years."
  :CHANGES NIL :ARTIFACTS NIL :SOURCES NIL)
+(:ID "2026-11-02T23:19:21#14" :MAP "lisp" :CHAT "chat-4002650361-4" :NODE NIL :ROLE "you" :AT
+ "2026-11-02T23:19:21" :TEXT
+ "Any further developments to recent times? I know Paul Graham used it in Viaweb, raves about it being the most powerful language, and am curious if it has been worked on since then."
+ :CHANGES NIL :ARTIFACTS NIL :SOURCES NIL)
+(:ID "2026-11-02T23:20:04#15" :MAP "lisp" :CHAT "chat-4002650361-4" :NODE NIL :ROLE "buddy" :AT
+ "2026-11-02T23:20:04" :TEXT
+ "The timeline currently stops around 1991 (the metaobject protocol). But Lisp kept moving — and the gap is real: nothing on the map after the CLOS era. Let me fill it, because the recent developments are genuinely important ideas, not trivia.
+
+What happened since:
+
+- **Scheme's hygienic macros got a rigorous answer** (`syntax-rules`, then `syntax-case`) — a pattern language that made hygiene practical, not just a 1986 promise.
+- **Clojure (2007)** is the biggest new dialect: Lisp on the JVM whose central idea is **persistent immutable data structures** and a disciplined story for state (atoms, refs, STM). It reframes \"mutation and identity\" around values that never change.
+- **Racket (1995→)** turned \"Lisp as a language laboratory\" into the whole point: `#lang`, languages as reusable modules, macro-defined syntax as the normal way to program.
+- **Paul Graham's own arc**: the Viaweb essays (\"Beating the Averages\", 2001) argued macros were his competitive edge, then he designed **Arc (2008)** as an attempt to re-minimise Common Lisp.
+
+I added these as dated nodes so the timeline runs to the present.Your timeline now runs to 2010 instead of stopping at 1991. The honest shape of it:
+
+| Era | What moved |
+|---|---|
+| 1998 | **syntax-rules pattern macros** — hygiene finally made writable |
+| 2001 | **Beating the Averages** (Graham's Viaweb argument) + **Persistent data structures** (the HAMT groundwork) |
+| 2007 | **Clojure** — the big new dialect |
+| 2008 | **Arc** — Graham's own re-minimisation |
+| 2010 | **Racket: languages as modules** — Lisp-as-lab taken all the way |
+
+Two things worth noticing on the shape of the field:
+
+1. **The core did not change.** Everything 1998→2010 lives in the *dialects*, *homoiconic-power*, and *mutation* groups — never in `symbolic-data` or `lambda-eval`. McCarthy's 1960 core is still the trunk; recent work is branches. That's the real answer to \"has it been worked on?\" — the activity is all in *how you build on the core*, not the core.
+
+2. **The live argument is synthesis vs. minimisation.** Common Lisp piled everything in; Clojure, Arc, and Racket each threw most of it out and kept one strong idea (immutability / terseness / language-making). Graham sits on the minimising side.
+
+Graham's primary sources, if you want them straight from him: *On Lisp* (1993, the macro bible), \"Beating the Averages\" (2001), and the Arc announcement (2008).
+
+Added six dated nodes spanning 1998–2010 across the dialects, homoiconic-power, and mutation groups."
+ :CHANGES
+ "+ syntax-rules pattern macros, + Beating the Averages, + Arc, + Persistent data structures, + Clojure, + Racket: languages as modules"
+ :ARTIFACTS NIL :SOURCES NIL)

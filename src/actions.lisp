@@ -400,6 +400,50 @@
                                                              "html" (chat-item c t))))
                                  (run c emit)))))))))
 
+;;; ---- Study: a throw-away conversation about one idea ---------------------------
+;;; Nothing here is stored. The browser keeps the conversation in memory and sends it back
+;;; with each question; the model has no tools, so it cannot touch the map either.
+
+(defprompt study
+  :system (str "You are a tutor helping a learner study one idea from a knowledge map. This is a scratch conversation: nothing is saved." #\Newline
+               *rules* #\Newline
+               "If the learner writes out their own understanding of the idea, mark it against the idea: what is right, what is missing (most important first), what is wrong, and a one-line verdict, as short lists. Judge only what is written; be honest, not kind. "
+               "Otherwise answer their question directly: mechanism first, concrete, as short as the question allows. Ask them a question back only when it would teach them something. "
+               "Reply in markdown, no preamble, no sign-off." #\Newline
+               "You may use web search when it is on; cite primary sources when you cite."))
+
+(defun study-messages (history-json)
+  (let ((h (handler-case (coerce (jzon:parse history-json) 'list) (error () nil))))
+    (loop for m in (last h 20)
+          for role = (and (hash-table-p m) (gethash "role" m))
+          for content = (and (hash-table-p m) (gethash "content" m))
+          when (and (member role '("user" "assistant") :test #'equal) (stringp content))
+            collect (list :role role :content content))))
+
+(defaction study "/action/study" (map-name here text history search effort)
+  (unless (select-map map-name) (return-from study (not-found "field")))
+  (let ((node (and (not (blankp here)) (find-node here) here)))
+    (cond ((or (blankp text) (null node)) "")
+          (t (sse-response
+              (lambda (emit)
+                (let ((*run* (list :emit emit)))
+                  (handler-case
+                      (let ((reply (strip-quotes
+                                    (trim (converse (append (study-messages history)
+                                                            (list (list :role "user"
+                                                                        :content (str "Field: " (map-title) #\Newline
+                                                                                      (node-context node) #\Newline #\Newline
+                                                                                      "Learner says:" #\Newline (trim text)))))
+                                                    :system (getf (prompt 'study) :system)
+                                                    :search (not (blankp search))
+                                                    :effort (if (member effort '("low" "medium" "high") :test #'equal) effort *effort*)
+                                                    :on-event #'relay-event)))))
+                        (funcall emit "message" (obj "html" (message-view (list :role "buddy" :text reply))
+                                                     "text" reply)))
+                    (llm-error (e)
+                      (funcall emit "message" (obj "html" (message-view (list :role "error" :text (llm-error-message e)))
+                                                   "text" "")))))))))))
+
 ;;; ---- Chats: the list beside the dock --------------------------------------
 
 ;; The chats at one place, as the dock's rail shows them.

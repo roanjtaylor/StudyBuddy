@@ -188,7 +188,7 @@
   (let ((node (find-node scope)))
     (html (:div :class "dock-empty"
             (:p :class "greeting"
-              (cond (node (str "Let's go deep on " (getf node :title) "."))
+              (cond (node (str "Explain " (getf node :title) " in your own words."))
                     ((equal scope "timeline") "Let's work on the timeline.")
                     ((equal scope "topics") "Let's shape the topics.")
                     (t (str "What are we working on in " (map-title) "?"))))
@@ -234,7 +234,9 @@
                   (:input :type "hidden" :name "chat" :value (or chat-id ""))
                   (:div :class "composer"
                     (:textarea :name "text" :rows 1 :spellcheck "false"
-                               :placeholder "Ask, ask for a change, or ask for cards, a quiz, a diagram, a page…")
+                               :placeholder (if (find-node focus)
+                                                "Explain it in your own words and I'll mark it — or ask anything about it…"
+                                                "Ask, ask for a change, or ask for cards, a quiz, a diagram, a page…"))
                     (:div :class "composer-row"
                       (:span :class "composer-tools"
                         (:span :class "pill" :title "What Claude is looking at"
@@ -422,7 +424,10 @@
                             (grid (+ 8 (* 30 rows)))
                             (dolist (it placed)
                               (destructuring-bind (n nx row) it
-                                (html (:a :href (node-url (getf n :id))
+                                (html (:a :href (node-url (getf n :id)) :class "tl-idea"
+                                        ;; An invisible target over the dot and its label, so the whole thing clicks.
+                                        (:rect :x (- nx 10) :y (+ 4 (* 30 row)) :width (+ 22 (* *label-px* (length (label n))))
+                                               :height 24 :class "hit")
                                         (:circle :cx nx :cy (+ 16 (* 30 row)) :r 6 :class "dot")
                                         (:title (getf n :era) " — " (getf n :title) " — " (getf n :compression))
                                         (:text :x (+ nx 12) :y (+ 22 (* 30 row)) :class "box-title"
@@ -440,26 +445,66 @@
            (claude-mark "mark"))
         (:div :class "dock-anchor")))
 
+;;; ---- The study pane: a compact, throw-away chat about the open idea -----------
+;;; Same look as the dock, none of its furniture (no rail, header or saved chats).
+;;; static/study.js keeps the conversation in memory; the server stores nothing.
+
+(defparameter *study-chips*
+  '(("Mark what I know" "Ask me to explain it, then mark my answer.")
+    ("Quiz me" "Quiz me on this idea: three questions, one at a time.")
+    ("Why does it matter?" "Why does this idea matter for the rest of the field? What breaks without it?")))
+
+(defcomponent study-pane (n)
+  (let ((id (getf n :id)))
+    (html (:section :class "dock inline study" :aria-label "Study"
+            (:div :class "dock-log study-log"
+              (:div :class "study-empty"
+                (:p :class "study-hint" "Explain it in your own words and press Enter: I'll mark it. Or ask anything. Nothing here is saved.")
+                (:div :class "dock-chips"
+                  (loop for (label text) in *study-chips*
+                        do (html (:button :type "button" :class "chip" :data-text text label))))))
+            (:form :class "dock-form study-form" :method "post" :action "/action/study"
+              (hidden "map-name" (map-id)) (hidden "here" id)
+              (:div :class "composer"
+                (:textarea :name "text" :rows 2 :spellcheck "false"
+                           :placeholder (str "Explain " (getf n :title) " in your own words, or ask about it…"))
+                (:div :class "composer-row"
+                  (:span :class "composer-tools"
+                    (:label :class "toggle" :title "Search the web"
+                      (:input :type "checkbox" :name "search" :value "1") (icon "globe") (:span "Web"))
+                    (:label :class "toggle select" :title "Extended thinking"
+                      (:span "Think")
+                      (:select :name "effort"
+                        (:option :value "" "off") (:option :value "low" "low")
+                        (:option :value "medium" "medium") (:option :value "high" "high"))))
+                  (:button :type "submit" :class "dock-send" :title "Send" :aria-label "Send" (icon "send"))
+                  (:button :type "button" :class "dock-send dock-stop" :hidden t
+                           :title "Stop" :aria-label "Stop" (icon "stop")))))))))
+
 (defcomponent field-view (nodes &optional idea)
   (let ((open (and idea (getf idea :group))))
     (html (if (null nodes)
               (html (:div :class "stage empty" (:p :class "quiet" "No ideas here yet.")))
-              (html (:div :class "stage grid"
-                      (:section :class "cell timeline" :aria-label "Timeline"
-                        (scope-button "timeline" "timeline")
-                        (timeline nodes *half-w* open))
-                      (:section :class "cell" :aria-label "Topics"
-                        (scope-button "topics" "topics")
-                        (breadth-map nodes *half-w* open)))))
+              (html (:div :class "section-wrap"
+                      (:div :class "section-label" (:span "Breadth-first"))
+                      (:div :class "stage grid"
+                        (:section :class "cell timeline" :aria-label "Timeline"
+                          (scope-button "timeline" "timeline")
+                          (timeline nodes *half-w* open))
+                        (:section :class "cell" :aria-label "Topics"
+                          (scope-button "topics" "topics")
+                          (breadth-map nodes *half-w* open))))))
           ;; Below: the open idea on the left; on the right, writing and the chat pinned to it.
-          (:section :id "idea" :class "idea-below"
+          (:section :id "idea" :class "idea-below section-wrap"
+            (:div :class "section-label" (:span "Depth-first"))
             (:div :class "idea-main"
               (if idea
                   (node-detail idea)
                   (html (:p :class "quiet" "Open an idea above to read it here."))))
-            (:aside :class "idea-side"
-              (:div :class "idea-write" (when idea (idea-write idea)))
-              (claude-dock (if idea (getf idea :id) "")))))))
+            ;; With an idea open: a throw-away study chat about it. Otherwise the field's own chat.
+            (:aside :class (str "idea-side" (if idea " has-idea" ""))
+              (:div :class "idea-study" (when idea (study-pane idea)))
+              (:div :class "idea-dock" (claude-dock (if idea (getf idea :id) ""))))))))
 
 (defcomponent map-warnings ()
   (let ((bad (check-map)))
@@ -542,33 +587,6 @@
           (:p :class "quiet small" (getf a :at))
           (:pre :class "wrote" (getf a :text))
           (feedback-view (getf a :feedback)))))
-
-(defcomponent write-box (id)
-  (html (:form :method "post" :action "/action/attempt" :class "write ask-form"
-          (hidden "map-name" (map-id)) (hidden "node-id" id)
-          (:textarea :name "text" :rows 8 :required t :spellcheck "false"
-                     :placeholder "Explain it cold, in your own words, as if teaching it.")
-          (:div :class "ask-row"
-            (:span :class "quiet small" "The model names what is right, missing and wrong.")
-            (:button :type "submit" :class "primary" "Check my explanation")))))
-
-(defcomponent edit-node-form (n)
-  (html (:details :class "edit"
-          (:summary "Edit by hand")
-          (:form :method "post" :action "/action/edit-node" :class "ask-form"
-            (hidden "map-name" (map-id)) (hidden "node-id" (getf n :id))
-            (:label "Title" (:input :type "text" :name "title" :value (getf n :title) :required t))
-            (:label "Compression" (:textarea :name "compression" :rows 2 (getf n :compression)))
-            (:label "Why it matters" (:textarea :name "why" :rows 2 (getf n :why)))
-            (:label "Notes (markdown)" (:textarea :name "notes" :rows 8 (getf n :notes)))
-            (:label "Group" (:input :type "text" :name "group" :value (getf n :group)))
-            (:label "Builds on (ids, comma separated)" (:input :type "text" :name "prereqs" :value (join ", " (getf n :prereqs))))
-            (:label "Era (year)" (:input :type "text" :name "era" :value (getf n :era)))
-            (:div :class "ask-row"
-              (:button :type "submit" :class "primary" "Save")))
-          (:form :method "post" :action "/action/remove-node" :class "inline"
-            (hidden "map-name" (map-id)) (hidden "node-id" (getf n :id))
-            (:button :type "submit" :class "danger" "Remove this idea from the map")))))
 
 ;;; ---- An artifact on its own page, and the thing itself for the frame --------
 
@@ -669,16 +687,7 @@
                            (when as
                              (html (:h2 "Made for this idea")
                                    (:div :class "artifact-list" (dolist (a as) (artifact-card a))))))
-                         (edit-node-form n))))))
-
-(defcomponent idea-write (n)
-  (let ((id (getf n :id)))
-    (html (:h2 "Explain it")
-          (write-box id)
-          (let ((as (node-attempts id)))
-            (when as
-              (html (:h2 "Attempts" (:span :class "quiet small" " (" (length as) ")"))
-                    (dolist (a as) (attempt-view a))))))))
+                         )))))
 
 (defpage node-page "/:name/:group/:id" (name group id)
   (unless (select-map name) (return-from node-page (not-found "field")))

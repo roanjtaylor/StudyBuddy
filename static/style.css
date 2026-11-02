@@ -257,3 +257,34 @@ svg .bar-title { font-family: ui-monospace, Menlo, Consolas, monospace; font-siz
 }
 .scope-claude:hover { border: 0; filter: brightness(1.08); }
 .scope-claude .mark { width: 1rem; height: 1rem; }
+
+/* Section banners: a blue, Pokemon-menu style plate overlaid at the top middle of each section. */
+.section-wrap { position: relative; padding-top: 3.4rem; }
+.section-label { position: absolute; top: .55rem; left: 0; right: 0; z-index: 6; display: flex; justify-content: center; pointer-events: none; }
+.section-label span {
+  font: 700 .95rem ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase;
+  color: #fff; text-shadow: 1px 1px 0 #1b2f6b;
+  padding: .3rem 1.6rem; border-radius: 10px;
+  background: linear-gradient(#4f86e8, #2a56b8);
+  border: 3px solid #fff; outline: 3px solid #1b2f6b; outline-offset: 0;
+  box-shadow: 0 2px 0 3px #14234f;
+}
+.idea-below.section-wrap { padding-top: 4.2rem; }
+
+/* Timeline ideas: the dot, its label and the space around them all click. */
+svg .hit { fill: transparent; }
+.tl-group svg .box-title { pointer-events: auto; cursor: pointer; }
+.tl-group svg a.tl-idea { cursor: pointer; }
+.tl-group svg a.tl-idea:hover .box-title { text-decoration: underline; }
+
+/* The study chat: the dock's look, compact, with no furniture. */
+.idea-side.has-idea .idea-dock { display: none; }
+.dock.inline.study { height: auto; }
+.study .study-log { flex: 0 1 auto; max-height: min(28rem, 60dvh); padding: .6rem .75rem .2rem; gap: .7rem; }
+.study .study-log:has(.study-empty:only-child) { overflow: visible; }
+.study-empty { padding: 0; text-align: left; }
+.study-hint { margin: 0 0 .5rem; font-size: .8rem; color: var(--cl-muted); }
+.study .dock-chips { justify-content: flex-start; gap: .3rem; }
+.study .dock-form { padding: .3rem .5rem .5rem; }
+.study .composer { padding: .45rem .45rem .35rem .75rem; border-radius: .9rem; }
+.study .composer textarea { margin-bottom: .3rem; }

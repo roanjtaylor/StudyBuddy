@@ -53,6 +53,7 @@
   }
   launcher.addEventListener('click', function () { show(true); });
   document.getElementById('dock-close').addEventListener('click', function () { if (inline) goHome(); else show(false); });
+
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
     if (inline) { if (dock.classList.contains('popover')) goHome(); }
@@ -200,6 +201,9 @@
     show(true);
     openArtifact(card.dataset.artifact, card.dataset.type, card.dataset.title);
   });
+
+  // Another idea was opened in place: the chat follows it.
+  document.addEventListener('idea-swapped', function () { if (!dock.classList.contains('popover')) loadScope(); });
 
   // ---- Where the dock is: built in under the open idea, or hung from a section's corner ----
   // Each place has its own chats, so moving the dock reloads the rail.

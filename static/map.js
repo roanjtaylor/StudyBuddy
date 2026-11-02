@@ -27,13 +27,16 @@
         var doc = new DOMParser().parseFromString(text, 'text/html');
         if (!doc.getElementById('idea')) { location.href = url; return; }
         // Swap the idea and the writing box; the chat on the right stays as it is.
-        ['.idea-main', '.idea-write'].forEach(function (sel) {
+        ['.idea-main', '.idea-study'].forEach(function (sel) {
           var mine = document.querySelector(sel), theirs = doc.querySelector(sel);
           if (!mine || !theirs) return;
           var fresh = document.importNode(theirs, true);
           mine.replaceWith(fresh);
           wireForms(fresh);
         });
+        // With an idea open the study chat shows; with none, the field's own chat does.
+        var side = document.querySelector('.idea-side'), newSide = doc.querySelector('.idea-side');
+        if (side && newSide) side.classList.toggle('has-idea', newSide.classList.contains('has-idea'));
         var node = document.getElementById('idea');
 
         // Open the groups the new idea sits in; leave the ones the learner opened.
@@ -57,6 +60,7 @@
           }
         }
 
+        document.dispatchEvent(new Event('idea-swapped'));
         if (push) history.pushState(null, '', url);
         // Bring the detail into view only if it is down below the fold.
         var top = node.getBoundingClientRect().top;
