@@ -6,16 +6,12 @@
 
 ;;; ---- Small components --------------------------------------------------
 
-(defcomponent level-badge (id)
-  (let ((n (node-level id)))
-    (html (:span :class (str "lvl lvl-" n) :title (str "level " n) (level-name n)))))
-
 (defcomponent node-link (id)
   (let ((n (find-node id)))
-    (html (:a :class "nodelink" :href (node-url id) (if n (getf n :title) id)) " " (level-badge id))))
+    (html (:a :class "nodelink" :href (node-url id) (if n (getf n :title) id)))))
 
 (defcomponent group-tag (group-id)
-  (html (:a :class "tag" :href (group-url group-id) group-id)))
+  (html (:span :class "tag" group-id)))
 
 (defcomponent string-list (items &key (class "plain"))
   (when items
@@ -34,9 +30,18 @@
 ;;; the model is told what you are looking at; static/dock.js does the rest.
 
 (defparameter *field-chips*
-  '(("What am I weakest on?" "Looking at my levels and attempts, which ideas in this field am I weakest on, and what should I do next?")
+  '(("What am I weakest on?" "Looking at my attempts, which ideas in this field am I weakest on, and what should I do next?")
     ("Fill the gaps" "What core ideas is this map missing? Add them, breadth first.")
     ("Quiz me" "Quiz me across this field: five questions, answers hidden at the end.")))
+
+(defparameter *timeline-chips*
+  '(("Date the undated" "Give every idea without a date a sensible era, using your tools.")
+    ("Fill time gaps" "Where does this timeline have long gaps with no ideas? Add the core ideas that belong there, breadth first.")))
+
+(defparameter *topic-chips*
+  '(("Fill the gaps" "What core ideas is this map missing? Add them, breadth first.")
+    ("Regroup" "Is anything in the wrong group, or are the groups badly chosen? Fix it with your tools.")
+    ("Tighten" "Merge or remove ideas that are examples, remixes or padding rather than core ideas.")))
 
 (defparameter *node-chips*
   '(("Explain it to me" "Explain this idea to me from first principles, mechanism first. Then record the explanation in its notes.")
@@ -55,7 +60,9 @@
 
 ;; The "Looking at" chip: the field, a group of it, or one idea.
 (defun focus-label (focus)
-  (cond ((find-group focus) (str (map-title) " / " focus))
+  (cond ((equal focus "timeline") (str (map-title) " / timeline"))
+        ((equal focus "topics") (str (map-title) " / topics"))
+        ((find-group focus) (str (map-title) " / " focus))
         ((find-node focus) (node-title focus))
         (t (map-title))))
 
@@ -134,13 +141,13 @@
               (dolist (m ms) (message-view m))
               (html (:p :class "dock-empty" "Ask anything about this field, or tell me how to change the map.")
                     (:div :class "dock-chips"
-                      (loop for (label text) in (if (find-node focus) *node-chips* *field-chips*)
+                      (loop for (label text) in (cond ((find-node focus) *node-chips*) ((equal focus "timeline") *timeline-chips*) ((equal focus "topics") *topic-chips*) (t *field-chips*))
                             do (html (:button :type "button" :class "chip" :data-text text label)))))))))
 
 (defcomponent claude-dock (focus)
-  (html (:button :type "button" :id "dock-open" :class "dock-launcher"
+  (html (:button :type "button" :id "dock-open" :class "dock-launcher" :hidden t
                  :aria-label "Ask Claude" :title "Ask Claude" (claude-mark "mark big"))
-        (:section :id "dock" :class "dock" :aria-label "Claude" :hidden t
+        (:section :id "dock" :class "dock inline" :aria-label "Claude"
           (:header
             (:span :class "dock-badge" (claude-mark "mark"))
             (:span :class "dock-title" "Claude")
@@ -156,10 +163,7 @@
                 (:div :class "dock-ctx"
                   (:span :class "quiet" "Looking at")
                   (:span :class "pill"
-                    (:span :class "pill-text" (focus-label focus))
-                    (if (blankp focus)
-                        (html (:span :class "pill-gap"))
-                        (html (:button :type "button" :id "dock-drop" :aria-label "Leave this out" "×")))))
+                    (:span :class "pill-text" (focus-label focus))))
                 (:textarea :name "text" :rows 2 :spellcheck "false"
                            :placeholder "Ask, ask for a change, or ask for cards, a quiz, a diagram, a page…")
                 (:div :class "dock-row"
@@ -183,13 +187,16 @@
 ;;; ---- Views of a field -----------------------------------------------------
 ;;; One page shows it all: breadth (the groups) as a timeline and a map side by side,
 ;;; and depth (every idea) underneath.
+;;;
+;;; Every view is a sheet of paper: a fixed width, text at its natural size, and as tall
+;;; as it needs to be. Nothing pans or zooms; what does not fit the width wraps onto the
+;;; next row, and the page scrolls. The sheet shrinks to fit a window narrower than it.
 
 (defparameter *views* '("map" "timeline"))  ; actions.lisp still checks a ?view= on redirect
 
-(defparameter *col-w* 310)
-(defparameter *row-h* 92)
-(defparameter *box-w* 280)
-(defparameter *box-h* 72)
+(defparameter *paper-w* 1480 "Width of the depth sheet (the bottom, full-width cell).")
+(defparameter *half-w* 740 "Width of a breadth sheet (one of the two top cells).")
+(defparameter *margin* 20)
 
 (defun nodes-in-group (nodes group-id)
   (stable-sort (remove group-id nodes :key (lambda (n) (getf n :group)) :test-not #'equal)
@@ -209,61 +216,26 @@
                 (list (truncate-string (join " " (nthcdr (1- max-lines) lines)) width)))
         lines)))
 
-;; The svg every picture is drawn in; map.js pans and zooms it.
-;; :pan t makes it a map (map.js pans and zooms it); otherwise it scrolls like a page.
-(defmacro with-canvas ((w h &key pan) &body body)
-  `(html (:div :class (str "map-wrap" (when ,pan " pan"))
+;; Characters that fit in PX, at PER-CHAR pixels each (8 for 16px body text).
+(defun chars-at (px &optional (per-char 8)) (max 4 (floor px per-char)))
+
+;; Lines of text starting at X Y, LEAD apart. Used inside a :text element.
+(defun text-lines (x y lines lead)
+  (declare (ignore y))
+  (loop for line in lines for i from 0
+        do (html (:tspan :x x :dy (if (= i 0) 0 lead) line))))
+
+;; The svg every sheet is drawn in: W wide at 1:1, H tall, scaled down only to fit a
+;; narrower window (style.css: max-width 100%).
+(defmacro with-canvas ((w h) &body body)
+  `(html (:div :class "map-wrap"
            (:svg :class "map" :xmlns "http://www.w3.org/2000/svg"
-                 :viewBox (str "0 0 " ,w " " ,h) :width "100%"
-             (:g :class "viewport" ,@body)))))
+                 :viewBox (str "0 0 " ,w " " ,h) :width ,w :height ,h
+             ,@body))))
 
-;;; -- Depth map: every idea, a column per group, prerequisites as lines --------
-
-;; → hash id → (x y), total width, total height. Rows are prerequisite depth in the group.
-(defun map-positions (nodes groups)
-  (let ((pos (make-hash-table :test #'equal)) (col 0) (maxrows 0))
-    (dolist (g groups)
-      (let ((gn (nodes-in-group nodes (getf g :id))))
-        (loop for n in gn for row from 0
-              do (setf (gethash (getf n :id) pos)
-                       (list (+ 20 (* col *col-w*)) (+ 88 (* row *row-h*)))))
-        (setf maxrows (max maxrows (length gn))))
-      (incf col))
-    (values pos (+ 40 (* col *col-w*)) (+ 108 (* maxrows *row-h*)))))
-
-(defcomponent depth-map (nodes)
-  (let ((groups (visible-groups nodes)))
-    (multiple-value-bind (pos w h) (map-positions nodes groups)
-      (with-canvas (w h :pan t)
-        (loop for g in groups for col from 0
-              do (let ((x (+ 20 (* col *col-w*))))
-                   (html (:a :href (group-url (getf g :id))
-                           (:text :x x :y 34 :class "group-title" (getf g :id)))
-                         (:text :x x :y 58 :class "group-comp"
-                                (truncate-string (getf* g :compression "") 36)))))
-        (dolist (n nodes)
-          (let ((to (gethash (getf n :id) pos)))
-            (dolist (p (getf n :prereqs))
-              (let ((from (gethash p pos)))
-                (when (and from to)
-                  (html (:line :class "edge"
-                               :x1 (+ (first from) (/ *box-w* 2)) :y1 (+ (second from) *box-h*)
-                               :x2 (+ (first to) (/ *box-w* 2)) :y2 (second to))))))))
-        (dolist (n nodes)
-          (let* ((id (getf n :id)) (p (gethash id pos)) (x (first p)) (y (second p)))
-            (html (:a :href (node-url id)
-                    (:rect :x x :y y :width *box-w* :height *box-h* :rx 6
-                           :class (str "box lvl-" (node-level id)))
-                    (:title (getf n :title) " — " (getf n :compression))
-                    (:text :x (+ x 12) :y (+ y 28) :class "box-title"
-                      (loop for line in (wrap-words (getf n :title) 27) for i from 0
-                            do (html (:tspan :x (+ x 12) :dy (if (= i 0) 0 21) line))))))))))))
-
-;;; -- Breadth map: one box per group, left to right in prerequisite order -------
-
-(defparameter *gbox-w* 340)
-(defparameter *gbox-h* 170)
-(defparameter *gap* 50)
+;;; -- Breadth map: the groups as an outline -----------------------------------------
+;;; Each group is a title with its one-line compression underneath; opening it lists its
+;;; ideas in prerequisite order, like a folder in a file tree.
 
 ;; The groups a group's ideas build on, other than itself.
 (defun group-prereqs (nodes group-id)
@@ -277,57 +249,35 @@
            :test #'equal)
           :test #'equal))
 
-;; Column of a group: 0 with nothing before it, else one past its latest prerequisite group.
+;; Layer of a group: 0 with nothing before it, else one past its latest prerequisite group.
 (defun group-layer (nodes group-id &optional seen)
   (let ((ps (remove-if (lambda (g) (member g seen :test #'equal)) (group-prereqs nodes group-id))))
     (if ps
         (1+ (reduce #'max (mapcar (lambda (g) (group-layer nodes g (cons group-id seen))) ps)))
         0)))
 
-;; Prerequisites run left to right.
-(defcomponent breadth-map (nodes)
-  (let* ((groups (visible-groups nodes))
-         (pos (make-hash-table :test #'equal))
-         (fill (make-hash-table)) (layers 0) (rows 0)
-         (bw *gbox-w*) (bh *gbox-h*))
-    (dolist (g groups)
-      (let* ((layer (group-layer nodes (getf g :id))) (row (gethash layer fill 0)))
-        (setf (gethash (getf g :id) pos) (list layer row)
-              (gethash layer fill) (1+ row)
-              layers (max layers (1+ layer))
-              rows (max rows (1+ row)))))
-    (flet ((px (g) (destructuring-bind (layer row) (gethash (getf g :id) pos)
-                     (+ 20 (* layer (+ bw *gap*)))))
-           (py (g) (destructuring-bind (layer row) (gethash (getf g :id) pos)
-                     (+ 20 (* row (+ bh *gap*))))))
-      (with-canvas ((+ 40 (* layers (+ bw *gap*)))
-                    (+ 40 (* rows (+ bh *gap*)))
-                    :pan t)
-        (dolist (g groups)
-          (dolist (p (group-prereqs nodes (getf g :id)))
-            (let ((from (find p groups :key (lambda (x) (getf x :id)) :test #'equal)))
-              (when from
-                (html (:line :class "edge"
-                             :x1 (+ (px from) bw) :y1 (+ (py from) (/ bh 2))
-                             :x2 (px g) :y2 (+ (py g) (/ bh 2))))))))
-        (dolist (g groups)
-          (let* ((id (getf g :id)) (x (px g)) (y (py g))
-                 (mine (nodes-in-group nodes id))
-                 (done (count-if (lambda (n) (>= (node-level (getf n :id)) 2)) mine)))
-            (html (:a :href (group-url id)
-                    (:rect :x x :y y :width bw :height bh :rx 8 :class "box group-box")
-                    (:text :x (+ x 16) :y (+ y 34) :class "group-title gb-text" id)
-                    (:text :x (+ x 16) :y (+ y 62) :class "box-title gb-text"
-                      (loop for line in (wrap-words (getf* g :compression "") 34 3) for i from 0
-                            do (html (:tspan :x (+ x 16) :dy (if (= i 0) 0 21) line))))
-                    (:text :x (+ x 16) :y (+ y bh -14) :class "group-comp gb-meta"
-                           (length mine) " ideas · " done " explained")))))))))
+(defcomponent breadth-map (nodes &optional (w *half-w*) open)
+  (declare (ignore w))
+  (let ((groups (stable-sort (copy-list (visible-groups nodes)) #'<
+                             :key (lambda (g) (group-layer nodes (getf g :id))))))
+    (html (:div :class "outline"
+            (dolist (g groups)
+              (let* ((id (getf g :id))
+                     (mine (nodes-in-group nodes id)))
+                (html (:details :class "outline-group" :open (equal id open)
+                        (:summary
+                          (:span :class "outline-title" id)
+                          (:span :class "outline-sub" " — " (getf* g :compression "")))
+                        (:ul
+                          (dolist (n mine)
+                            (html (:li (:a :href (node-url (getf n :id)) :title (getf n :compression)
+                                        (getf n :title))))))))))))))
 
 ;;; -- Timeline: years along the x axis, a lane per group -----------------------
 
-(defparameter *tl-left* 190)
-(defparameter *tl-right* 870)
+(defparameter *tl-left* 40 "Where the years start; room for the expand arrow.")
 (defparameter *tl-top* 52)
+(defparameter *label-px* 9 "Width of one character of a dot's label.")
 
 ;; A tick every 10 years, or wider when the span is long.
 (defun tick-step (span) (cond ((<= span 150) 10) ((<= span 600) 50) (t 500)))
@@ -346,77 +296,96 @@
         (push (list it x row) placed)))
     (values (nreverse placed) (max 1 (length ends)))))
 
-(defcomponent timeline (nodes depth)
+;; One shared year axis across the full width. Each group is a bar from its first to its
+;; last idea, named inside; clicking it opens the group's ideas as dots on the same axis.
+(defcomponent timeline (nodes &optional (w *paper-w*) open)
   (let* ((dated (remove-if-not (lambda (n) (getf n :era)) nodes))
          (groups (remove-if-not (lambda (g) (some (lambda (n) (equal (getf n :group) (getf g :id))) dated))
                                 (visible-groups nodes)))
-         (eras (mapcar (lambda (n) (getf n :era)) dated)))
+         (eras (mapcar (lambda (n) (getf n :era)) dated))
+         ;; Room on the right for the last labels.
+         (right (- w 30 (min 240 (floor w 4)))))
     (if (null dated)
         (html (:p :class "quiet" "No ideas here have a date yet."))
         (let* ((step (tick-step (- (reduce #'max eras) (reduce #'min eras))))
                (lo (* step (floor (reduce #'min eras) step)))
-               (hi (let ((h (* step (ceiling (reduce #'max eras) step)))) (if (= h lo) (+ lo step) h)))
-               (deep (equal depth "depth"))
-               (lanes '()) (y *tl-top*))
-          (flet ((x (year) (round (+ *tl-left* (* (- *tl-right* *tl-left*) (/ (- year lo) (- hi lo)))))))
-            ;; Lane = (group nodes-by-year placed-items height top).
-            (dolist (g groups)
-              (let ((gn (stable-sort (remove (getf g :id) dated :key (lambda (n) (getf n :group)) :test-not #'equal)
-                                     #'< :key (lambda (n) (getf n :era)))))
-                (multiple-value-bind (placed rows)
-                    (if deep
-                        (pack-rows gn (lambda (n) (x (getf n :era)))
-                                   (lambda (n) (+ 20 (* 9 (length (getf n :title))))))
-                        (values nil 0))
-                  (let ((height (if deep (+ 16 (* 30 rows)) 78)))
-                    (push (list g gn placed height y) lanes)
-                    (incf y height)))))
-            (setf lanes (nreverse lanes))
+               (hi (let ((h (* step (ceiling (reduce #'max eras) step)))) (if (= h lo) (+ lo step) h))))
+          (labels ((x (year) (round (+ *tl-left* (* (- right *tl-left*) (/ (- year lo) (- hi lo))))))
+                   (label (n) (truncate-string (getf n :title)
+                                               (max 6 (floor (- w (x (getf n :era)) 24) *label-px*))))
+                   (label-w (n) (+ 20 (* *label-px* (length (label n)))))
+                   (grid (h)
+                     (loop for year from lo to hi by step
+                           do (html (:line :class "gridline" :x1 (x year) :y1 0 :x2 (x year) :y2 h)))))
             (html
-              (with-canvas (900 (+ y 16))
-                (loop for year from lo to hi by step
-                      do (html (:line :class "gridline" :x1 (x year) :y1 (- *tl-top* 10) :x2 (x year) :y2 y)
-                               (:text :x (x year) :y (- *tl-top* 20) :class "tick" :text-anchor "middle" year)))
-                (dolist (lane lanes)
-                  (destructuring-bind (g gn placed height ly) lane
-                    (declare (ignore height))
-                    (html (:line :class "lane" :x1 20 :y1 ly :x2 *tl-right* :y2 ly)
-                          (:a :href (group-url (getf g :id))
-                            (:text :x 14 :y (+ ly 26) :class "group-title" (getf g :id)))
-                          (if deep
-                              (dolist (it placed)
-                                (destructuring-bind (n nx row) it
-                                  (html (:a :href (node-url (getf n :id))
-                                          (:circle :cx nx :cy (+ ly 20 (* 30 row)) :r 6
-                                                   :class (str "dot lvl-" (node-level (getf n :id))))
-                                          (:title (getf n :era) " — " (getf n :compression))
-                                          (:text :x (+ nx 12) :y (+ ly 26 (* 30 row)) :class "box-title"
-                                                 (getf n :title))))))
-                              (let* ((first-year (getf (first gn) :era))
-                                     (last-year (getf (car (last gn)) :era))
-                                     (a (x first-year)) (b (max (x last-year) (+ a 8))))
-                                (html (:a :href (group-url (getf g :id))
-                                        (:rect :x a :y (+ ly 12) :width (- b a) :height 18 :rx 4 :class "span")
-                                        (:title (getf* g :compression ""))
-                                        (:text :x a :y (+ ly 56) :class "group-comp"
-                                               first-year "–" last-year " · "
-                                               (truncate-string (getf* g :compression "") 52)))))))))))
+              (:div :class "tl"
+                (with-canvas (w 30)
+                  (loop for year from lo to hi by step
+                        do (html (:line :class "gridline" :x1 (x year) :y1 22 :x2 (x year) :y2 30)
+                                 (:text :x (x year) :y 16 :class "tick" :text-anchor "middle" year))))
+                (dolist (g groups)
+                  (let* ((id (getf g :id))
+                         (gn (stable-sort (remove id dated :key (lambda (n) (getf n :group)) :test-not #'equal)
+                                          #'< :key (lambda (n) (getf n :era))))
+                         (a (x (getf (first gn) :era)))
+                         (b (max (x (getf (car (last gn)) :era)) (+ a 8)))
+                         (name-w (* 9 (length id)))
+                         (flip (> (+ a 28 name-w) (- w 10))))
+                    (multiple-value-bind (placed rows) (pack-rows gn (lambda (n) (x (getf n :era))) #'label-w)
+                      (html
+                        (:details :class "tl-group" :open (equal id open)
+                          (:summary
+                            (with-canvas (w 34)
+                              (grid 34)
+                              (:text :x 8 :y 22 :class "chev chev-closed" "▸")
+                              (:text :x 8 :y 22 :class "chev chev-open" "▾")
+                              (:rect :x a :y 5 :width (- b a) :height 24 :rx 4 :class "span")
+                              (:title (getf* g :compression ""))
+                              (if flip
+                                  (html (:text :x (- b 8) :y 22 :class "bar-title" :text-anchor "end" id))
+                                  (html (:text :x (+ a 8) :y 22 :class "bar-title" id)))))
+                          (with-canvas (w (+ 8 (* 30 rows)))
+                            (grid (+ 8 (* 30 rows)))
+                            (dolist (it placed)
+                              (destructuring-bind (n nx row) it
+                                (html (:a :href (node-url (getf n :id))
+                                        (:circle :cx nx :cy (+ 16 (* 30 row)) :r 6 :class "dot")
+                                        (:title (getf n :era) " — " (getf n :title) " — " (getf n :compression))
+                                        (:text :x (+ nx 12) :y (+ 22 (* 30 row)) :class "box-title"
+                                               (label n)))))))))))))
             (let ((undated (- (length nodes) (length dated))))
               (when (> undated 0)
-                (html (:p :class "quiet small" undated " ideas have no date and are left out here.")))))))))
+                (html (:p :class "quiet small" undated " ideas have no date and are left out here."))))))))))
 
 ;;; -- The field at a glance: a 2x2 grid ------------------------------------------
-;;; Top row, breadth: timeline left, map right. Bottom row, depth: one merged cell.
+;;; Two columns: the timeline on the left (an expandable bar per group), the outline of groups on the right.
 
-(defcomponent field-view (nodes)
-  (if (null nodes)
-      (html (:div :class "stage empty" (:p :class "quiet" "No ideas here yet.")))
-      (html (:div :class "stage grid"
-              (:section :class "cell" :aria-label "Timeline" (timeline nodes "breadth"))
-              (:section :class "cell" :aria-label "Map" (breadth-map nodes))
-              (:section :class "cell depth" :aria-label "Every idea"
-                (depth-map nodes)
-                (timeline nodes "depth"))))))
+(defcomponent scope-button (scope what)
+  (html (:button :type "button" :class "scope-claude" :data-scope scope :data-label (str (map-title) " / " scope)
+                 :title (str "Ask Claude about the " what) :aria-label (str "Ask Claude about the " what)
+           (claude-mark "mark"))
+        (:div :class "dock-anchor")))
+
+(defcomponent field-view (nodes &optional idea)
+  (let ((open (and idea (getf idea :group))))
+    (html (if (null nodes)
+              (html (:div :class "stage empty" (:p :class "quiet" "No ideas here yet.")))
+              (html (:div :class "stage grid"
+                      (:section :class "cell timeline" :aria-label "Timeline"
+                        (scope-button "timeline" "timeline")
+                        (timeline nodes *half-w* open))
+                      (:section :class "cell" :aria-label "Topics"
+                        (scope-button "topics" "topics")
+                        (breadth-map nodes *half-w* open)))))
+          ;; Below: the open idea on the left; on the right, writing and the chat pinned to it.
+          (:section :id "idea" :class "idea-below"
+            (:div :class "idea-main"
+              (if idea
+                  (node-detail idea)
+                  (html (:p :class "quiet" "Open an idea above to read it here."))))
+            (:aside :class "idea-side"
+              (:div :class "idea-write" (when idea (idea-write idea)))
+              (claude-dock (if idea (getf idea :id) "")))))))
 
 (defcomponent map-warnings ()
   (let ((bad (check-map)))
@@ -457,28 +426,28 @@
 
 ;;; ---- A field, or one group of it -----------------------------------------
 
-;; Shared by the field page (focus "") and the group page (focus = group id or idea id).
-(defun render-field (focus)
-  (let* ((group (and (not (blankp focus)) (find-group focus)))
-         (nodes (visible-nodes focus))
+;; The field page: timeline and outline, and below them the idea (if one is open).
+(defun render-field (&optional idea-id)
+  (let* ((idea (and (not (blankp idea-id)) (find-node idea-id)))
+         (nodes (map-nodes))
          (*page-class* "field")
-         (*focus* focus)
+         (*focus* (if idea idea-id ""))
          (*crumbs* (append (list (cons "fields" "/fields")
-                                 (cons (map-id) (and group (field-url))))
-                           (when group (list (list (getf group :id))))))
-         (*nav-extra* (html (:span :class "tagline" (if group (getf group :compression) (getf *map* :compression))))))
-    (layout (if group (str (getf group :id) " · " (map-title)) (map-title))
-      (html (unless group (map-warnings))
-            (field-view nodes)))))
+                                 (cons (map-id) (and idea (field-url))))
+                           (when idea (list (list (getf idea :title))))))
+         (*nav-extra* (html (:span :class "tagline" (getf *map* :compression)))))
+    (layout (if idea (str (getf idea :title) " · " (map-title)) (map-title))
+      (html (map-warnings)
+            (field-view nodes idea)))))
 
-(defpage field-page "/:name" (name around)
+(defpage field-page "/:name" (name idea)
   (unless (select-map name) (return-from field-page (not-found "field")))
-  (render-field (if (and around (find-node around)) around "")))
+  (render-field idea))
 
-;; /computers/switches is the group; /computers/ram forgives a dropped group.
+;; Old group and idea addresses fold back into the one page.
 (defpage group-page "/:name/:group" (name group)
   (unless (select-map name) (return-from group-page (not-found "field")))
-  (cond ((find-group group) (render-field group))
+  (cond ((find-group group) (redirect (field-url)))
         ((find-node group) (redirect (node-url group)))
         (t (not-found "group"))))
 
@@ -492,9 +461,7 @@
               (:div (:h4 "Right") (string-list (getf fb :right)))
               (:div (:h4 "Missing") (string-list (getf fb :missing)))
               (:div (:h4 "Wrong") (string-list (getf fb :wrong))))
-            (when (getf fb :suggested-level)
-              (html (:p :class "quiet small" "Model's suggestion: level " (getf fb :suggested-level)
-                        " (" (level-name (getf fb :suggested-level)) "). You decide.")))))))
+            ))))
 
 (defcomponent attempt-view (a)
   (html (:article :class "attempt"
@@ -502,23 +469,13 @@
           (:pre :class "wrote" (getf a :text))
           (feedback-view (getf a :feedback)))))
 
-(defcomponent rate-form (id)
-  (let ((current (node-level id)))
-    (html (:form :method "post" :action "/action/rate" :class "rate"
-            (hidden "map-name" (map-id)) (hidden "node-id" id)
-            (:span :class "quiet" "Your level: ")
-            (loop for i from 0 to 3
-                  do (html (:button :type "submit" :name "level" :value i
-                                    :class (str "lvl lvl-" i (when (= i current) " current"))
-                                    (level-name i))))))))
-
 (defcomponent write-box (id)
   (html (:form :method "post" :action "/action/attempt" :class "write ask-form"
           (hidden "map-name" (map-id)) (hidden "node-id" id)
           (:textarea :name "text" :rows 8 :required t :spellcheck "false"
                      :placeholder "Explain it cold, in your own words, as if teaching it.")
           (:div :class "ask-row"
-            (:span :class "quiet small" "The model names what is right, missing and wrong. It never sets your level.")
+            (:span :class "quiet small" "The model names what is right, missing and wrong.")
             (:button :type "submit" :class "primary" "Check my explanation")))))
 
 (defcomponent edit-node-form (n)
@@ -613,22 +570,13 @@
               (:iframe :class "artifact-full" :src (artifact-view-url id) :sandbox (artifact-sandbox a)
                        :title (getf a :title)))))))
 
-(defpage node-page "/:name/:group/:id" (name group id)
-  (unless (select-map name) (return-from node-page (not-found "field")))
-  (let ((n (find-node id)))
-    (cond ((null n) (not-found "idea"))
-          ;; The idea moved group: follow it.
-          ((not (equal group (getf n :group))) (redirect (node-url id)))
-          (t
-           (let ((*focus* id)
-                 (*crumbs* (list (cons "fields" "/fields") (cons (map-id) (field-url))
-                                 (cons (getf n :group) (group-url (getf n :group))) (list id))))
-             (layout (getf n :title)
-               (html (:div :class "node"
-                       (:section :class "node-main"
+(defcomponent node-detail (n)
+  (let ((id (getf n :id)))
+    (html (:div :class "node"
+            (:section :class "node-main"
                          (:p :class "crumb"
-                             (when (getf n :era) (html (getf n :era) " · "))
-                             (:a :href (str (field-url) "?around=" id) "see what it connects to"))
+                             (getf n :group)
+                             (when (getf n :era) (html " · " (getf n :era))))
                          (:h1 (getf n :title))
                          (:p :class "compression" (getf n :compression))
                          (:p :class "why" (getf n :why))
@@ -647,11 +595,17 @@
                            (when as
                              (html (:h2 "Made for this idea")
                                    (:div :class "artifact-list" (dolist (a as) (artifact-card a))))))
-                         (:h2 "Explain it")
-                         (write-box id)
-                         (rate-form id)
-                         (let ((as (node-attempts id)))
-                           (when as
-                             (html (:h2 "Attempts" (:span :class "quiet small" " (" (length as) ")"))
-                                   (dolist (a as) (attempt-view a)))))
-                         (edit-node-form n))))))))))
+                         (edit-node-form n))))))
+
+(defcomponent idea-write (n)
+  (let ((id (getf n :id)))
+    (html (:h2 "Explain it")
+          (write-box id)
+          (let ((as (node-attempts id)))
+            (when as
+              (html (:h2 "Attempts" (:span :class "quiet small" " (" (length as) ")"))
+                    (dolist (a as) (attempt-view a))))))))
+
+(defpage node-page "/:name/:group/:id" (name group id)
+  (unless (select-map name) (return-from node-page (not-found "field")))
+  (if (find-node id) (redirect (node-url id)) (not-found "idea")))

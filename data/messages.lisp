@@ -47,3 +47,17 @@ No map changes — this was a quiz."
  :CHANGES NIL :ARTIFACTS ("computers-the-whole-map") :SOURCES NIL)
 (:ID "2026-11-01T00:05:20#4" :MAP "computers" :NODE NIL :ROLE "you" :AT "2026-11-01T00:05:20" :TEXT
  "Show me a diagram of a transistor." :CHANGES NIL :ARTIFACTS NIL :SOURCES NIL)
+(:ID "2026-11-01T00:05:48#5" :MAP "computers" :NODE NIL :ROLE "buddy" :AT "2026-11-01T00:05:48"
+ :TEXT
+ "I'll make an SVG of a MOSFET — the kind of transistor in every chip — with the switch mechanism labelled.Made **MOSFET as a switch** — open it beside the chat.
+
+The whole thing to see: there are **three terminals**, and one of them (the gate) controls whether current can flow between the other two.
+
+- **Source** and **drain** are two pools of electron-rich silicon (`n+`), separated by a gap of `p-type` silicon that normally blocks current.
+- The **gate** sits over that gap but is *insulated* from it by a sliver of oxide — it never touches the silicon, so no current flows into the gate itself.
+- Put a voltage on the gate and its electric field reaches through the insulator and pulls electrons up into the gap, forming a thin conducting **channel** (orange). Now current flows source→drain. Drop the gate voltage and the channel vanishes.
+
+That is the entire trick behind *Transistor as a switch*: a small voltage at one terminal opens or closes a path between two others — a switch with no moving parts, worked by a field. Wire the drain of one such switch to the gate of the next and you have **one switch controlling another**, which is the seed the whole map grows from.
+
+One thing worth holding onto: the gate draws almost no current (it's insulated), which is *why* you can chain billions of these and why a transistor can drive many others downstream without running out of signal."
+ :CHANGES NIL :ARTIFACTS ("mosfet-as-a-switch") :SOURCES NIL)

@@ -13,14 +13,11 @@
 
 (defstore attempt  (:file "attempts.lisp"  :key :id :append t))
 (defstore message  (:file "messages.lisp"  :key :id :append t))
-(defstore level    (:file "levels.lisp"    :key :ref))
 (defstore setting  (:file "settings.lisp"  :key :key))
 (defstore artifact (:file "artifacts.lisp" :key :id))
 
 (defvar *map* nil "The current field: (:id :title :compression :groups :nodes). Bound per request.")
 (defvar *default-map* "computers")
-
-(defparameter *level-names* #("not yet" "shaky" "can explain" "can teach"))
 
 ;;; ---- Fields (maps) ----------------------------------------------------
 
@@ -85,12 +82,11 @@
         append (loop for p in (getf n :prereqs)
                      unless (find-node p) collect (cons (getf n :id) p))))
 
-;; How many ideas, and how many explained (level ≥ 2), for a field not yet loaded.
+;; Title and size of a field not yet loaded.
 (defun field-summary (name)
   (let* ((m (read-map name)) (nodes (getf m :nodes)))
     (list :id name :title (getf m :title) :compression (getf m :compression)
-          :ideas (length nodes)
-          :explained (count-if (lambda (n) (>= (node-level (getf n :id) name) 2)) nodes))))
+          :ideas (length nodes))))
 
 ;;; ---- Nodes -------------------------------------------------------------
 
@@ -198,19 +194,6 @@
   (let ((ids (remove-duplicates (mapcar (lambda (n) (getf n :group)) nodes) :test #'equal :from-end t)))
     (append (remove-if-not (lambda (g) (member (getf g :id) ids :test #'equal)) (map-groups))
             (loop for id in ids unless (find-group id) collect (list :id id :compression "")))))
-
-;;; ---- Levels ------------------------------------------------------------
-
-;; (node-level "ram") → 0..3, 0 when unset.
-(defun node-level (id &optional (map (map-id)))
-  (getf (find-level (node-ref id map)) :level 0))
-
-(defun level-name (n) (aref *level-names* (max 0 (min 3 n))))
-
-;; Levels are set by hand after feedback, never by the model.
-(defun set-level! (id n)
-  (put-level! (list :ref (node-ref id) :map (map-id) :node-id id
-                    :level (max 0 (min 3 n)) :at (now-iso))))
 
 ;;; ---- Attempts ----------------------------------------------------------
 

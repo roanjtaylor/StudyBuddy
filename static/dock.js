@@ -10,6 +10,7 @@
   var dock = document.getElementById('dock');
   if (!dock) return;
   var launcher = document.getElementById('dock-open');
+  var inline = dock.classList.contains('inline');
   var log = document.getElementById('dock-log');
   var form = document.getElementById('dock-form');
   var input = form.elements.text, here = form.elements.here;
@@ -24,11 +25,15 @@
   function show(on) {
     dock.hidden = !on; launcher.hidden = on;
     keep('sessionStorage', 'dock-open', on ? '1' : '0');
-    if (on) { log.scrollTop = log.scrollHeight; input.focus(); }
+    if (on) { log.scrollTop = log.scrollHeight; if (!inline) input.focus(); }
   }
   launcher.addEventListener('click', function () { show(true); });
-  document.getElementById('dock-close').addEventListener('click', function () { show(false); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !dock.hidden) show(false); });
+  document.getElementById('dock-close').addEventListener('click', function () { if (inline) goHome(); else show(false); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (inline) { if (dock.classList.contains('popover')) goHome(); }
+    else if (!dock.hidden) show(false);
+  });
 
   var wide = document.getElementById('dock-wide');
   function setWide(on) {
@@ -66,12 +71,24 @@
     openArtifact(card.dataset.artifact, card.dataset.type, card.dataset.title);
   });
 
-  // × on the "Looking at" chip steps out to the whole field.
-  var drop = document.getElementById('dock-drop');
-  if (drop) drop.addEventListener('click', function () {
-    here.value = '';
-    form.querySelector('.pill-text').textContent = form.dataset.field;
-    drop.remove();
+  // Built in, the chat lives under the open idea. A Claude button on a section (timeline, topics)
+  // hangs it from that section's corner, pinned to that section; closing sends it home again.
+  var home = dock.parentNode, pill = form.querySelector('.pill-text');
+  form.dataset.homeHere = here.value; form.dataset.homeLabel = pill.textContent;
+  function goHome() {
+    home.appendChild(dock); dock.classList.remove('popover');
+    here.value = form.dataset.homeHere; pill.textContent = form.dataset.homeLabel;
+    document.querySelectorAll('.scope-claude.on').forEach(function (b) { b.classList.remove('on'); });
+  }
+  document.querySelectorAll('.scope-claude').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var anchor = btn.nextElementSibling;
+      if (dock.parentNode === anchor) { goHome(); return; }
+      goHome();
+      anchor.appendChild(dock); dock.classList.add('popover'); btn.classList.add('on');
+      here.value = btn.dataset.scope; pill.textContent = btn.dataset.label;
+      log.scrollTop = log.scrollHeight; input.focus();
+    });
   });
 
   // Canned asks fill the box and send.
@@ -229,7 +246,7 @@
       });
   });
 
-  if (keep('sessionStorage', 'dock-open') === '1') show(true);
+  if (inline || keep('sessionStorage', 'dock-open') === '1') show(true);
   var staged = keep('sessionStorage', 'dock-stage');
   if (staged) { try { var s = JSON.parse(staged); if (s && s.id) openArtifact(s.id, s.type, s.title); } catch (e) {} }
 })();

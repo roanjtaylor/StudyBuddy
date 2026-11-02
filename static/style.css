@@ -130,16 +130,6 @@ details.edit textarea { width: 100%; margin-top: .5rem; }
 .artifact-head button.danger { margin: 0; padding: .2rem .6rem; font-size: .8rem; }
 .artifact-full { flex: 1; width: 100%; border: 0; background: var(--bg); }
 
-/* Levels */
-.lvl {
-  display: inline-block; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .7rem;
-  padding: .1rem .45rem; border-radius: 999px; border: 1px solid var(--line); vertical-align: middle;
-}
-.lvl-0 { background: var(--l0); }
-.lvl-1 { background: var(--l1); }
-.lvl-2 { background: var(--l2); color: #111; }
-.lvl-3 { background: var(--l3); color: var(--l3-fg); }
-
 /* Navbar extras: subtitle */
 nav.top .tagline { font-size: .8rem; margin-left: .75rem; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
@@ -156,29 +146,21 @@ body.field main { overflow-y: auto; }
   grid-template-rows: auto auto;
 }
 .stage .cell { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.stage .cell.depth { grid-column: 1 / -1; }
 @media (max-width: 800px) {
   .stage.grid { grid-template-columns: minmax(0, 1fr); }
-  .stage .cell.depth { grid-column: auto; }
 }
-/* Every drawing takes its natural height; a shorter cell's drawing stretches to fill its row. */
+/* Each drawing is a sheet at its natural size; a shorter cell's sheet stretches to fill its row. */
 .stage .map-wrap { flex: 1 0 auto; overflow: hidden; }
-.stage .map-wrap svg.map { width: 100%; height: auto; }
 body.field > main > .warn { margin: .5rem 1rem 0; }
 
 /* Map and timeline */
 .map-wrap { border: 1px solid var(--line); border-radius: 0; background: var(--panel); overflow: hidden; }
-.map-wrap.pan { cursor: grab; }
-.map-wrap.pan:active { cursor: grabbing; }
-svg.map { display: block; user-select: none; }
+/* The sheet is drawn 1:1 and only shrinks to fit a narrower window. */
+svg.map { display: block; max-width: 100%; height: auto; user-select: none; }
 svg .group-title { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 18px; font-weight: 600; fill: var(--fg); }
 svg .group-comp { font-size: 15px; fill: var(--muted); font-style: italic; }
-svg .edge { stroke: var(--line); stroke-width: 1.5; }
+svg .edge { stroke: var(--line); stroke-width: 1.5; fill: none; }
 svg .box { stroke: var(--line); stroke-width: 1.5; }
-svg .box.lvl-0 { fill: var(--l0); }
-svg .box.lvl-1 { fill: var(--l1); }
-svg .box.lvl-2 { fill: var(--l2); }
-svg .box.lvl-3 { fill: var(--l3); }
 /* Breadth boxes: light grey with black text in either theme. */
 svg rect.box.group-box { fill: #e4e4df; stroke: #bdbdb6; }
 svg a:hover rect.box.group-box { stroke: #1a1a1a; }
@@ -188,11 +170,7 @@ svg .gridline { stroke: var(--line); stroke-dasharray: 2 4; }
 svg .lane { stroke: var(--line); }
 svg .tick { font-size: 15px; fill: var(--muted); }
 svg .span { fill: var(--l2); }
-svg .dot { stroke: var(--fg); stroke-width: 1; }
-svg .dot.lvl-0 { fill: var(--l0); }
-svg .dot.lvl-1 { fill: var(--l1); }
-svg .dot.lvl-2 { fill: var(--l2); }
-svg .dot.lvl-3 { fill: var(--l3); }
+svg .dot { fill: var(--l2); stroke: var(--fg); stroke-width: 1; }
 svg a:hover .dot, svg a:hover .span { stroke: var(--fg); stroke-width: 2; }
 .nodelink { text-decoration: none; border-bottom: 1px solid var(--line); }
 
@@ -224,9 +202,6 @@ button:hover { border-color: var(--fg); }
 button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 button.danger { color: var(--warn); border-color: var(--warn); margin-top: .75rem; }
 form.inline { display: inline; }
-form.rate { margin: 1rem 0; display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
-form.rate button.lvl { font-size: .8rem; padding: .25rem .7rem; }
-form.rate button.current { outline: 2px solid var(--fg); }
 
 .attempt { border-top: 1px solid var(--line); padding: 1rem 0; }
 pre.wrote { white-space: pre-wrap; font: inherit; margin: .5rem 0; }
@@ -243,3 +218,42 @@ label input, label textarea { display: block; margin-top: .25rem; }
 /* Breadth box text (after the generic svg text rules, so these win) */
 svg text.gb-text, svg .group-title.gb-text, svg .box-title.gb-text { fill: #1a1a1a; }
 svg text.gb-meta, svg .group-comp.gb-meta { fill: #444; }
+
+/* Breadth: an outline of groups; each opens like a folder to list its ideas. */
+.outline { padding: .6rem 1rem; border: 1px solid var(--line); background: var(--panel); }
+.outline-group { margin-bottom: .4rem; }
+.outline-group summary { cursor: pointer; }
+.outline-title { font: 600 .95rem ui-monospace, Menlo, Consolas, monospace; color: var(--fg); text-decoration: none; }
+.outline-sub { font-size: .85rem; color: var(--muted); font-style: italic; }
+.outline-group ul { margin: .15rem 0 .2rem; padding-left: 2rem; font-size: .9rem; line-height: 1.35; }
+
+/* Timeline: bars per group on one shared axis; a bar opens to show its ideas. */
+.tl { border: 1px solid var(--line); background: var(--panel); }
+.tl .map-wrap { border: 0; background: none; }
+.tl-group summary { list-style: none; cursor: pointer; }
+.tl-group summary::-webkit-details-marker { display: none; }
+.tl-group .chev { font-size: 14px; fill: var(--muted); }
+.tl-group .chev-open, .tl-group[open] .chev-closed { display: none; }
+.tl-group[open] .chev-open { display: inline; }
+svg .bar-title { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 600; fill: var(--fg); pointer-events: none; }
+.tl-group summary:hover .span { stroke: var(--fg); stroke-width: 2; }
+
+/* The open idea sits below the timeline and outline, on the same page. */
+.idea-below {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.5rem;
+  padding: 1rem; border-top: 1px solid var(--line); align-items: start;
+}
+.idea-main .node { max-width: none; }
+.idea-side { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.idea-side .three { grid-template-columns: 1fr; }
+@media (max-width: 800px) { .idea-below { grid-template-columns: minmax(0, 1fr); } }
+
+/* A Claude button at the top right of a section; it opens the chat pinned to that section. */
+.stage .cell { position: relative; }
+.scope-claude {
+  position: absolute; top: .4rem; right: .4rem; z-index: 5; display: grid; place-items: center;
+  width: 1.9rem; height: 1.9rem; padding: 0; border: 0; border-radius: 50%;
+  background: var(--tt-claude, #d97757); color: #fff;
+}
+.scope-claude:hover { border: 0; filter: brightness(1.08); }
+.scope-claude .mark { width: 1rem; height: 1rem; }

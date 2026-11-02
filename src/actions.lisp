@@ -1,6 +1,6 @@
 ;;;; L5c — Actions. One AI channel (ask) that answers and reshapes the map, one AI
 ;;;; check of a written explanation, one AI seed of a new field, and the plain
-;;;; hand edits. The level is never changed by any action but Rate.
+;;;; hand edits.
 
 (in-package :studybuddy)
 
@@ -8,7 +8,7 @@
   "Rules you must obey:
 1. Core ideas, not examples. A node is one idea with a one-sentence compression and why it matters. Favour the few ideas that generate the rest; never pad with remixes, tools or trivia.
 2. Theory is learned from the originator, products by using them. When you cite, cite primary sources.
-3. Nothing is understood until it has been written out and checked. You never set the learner's level; you only give evidence.")
+3. Nothing is understood until it has been written out and checked.")
 
 ;; Read-time available (#.) so the prompt schemas below can splice it in.
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -24,13 +24,12 @@
 
 ;;; ---- URLs ----------------------------------------------------------------
 
-;;; A directory: /computers → /computers/switches → /computers/switches/ram
+;;; One page per field: /computers, with ?idea=ram opening an idea below it.
 
 (defun field-url (&optional (map (map-id))) (str "/" map))
-(defun group-url (group &optional (map (map-id))) (str "/" map "/" group))
-(defun node-url (id &optional (map (map-id)))
-  (let ((n (find-node id)))
-    (str "/" map "/" (if n (getf n :group) "misc") "/" id)))
+(defun group-url (group &optional (map (map-id))) (declare (ignore group)) (field-url map))
+;; An idea opens below the field's timeline and outline, on the field's own page.
+(defun node-url (id &optional (map (map-id))) (str "/" map "?idea=" id "#idea"))
 ;; Where a focus (group id, idea id, or empty) lives.
 (defun focus-url (focus)
   (cond ((blankp focus) (field-url))
@@ -76,11 +75,11 @@
   (str "Field: " (map-title) " — " (getf *map* :compression) #\Newline
        "Groups (id: compression):" #\Newline
        (join #\Newline (mapcar (lambda (g) (str "  " (getf g :id) ": " (getf g :compression))) (map-groups)))
-       #\Newline "Ideas (id | title | group | learner's level 0-3 | prereqs | era | compression | latest verdict):" #\Newline
+       #\Newline "Ideas (id | title | group | prereqs | era | compression | latest verdict):" #\Newline
        (join #\Newline
              (mapcar (lambda (n)
                        (let ((id (getf n :id)))
-                         (str "  " id " | " (getf n :title) " | " (getf n :group) " | " (node-level id) " | "
+                         (str "  " id " | " (getf n :title) " | " (getf n :group) " | "
                               (join "," (getf n :prereqs)) " | " (or (getf n :era) "?") " | "
                               (getf n :compression) " | "
                               (or (getf (getf (latest-attempt id) :feedback) :verdict) "no attempt"))))
@@ -267,12 +266,12 @@
 
 (defprompt converse
   :system (str "You are the learner's study buddy, living inside their knowledge map of one field. "
-               "The map is the shared object: groups of ideas; each idea has a one-sentence compression, why it matters, prerequisites, optional deeper notes, and the learner's self-rated level 0-3 with the verdict on their latest written explanation."
+               "The map is the shared object: groups of ideas; each idea has a one-sentence compression, why it matters, prerequisites, optional deeper notes, and the verdict on the learner's latest written explanation."
                #\Newline *rules* #\Newline
                "The learner writes to you to learn, to reshape the map, and to have things made. You have tools for the last two; use them, do not describe what you could do." #\Newline
                "Reply in markdown: concise, no preamble, no sign-off, mechanism over vocabulary. Headings, lists, tables and code fences all render. Refer to ideas by title. When you used a tool, say what you did in one line at the end." #\Newline
                "Changing the map: when asked, fill gaps, go deeper on one idea (breadth first: three to six sub-ideas one level down, each listing the parent among its prereqs), remove, merge, regroup, rename, or record what they have learned in notes. "
-               "Ids are lowercase slugs. Group ids must exist in the map or be added with add_groups first. Prereqs must be ids that exist or that you are adding. Era is a year, 0 if unknown. Keep compression one sentence. Never set the learner's level; if asked where they are weak, say so with reasons." #\Newline
+               "Ids are lowercase slugs. Group ids must exist in the map or be added with add_groups first. Prereqs must be ids that exist or that you are adding. Era is a year, 0 if unknown. Keep compression one sentence. If asked where the learner is weak, say so with reasons." #\Newline
                "Making things: when a flashcard deck, a quiz, a diagram, a document, a program, or anything interactive would teach better than prose, make it with create_flashcards, create_quiz or create_artifact, then refer to it by title in a short reply — never paste its content into the reply as well. "
                "Diagrams: svg for anything spatial (an architecture, a data path, a timeline, a mechanism), mermaid for flows, sequences and state machines. "
                "Interactive: html, a complete document, self-contained, with its own styles; it may load libraries from a CDN. Good for simulators, step-through visualisers, calculators, drills. "
@@ -281,9 +280,16 @@
                "You may use web search when it is on; cite primary sources when you cite."))
 
 ;; The learner's turn: the map and where they are, then their words.
-(defun ask-turn (text node group)
+(defun scope-note (scope)
+  (cond ((equal scope "timeline")
+         "The learner is working on the TIMELINE of this field: one bar per group spanning the years of its ideas, and the dated ideas inside. Requests here are about dates (era), which group an idea sits in, and what is missing in time. Make the changes with your tools.")
+        ((equal scope "topics")
+         "The learner is working on the TOPIC LIST of this field: the groups and the ideas inside each. Requests here are about adding, renaming, regrouping, removing and reordering topics. Make the changes with your tools.")))
+
+(defun ask-turn (text node group &optional scope)
   (str (map-context) #\Newline #\Newline
        (artifacts-context) #\Newline #\Newline
+       (when scope (str (scope-note scope) #\Newline #\Newline))
        (when group (str "The learner is looking at group: " group #\Newline #\Newline))
        (when node (str (node-context node) #\Newline (attempts-context node) #\Newline #\Newline))
        "Learner says:" #\Newline (trim text)))
@@ -306,12 +312,12 @@
 
 ;; One ask, start to finish: store the learner's message, run the conversation with
 ;; tools, store the reply. EMIT, when given, is where the live events go.
-(defun run-ask (text &key node group search effort emit)
+(defun run-ask (text &key node group scope search effort emit)
   (add-message! "you" (trim text) :node node)
   (let ((*run* (list :node node :changes '() :artifacts '() :sources '() :emit emit)))
     (handler-case
         (let* ((reply (converse (append (conversation-messages)
-                                        (list (list :role "user" :content (ask-turn text node group))))
+                                        (list (list :role "user" :content (ask-turn text node group scope))))
                                 :system (getf (prompt 'converse) :system)
                                 :tools *buddy-tools*
                                 :search search
@@ -335,15 +341,14 @@
   (unless (select-map map-name) (return-from ask-buddy (not-found "field")))
   (let* ((node (and (not (blankp here)) (find-node here) here))
          (group (and (not (blankp here)) (not node) (find-group here) here))
+         (scope (and (member here '("timeline" "topics") :test #'equal) here))
          (search (not (blankp search))))
     (cond ((blankp dock)
-           (unless (blankp text) (run-ask text :node node :group group :search search :effort effort))
-           (redirect (str (focus-url here)
-                          (when (member view *views* :test #'equal)
-                            (str "?view=" view)))))
+           (unless (blankp text) (run-ask text :node node :group group :scope scope :search search :effort effort))
+           (redirect (focus-url here)))
           ((blankp text) "")
           (t (sse-response (lambda (emit)
-                             (run-ask text :node node :group group :search search :effort effort :emit emit)))))))
+                             (run-ask text :node node :group group :scope scope :search search :effort effort :emit emit)))))))
 
 ;;; ---- Write: check an explanation ---------------------------------------
 
@@ -353,20 +358,17 @@
                "Judge only what is written. Do not supply what the learner probably meant. "
                "Name the single most important missing idea first in the missing list. "
                "Be concrete and short: each item one sentence. "
-               "The verdict is one or two plain sentences on whether this explanation would let the learner rebuild the idea from scratch. "
-               "suggested-level: 0 not yet, 1 shaky, 2 can explain, 3 can teach — advisory only.")
+               "The verdict is one or two plain sentences on whether this explanation would let the learner rebuild the idea from scratch.")
   :schema (:object (:right (:array :string) "what the learner got right")
                    (:missing (:array :string) "what a correct explanation needs that is absent; most important first")
                    (:wrong (:array :string) "claims that are false or confused")
-                   (:verdict :string)
-                   (:suggested-level :integer)))
+                   (:verdict :string)))
 
 (defun clean-feedback (fb)
   (list :right (mapcar #'strip-quotes (getf fb :right))
         :missing (mapcar #'strip-quotes (getf fb :missing))
         :wrong (mapcar #'strip-quotes (getf fb :wrong))
-        :verdict (strip-quotes (getf fb :verdict))
-        :suggested-level (getf fb :suggested-level)))
+        :verdict (strip-quotes (getf fb :verdict))))
 
 (defaction attempt "/action/attempt" (map-name node-id text)
   (unless (select-map map-name) (return-from attempt (not-found "field")))
@@ -377,13 +379,6 @@
                                              "Learner wrote:" #\Newline text))))
           (add-attempt! node-id (trim text) (clean-feedback feedback)))
       (llm-error (e) (add-message! "error" (llm-error-message e) :node node-id))))
-  (redirect (node-url node-id)))
-
-;;; ---- Rate (plain) -------------------------------------------------------
-
-(defaction rate "/action/rate" (map-name node-id level)
-  (unless (select-map map-name) (return-from rate (not-found "field")))
-  (set-level! node-id (parse-integer level))
   (redirect (node-url node-id)))
 
 ;;; ---- Hand edits (plain) ---------------------------------------------------

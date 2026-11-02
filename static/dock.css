@@ -122,3 +122,18 @@ body.field { --gutter: calc(200px + 1rem); }
 .dock .dock-send { padding: .375rem 1rem; border-radius: .25rem; background: var(--tt-claude); color: #fff; font-size: .75rem; font-weight: 500; }
 .dock .dock-stop { background: var(--tt-muted); }
 .dock .dock-send[hidden] { display: none; }
+
+/* Built in: the chat sits in the page instead of floating over it. */
+.dock.inline { position: static; width: auto; height: min(40rem, calc(100dvh - 5rem)); box-shadow: none; }
+.dock.inline #dock-close, .dock.inline #dock-wide { display: none; }
+.dock.inline .dock-body { flex-direction: column; }
+.dock.inline.staged { width: auto; }
+.dock.inline.staged .dock-chat { flex: 0 0 55%; }
+.dock.inline .dock-stage { border-left: 0; border-top: 1px solid var(--tt-line); }
+/* Opened from a section's button, it hangs from that section's top right corner. */
+.dock.inline.popover {
+  position: absolute; top: 2.6rem; right: .4rem; z-index: 60;
+  width: min(27rem, calc(100% - .8rem)); height: min(32rem, 70dvh);
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,.35);
+}
+.dock.inline.popover #dock-close { display: block; }
