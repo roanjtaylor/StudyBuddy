@@ -1,24 +1,35 @@
-/* ---- The Claude dock (the tastetrainer dock: warm wall, ink, one orange) ----------- */
+/* ---- The Claude dock, in claude.ai's clothes ----------------------------------------
+   Warm paper, dark ink, one orange, hairline borders; a serif for the greeting, a sans
+   for everything else. Three parts side by side: the rail (this place's chats), the
+   chat (messages above one composer card), and the stage (an open artifact). */
 :root {
-  --tt-wall: #f4f1ea; --tt-wall-soft: #efe9dd; --tt-card: #faf8f3;
-  --tt-ink: #1f1c18; --tt-muted: #6c655b; --tt-line: #e0d8c8;
-  --tt-accent: #b0552f; --tt-claude: #d97757;
+  --cl-bg: #f5f4ee; --cl-panel: #faf9f5; --cl-sunk: #f0eee6; --cl-hover: #e8e6dc;
+  --cl-ink: #1f1e1d; --cl-muted: #6e6c66; --cl-line: rgba(0,0,0,.09); --cl-line-strong: rgba(0,0,0,.18);
+  --cl-orange: #d97757; --cl-orange-soft: rgba(217,119,87,.14); --cl-orange-ink: #a9492b;
+  --cl-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
+  --cl-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, system-ui, sans-serif;
+  --cl-mono: ui-monospace, Menlo, Consolas, monospace;
+  --cl-shadow: 0 25px 50px -12px rgba(0,0,0,.28);
+  --tt-claude: var(--cl-orange);
   /* How far in from the window's right edge the content ends: the dock sits inside it. */
   --gutter: max(1rem, calc((100vw - 72rem) / 2 + 1rem));
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --tt-wall: #1b1916; --tt-wall-soft: #26231f; --tt-card: #201e1a;
-    --tt-ink: #ede8df; --tt-muted: #a39b8d; --tt-line: #38342d; --tt-accent: #e08a62;
+    --cl-bg: #262624; --cl-panel: #30302e; --cl-sunk: #393937; --cl-hover: #44433f;
+    --cl-ink: #ecebe6; --cl-muted: #a5a39d; --cl-line: rgba(255,255,255,.1); --cl-line-strong: rgba(255,255,255,.22);
+    --cl-orange-soft: rgba(217,119,87,.2); --cl-orange-ink: #e8a98f;
+    --cl-shadow: 0 25px 50px -12px rgba(0,0,0,.6);
   }
 }
 body.field { --gutter: calc(200px + 1rem); }
 @media (max-width: 1100px) { body.field { --gutter: 1rem; } }
 
+/* ---- The launcher and the frame ---- */
 .dock-launcher {
   position: fixed; bottom: 1.25rem; right: var(--gutter); z-index: 55;
   display: grid; place-items: center; width: 3.25rem; height: 3.25rem; padding: 0;
-  border: 0; border-radius: 50%; background: var(--tt-claude); color: #fff;
+  border: 0; border-radius: 50%; background: var(--cl-orange); color: #fff;
   box-shadow: 0 10px 15px -3px rgba(0,0,0,.2), 0 4px 6px -4px rgba(0,0,0,.2);
   transition: transform .15s;
 }
@@ -26,114 +37,196 @@ body.field { --gutter: calc(200px + 1rem); }
 .dock-launcher[hidden], .dock[hidden] { display: none; }
 .mark { width: .75rem; height: .75rem; }
 .mark.big { width: 1.5rem; height: 1.5rem; }
+.ico { width: 1rem; height: 1rem; flex-shrink: 0; }
 
 .dock {
   position: fixed; bottom: 1rem; right: var(--gutter); z-index: 55;
-  display: flex; flex-direction: column; width: 27rem; height: min(46rem, calc(100dvh - 5rem));
-  background: var(--tt-wall); color: var(--tt-ink); border: 1px solid var(--tt-line); border-radius: .75rem;
-  box-shadow: 0 25px 50px -12px rgba(0,0,0,.3);
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  display: flex; flex-direction: column; width: 30rem; height: min(46rem, calc(100dvh - 5rem));
+  background: var(--cl-bg); color: var(--cl-ink); border: 1px solid var(--cl-line-strong); border-radius: 1rem;
+  box-shadow: var(--cl-shadow); overflow: hidden;
+  font-family: var(--cl-sans); font-size: .9rem; line-height: 1.5;
 }
-.dock.wide { width: min(60rem, calc(100vw - 2rem)); height: calc(100dvh - 5rem); }
-/* With an artifact open the dock splits: the chat keeps its width, the stage takes the rest. */
-.dock.staged { width: min(84rem, calc(100vw - 2rem)); height: calc(100dvh - 5rem); }
-.dock-body { flex: 1; min-height: 0; display: flex; }
-.dock-chat { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.dock.staged .dock-chat { flex: 0 0 26rem; }
-.dock-stage { flex: 1; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid var(--tt-line); background: var(--tt-card); }
+.dock.wide { width: min(64rem, calc(100vw - 2rem)); height: calc(100dvh - 5rem); }
+.dock.staged { width: min(88rem, calc(100vw - 2rem)); height: calc(100dvh - 5rem); }
+.dock button { font: inherit; background: none; border: 0; color: inherit; padding: 0; cursor: pointer; border-radius: .5rem; }
+.dock button:hover { border: 0; }
+.dock-btn { display: grid; place-items: center; width: 1.9rem; height: 1.9rem; color: var(--cl-muted); }
+.dock-btn:hover { background: var(--cl-hover); color: var(--cl-ink); }
+
+.dock > header {
+  display: flex; align-items: center; gap: .3rem; flex-shrink: 0;
+  height: 2.75rem; padding: 0 .5rem; border-bottom: 1px solid var(--cl-line); background: var(--cl-bg);
+}
+.dock-badge { display: grid; place-items: center; width: 1.4rem; height: 1.4rem; margin-left: .15rem; border-radius: 50%; background: var(--cl-orange); color: #fff; }
+.dock-title { flex: 1; min-width: 0; padding: 0 .35rem; font-size: .85rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.dock-body { flex: 1; min-height: 0; display: flex; position: relative; }
+
+/* ---- The rail: chats at this place ---- */
+.dock-rail {
+  flex: 0 0 12rem; min-width: 0; display: flex; flex-direction: column;
+  border-right: 1px solid var(--cl-line); background: var(--cl-bg);
+}
+.dock:not(.rail-open) .dock-rail { display: none; }
+.rail-head { display: flex; flex-direction: column; gap: .25rem; padding: .6rem .5rem .35rem; }
+.rail-title { padding: 0 .4rem; font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--cl-muted); }
+.rail-newbtn { display: flex; align-items: center; gap: .4rem; padding: .35rem .5rem; font-size: .82rem; font-weight: 500; color: var(--cl-orange-ink); }
+.rail-newbtn:hover { background: var(--cl-orange-soft); }
+.chat-list { flex: 1; min-height: 0; overflow-y: auto; margin: 0; padding: 0 .5rem .5rem; list-style: none; scrollbar-width: thin; scrollbar-color: var(--cl-line-strong) transparent; }
+.rail-empty { padding: .35rem .5rem; font-size: .78rem; color: var(--cl-muted); }
+.chat-item { position: relative; display: flex; align-items: center; border-radius: .5rem; }
+.chat-item:hover, .chat-item.current, .chat-item.editing, .chat-item.confirming { background: var(--cl-sunk); }
+.chat-item.current { font-weight: 500; }
+.chat-open { flex: 1; min-width: 0; padding: .4rem .55rem; text-align: left; font-size: .82rem; border-radius: .5rem; }
+.chat-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-tools { display: none; align-items: center; gap: .1rem; padding-right: .2rem; }
+.chat-item:hover .chat-tools, .chat-item:focus-within .chat-tools { display: flex; }
+.chat-item.editing .chat-tools, .chat-item.editing .chat-open, .chat-item.confirming .chat-tools, .chat-item.confirming .chat-open { display: none; }
+.chat-tools button, .chat-confirm button { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; color: var(--cl-muted); border-radius: .35rem; }
+.chat-tools button:hover, .chat-confirm button:hover { background: var(--cl-hover); color: var(--cl-ink); }
+.chat-tools .ico, .chat-confirm .ico { width: .85rem; height: .85rem; }
+.chat-edit { flex: 1; min-width: 0; margin: .15rem .2rem; padding: .25rem .4rem; font: inherit; font-size: .82rem; color: var(--cl-ink); background: var(--cl-panel); border: 1px solid var(--cl-orange); border-radius: .4rem; outline: none; }
+.chat-confirm { display: flex; align-items: center; gap: .15rem; flex: 1; min-width: 0; padding: .2rem .3rem .2rem .55rem; font-size: .78rem; color: var(--cl-muted); }
+.chat-confirm span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-confirm .yes:hover { color: #b42318; }
+
+/* ---- The chat ---- */
+.dock-chat { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--cl-bg); }
+.dock.staged .dock-chat { flex: 0 0 28rem; }
+.dock-log {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 1rem .9rem .5rem; display: flex; flex-direction: column; gap: 1.1rem;
+  scrollbar-width: thin; scrollbar-color: var(--cl-line-strong) transparent;
+}
+.dock-empty { margin: auto 0; padding: 1rem .5rem; text-align: center; }
+.dock-empty .greeting { margin: 0 0 1rem; font-family: var(--cl-serif); font-size: 1.4rem; line-height: 1.3; letter-spacing: -.01em; color: var(--cl-ink); }
+.dock-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem; }
+.dock .chip { padding: .35rem .8rem; font-size: .78rem; color: var(--cl-ink); background: var(--cl-panel); border: 1px solid var(--cl-line); border-radius: 999px; }
+.dock .chip:hover { background: var(--cl-sunk); border-color: var(--cl-line-strong); }
+
+.msg { position: relative; font-size: .9rem; line-height: 1.6; }
+.msg p { margin: 0; }
+.msg-you { align-self: flex-end; max-width: 92%; padding: .55rem .9rem; border-radius: 1.1rem 1.1rem .3rem 1.1rem; background: var(--cl-sunk); }
+.msg-you p { white-space: pre-wrap; }
+.msg-about { display: block; margin-top: .2rem; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--cl-muted); text-decoration: none; }
+.msg-buddy { padding-left: 1.7rem; }
+.msg-mark { position: absolute; left: 0; top: .3rem; display: grid; place-items: center; width: 1.2rem; height: 1.2rem; border-radius: 50%; background: var(--cl-orange); color: #fff; }
+.msg-mark .mark { width: .65rem; height: .65rem; }
+.msg-buddy .md > :first-child { margin-top: 0; }
+.msg-buddy .md > :last-child { margin-bottom: 0; }
+.msg-buddy .md p { margin: .5rem 0; }
+.msg-buddy .md h2, .msg-buddy .md h3, .msg-buddy .md h4 { margin: .9rem 0 .3rem; font-weight: 600; }
+.msg-buddy .md h2 { font-size: 1.05rem; }
+.msg-buddy .md h3 { font-size: .95rem; }
+.msg-buddy .md h4 { font-size: .88rem; text-transform: none; letter-spacing: 0; color: var(--cl-ink); }
+.msg-buddy .md a { color: var(--cl-orange-ink); }
+.msg-buddy .md pre { background: var(--cl-panel); border: 1px solid var(--cl-line); border-radius: .6rem; padding: .6rem .8rem; font-size: .8rem; }
+.msg-buddy .md code { background: var(--cl-sunk); font-family: var(--cl-mono); font-size: .84em; }
+.msg-buddy .md pre code { background: none; }
+.msg-buddy .md table { font-size: .82rem; }
+.msg-buddy .md th { background: var(--cl-sunk); }
+.msg-buddy .md th, .msg-buddy .md td { border-color: var(--cl-line); }
+.msg-buddy .md blockquote { border-left-color: var(--cl-line-strong); color: var(--cl-muted); }
+.msg .changes { margin: .5rem 0 0; font-size: .75rem; color: var(--cl-muted); }
+/* What the model did on the way, one quiet line each, as claude.ai lists them. */
+.msg .activity:empty { display: none; }
+.msg .did { display: flex; align-items: center; gap: .4rem; margin: .15rem 0; font-size: .78rem; color: var(--cl-muted); }
+.msg .did::before { content: ""; width: .35rem; height: .35rem; border-radius: 50%; background: var(--cl-orange); flex-shrink: 0; }
+.msg details.thinking { margin: 0 0 .5rem; font-size: .78rem; color: var(--cl-muted); }
+.msg details.thinking summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: .3rem; padding: .15rem .5rem .15rem .4rem; border-radius: 999px; }
+.msg details.thinking summary::-webkit-details-marker { display: none; }
+.msg details.thinking summary::before { content: "›"; display: inline-block; transition: transform .15s; }
+.msg details.thinking[open] summary::before { transform: rotate(90deg); }
+.msg details.thinking summary:hover { background: var(--cl-sunk); }
+.msg .thinking-text { white-space: pre-wrap; margin: .35rem 0 0 .4rem; padding-left: .6rem; border-left: 2px solid var(--cl-line-strong); max-height: 12rem; overflow: auto; font-size: .78rem; }
+.msg details.sources { margin-top: .5rem; font-size: .75rem; color: var(--cl-muted); }
+.msg details.sources summary { cursor: pointer; }
+.msg details.sources ul { margin: .25rem 0; padding-left: 1rem; }
+.msg details.sources a { color: var(--cl-orange-ink); }
+.msg-artifacts { display: flex; flex-direction: column; gap: .4rem; margin: .6rem 0 0; }
+.msg-artifacts[hidden] { display: none; }
+.dock .artifact-card { background: var(--cl-panel); border: 1px solid var(--cl-line); border-radius: .75rem; }
+.dock .artifact-card:hover { border-color: var(--cl-line-strong); background: var(--cl-sunk); }
+.dock .artifact-icon { background: var(--cl-sunk); }
+/* A visual artifact shows itself in the chat: a framed preview with its card as the caption. */
+.artifact-inline { margin: 0; max-width: 28rem; }
+.artifact-preview {
+  display: block; width: 100%; height: 15rem; border: 1px solid var(--cl-line); border-bottom: 0;
+  border-radius: .75rem .75rem 0 0; background: var(--cl-panel);
+}
+.artifact-inline-html .artifact-preview { height: 22rem; }
+.artifact-inline .artifact-card { max-width: none; border-radius: 0 0 .75rem .75rem; }
+.msg-error { padding: .5rem .75rem; border: 1px solid #f3c6c0; border-radius: .6rem; background: #fdf1ef; color: #9a2f1f; font-size: .8rem; }
+@media (prefers-color-scheme: dark) { .msg-error { background: #3a211d; border-color: #6b2f27; color: #f0a899; } }
+.dock-status { display: flex; align-items: center; gap: .4rem; margin: .25rem 0 0; font-size: .78rem; color: var(--cl-muted); }
+.dock-status .spin { display: inline-block; width: .9rem; text-align: center; color: var(--cl-orange); }
+
+/* ---- The composer: one card ---- */
+.dock-form { flex-shrink: 0; padding: .4rem .75rem .75rem; }
+.composer {
+  background: var(--cl-panel); border: 1px solid var(--cl-line-strong); border-radius: 1.1rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,.05); padding: .6rem .55rem .45rem .9rem;
+  transition: border-color .15s, box-shadow .15s;
+}
+.composer:focus-within { border-color: var(--cl-orange); box-shadow: 0 2px 16px rgba(0,0,0,.08); }
+.composer textarea {
+  display: block; width: 100%; max-height: 11rem; resize: none; padding: 0; margin: 0 0 .5rem;
+  font: inherit; font-size: .9rem; line-height: 1.5; color: var(--cl-ink); background: transparent; border: 0; outline: none;
+  scrollbar-width: thin;
+}
+.composer textarea::placeholder { color: var(--cl-muted); }
+.composer-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.composer-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; min-width: 0; }
+.dock .pill { display: inline-flex; align-items: center; max-width: 13rem; padding: .18rem .6rem; font-size: .72rem; color: var(--cl-muted); background: var(--cl-sunk); border-radius: 999px; }
+.dock .pill-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dock .toggle {
+  display: inline-flex; align-items: center; gap: .3rem; margin: 0; padding: .18rem .6rem; cursor: pointer;
+  font-size: .72rem; color: var(--cl-muted); border: 1px solid var(--cl-line); border-radius: 999px; user-select: none;
+}
+.dock .toggle:hover { background: var(--cl-sunk); }
+.dock .toggle input { display: none; }
+.dock .toggle .ico { width: .8rem; height: .8rem; }
+.dock .toggle:has(input:checked), .dock .toggle.on {
+  color: var(--cl-orange-ink); background: var(--cl-orange-soft); border-color: transparent;
+}
+.dock .toggle select { font: inherit; font-size: .72rem; color: inherit; background: transparent; border: 0; padding: 0; outline: none; cursor: pointer; }
+.dock .dock-send { display: grid; place-items: center; flex-shrink: 0; width: 2rem; height: 2rem; border-radius: 50%; background: var(--cl-orange); color: #fff; }
+.dock .dock-send:hover { filter: brightness(1.08); }
+.dock .dock-send .ico { width: 1rem; height: 1rem; }
+.dock .dock-stop { background: var(--cl-ink); color: var(--cl-bg); }
+.dock .dock-send[hidden] { display: none; }
+.composer:has(textarea:placeholder-shown) .dock-send:not(.dock-stop) { opacity: .35; }
+.dock-form.busy .dock-send:not(.dock-stop) { opacity: .35; pointer-events: none; }
+
+/* ---- The stage: one artifact beside the chat ---- */
+.dock-stage { flex: 1; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid var(--cl-line); background: var(--cl-panel); }
 .dock-stage[hidden] { display: none; }
-.dock-stage header { border-bottom: 1px solid var(--tt-line); }
-.stage-title { flex: 1; padding-left: .25rem; font-size: .8rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dock-stage a.dock-btn { display: grid; place-items: center; text-decoration: none; font-size: .9rem; }
-.stage-frame { flex: 1; width: 100%; border: 0; background: var(--bg); border-radius: 0 0 .75rem 0; }
+.dock-stage header { display: flex; align-items: center; gap: .3rem; height: 2.75rem; padding: 0 .5rem; border-bottom: 1px solid var(--cl-line); }
+.stage-title { flex: 1; min-width: 0; padding-left: .35rem; font-size: .85rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dock-stage a.dock-btn { text-decoration: none; }
+.stage-frame { flex: 1; width: 100%; border: 0; background: var(--bg); }
+
+/* ---- Built in: the chat sits in the page, and can hang from a section's corner ---- */
+.dock.inline { position: static; width: auto; height: min(42rem, calc(100dvh - 5rem)); box-shadow: none; }
+.dock.inline #dock-close, .dock.inline #dock-wide { display: none; }
+/* With an artifact on the stage, the built-in dock splits in two and folds its rail away. */
+.dock.inline.staged { width: auto; height: min(52rem, calc(100dvh - 5rem)); }
+.dock.inline.staged .dock-rail { display: none; }
+.dock.inline.staged .dock-chat { flex: 1 1 50%; }
+.dock.inline.staged .dock-stage { flex: 1 1 50%; }
+.dock.inline.popover {
+  position: absolute; top: 2.6rem; right: .4rem; z-index: 60;
+  width: min(36rem, calc(100% - .8rem)); height: min(34rem, 72dvh);
+  box-shadow: var(--cl-shadow);
+}
+.dock.inline.popover #dock-close { display: grid; }
+
 @media (max-width: 900px) {
   .dock.staged .dock-body { flex-direction: column; }
   .dock.staged .dock-chat { flex: 0 0 45%; }
-  .dock-stage { border-left: 0; border-top: 1px solid var(--tt-line); }
+  .dock-stage { border-left: 0; border-top: 1px solid var(--cl-line); }
 }
 @media (max-width: 640px) {
   .dock, .dock.wide, .dock.staged { left: .5rem; right: .5rem; bottom: .5rem; width: auto; }
   #dock-wide { display: none; }
+  .dock-rail { position: absolute; top: 0; bottom: 0; left: 0; z-index: 2; box-shadow: 8px 0 24px rgba(0,0,0,.15); }
 }
-.dock button { font-size: inherit; background: none; border: 0; color: inherit; padding: 0; }
-.dock header { display: flex; align-items: center; gap: .375rem; padding: .5rem; border-bottom: 1px solid var(--tt-line); }
-.dock-badge { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--tt-claude); color: #fff; }
-.dock-title { flex: 1; font-size: .875rem; font-weight: 600; }
-.dock-btn { width: 1.75rem; height: 1.75rem; border-radius: 50%; color: var(--tt-muted); font-size: 1.1rem; line-height: 1; }
-.dock-btn:hover, .dock #dock-drop:hover { background: var(--tt-wall-soft); }
-
-.dock-log {
-  flex: 1; min-height: 0; overflow-y: auto; padding: .75rem; display: flex; flex-direction: column; gap: 1rem;
-  scrollbar-width: thin; scrollbar-color: var(--tt-line) transparent;
-}
-.dock-empty { margin: 1.5rem 0 0; text-align: center; color: var(--tt-muted); font-size: .875rem; }
-.dock-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: .375rem; }
-.dock .chip { border: 1px solid var(--tt-line); border-radius: 999px; background: var(--tt-wall); padding: .25rem .75rem; font-size: .75rem; }
-.dock .chip:hover { border-color: var(--tt-claude); }
-
-.msg { font-size: .875rem; }
-.msg p { margin: 0; }
-.msg-you { margin-left: 2rem; padding: .5rem .75rem; border-radius: .5rem; background: var(--tt-wall-soft); }
-.msg-you p { white-space: pre-wrap; }
-.msg-about { display: block; margin-top: .25rem; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--tt-muted); text-decoration: none; }
-.msg-buddy { padding: 0 .375rem; line-height: 1.6; }
-.msg-buddy .md > :first-child { margin-top: 0; }
-.msg-buddy .md > :last-child { margin-bottom: 0; }
-.msg-buddy .md p { margin: .375rem 0; }
-.msg-buddy .md a { color: var(--tt-accent); }
-.msg-buddy .md pre, .msg-buddy .md code { background: var(--tt-wall-soft); }
-.msg-buddy .md table { font-size: .8rem; }
-.msg .changes { margin: .375rem 0 0; font: 11px ui-monospace, Menlo, Consolas, monospace; color: var(--tt-muted); }
-/* What the model did on the way to its answer, one line each, as claude.ai lists them. */
-.msg .activity:empty { display: none; }
-.msg .did { margin: .125rem 0; font: 11px ui-monospace, Menlo, Consolas, monospace; color: var(--tt-muted); }
-.msg .did::before { content: "✓ "; color: var(--tt-claude); }
-.msg details.thinking { margin: 0 0 .5rem; font-size: .75rem; color: var(--tt-muted); }
-.msg details.thinking summary { cursor: pointer; }
-.msg .thinking-text { white-space: pre-wrap; margin-top: .25rem; padding-left: .5rem; border-left: 2px solid var(--tt-line); max-height: 12rem; overflow: auto; }
-.msg details.sources { margin-top: .375rem; font-size: 11px; color: var(--tt-muted); }
-.msg details.sources summary { cursor: pointer; }
-.msg details.sources ul { margin: .25rem 0; padding-left: 1rem; }
-.msg details.sources a { color: var(--tt-accent); }
-.msg-artifacts { display: flex; flex-direction: column; gap: .375rem; margin: .5rem 0 0; }
-.msg-artifacts[hidden] { display: none; }
-.msg-error { padding: .375rem .5rem; border: 1px solid #fecaca; border-radius: .25rem; background: #fef2f2; color: #991b1b; font-size: .75rem; }
-@media (prefers-color-scheme: dark) { .msg-error { background: #2a1513; border-color: #5c2420; color: #fca5a5; } }
-.dock-status { margin: 0; padding: 0 .25rem; font: 11px ui-monospace, Menlo, Consolas, monospace; color: var(--tt-muted); }
-.dock-status .spin { display: inline-block; width: .75rem; text-align: center; color: var(--tt-claude); }
-
-.dock-form { position: relative; padding: .625rem; border-top: 1px solid var(--tt-line); border-radius: 0 0 .75rem .75rem; background: var(--tt-card); }
-.dock-form.busy .dock-send { opacity: .4; pointer-events: none; }
-.dock-ctx { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; margin-bottom: .375rem; font-size: 11px; }
-.dock-ctx .quiet { color: var(--tt-muted); }
-.dock .pill { display: inline-flex; align-items: center; gap: .25rem; max-width: 18rem; padding: .125rem .25rem .125rem .5rem; border: 1px solid var(--tt-line); border-radius: 999px; background: var(--tt-wall); }
-.dock .pill-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dock .pill-gap { width: .25rem; }
-.dock #dock-drop { width: 1rem; height: 1rem; border-radius: 50%; line-height: 1; color: var(--tt-muted); }
-.dock-form textarea {
-  display: block; width: 100%; resize: none; padding: .5rem .75rem; font: inherit; font-size: .875rem; line-height: 1.5;
-  background: var(--tt-wall); color: var(--tt-ink); border: 1px solid var(--tt-line); border-radius: .5rem; outline: none;
-}
-.dock-form textarea:focus { border-color: var(--tt-claude); }
-.dock-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .375rem; }
-.dock-opts { display: flex; align-items: center; gap: .75rem; }
-.dock-row label.check { margin: 0; font-size: 11px; color: var(--tt-muted); }
-.dock-row select { font: inherit; font-size: 11px; color: var(--tt-ink); background: var(--tt-wall); border: 1px solid var(--tt-line); border-radius: .25rem; padding: .05rem .25rem; }
-.dock .dock-send { padding: .375rem 1rem; border-radius: .25rem; background: var(--tt-claude); color: #fff; font-size: .75rem; font-weight: 500; }
-.dock .dock-stop { background: var(--tt-muted); }
-.dock .dock-send[hidden] { display: none; }
-
-/* Built in: the chat sits in the page instead of floating over it. */
-.dock.inline { position: static; width: auto; height: min(40rem, calc(100dvh - 5rem)); box-shadow: none; }
-.dock.inline #dock-close, .dock.inline #dock-wide { display: none; }
-.dock.inline .dock-body { flex-direction: column; }
-.dock.inline.staged { width: auto; }
-.dock.inline.staged .dock-chat { flex: 0 0 55%; }
-.dock.inline .dock-stage { border-left: 0; border-top: 1px solid var(--tt-line); }
-/* Opened from a section's button, it hangs from that section's top right corner. */
-.dock.inline.popover {
-  position: absolute; top: 2.6rem; right: .4rem; z-index: 60;
-  width: min(27rem, calc(100% - .8rem)); height: min(32rem, 70dvh);
-  box-shadow: 0 25px 50px -12px rgba(0,0,0,.35);
-}
-.dock.inline.popover #dock-close { display: block; }

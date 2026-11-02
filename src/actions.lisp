@@ -94,11 +94,11 @@
                                      as)))
         "No artifacts made in this field yet.")))
 
-;; The conversation so far as proper turns for the model, newest last. A buddy turn
+;; One chat so far as proper turns for the model, newest last. A buddy turn
 ;; carries, after its text, what it did (map changes, artifacts) so later turns can
 ;; refer to them by id.
-(defun conversation-messages (&optional (limit 20))
-  (let ((ms (last (remove "error" (map-messages) :key (lambda (m) (getf m :role)) :test #'equal) limit)))
+(defun conversation-messages (chat &optional (limit 20))
+  (let ((ms (last (remove "error" (chat-messages chat) :key (lambda (m) (getf m :role)) :test #'equal) limit)))
     (mapcar (lambda (m)
               (list :role (if (equal (getf m :role) "you") "user" "assistant")
                     :content (str (when (and (getf m :node) (equal (getf m :role) "you"))
@@ -209,7 +209,7 @@
                           :content (getf input :content) :language (getf input :language)
                           :node (getf *run* :node))))
     (push (getf a :id) (getf *run* :artifacts))
-    (emit-event "artifact" "html" (artifact-card a))
+    (emit-event "artifact" "html" (artifact-block a))
     (str "Created artifact " (getf a :id) " (" (getf a :type) "): " (getf a :title))))
 
 (deftool update-artifact
@@ -218,7 +218,7 @@
   (input)
   (let ((a (update-artifact! (getf input :id) :content (getf input :content) :title (getf input :title))))
     (cond (a (pushnew (getf a :id) (getf *run* :artifacts) :test #'equal)
-             (emit-event "artifact" "html" (artifact-card a))
+             (emit-event "artifact" "html" (artifact-block a))
              (str "Updated artifact " (getf a :id) " to version " (getf a :version) "."))
           (t (str "No artifact with id " (getf input :id) ".")))))
 
@@ -240,7 +240,7 @@
   (let ((a (add-artifact! :title (getf input :title) :type "flashcards"
                           :content (getf input :cards) :node (getf *run* :node))))
     (push (getf a :id) (getf *run* :artifacts))
-    (emit-event "artifact" "html" (artifact-card a))
+    (emit-event "artifact" "html" (artifact-block a))
     (str "Created flashcards " (getf a :id) " with " (length (getf input :cards)) " cards.")))
 
 (deftool create-quiz
@@ -255,7 +255,7 @@
   (let ((a (add-artifact! :title (getf input :title) :type "quiz"
                           :content (getf input :questions) :node (getf *run* :node))))
     (push (getf a :id) (getf *run* :artifacts))
-    (emit-event "artifact" "html" (artifact-card a))
+    (emit-event "artifact" "html" (artifact-block a))
     (str "Created quiz " (getf a :id) " with " (length (getf input :questions)) " questions.")))
 
 (defparameter *buddy-tools*
@@ -312,11 +312,11 @@
 
 ;; One ask, start to finish: store the learner's message, run the conversation with
 ;; tools, store the reply. EMIT, when given, is where the live events go.
-(defun run-ask (text &key node group scope search effort emit)
-  (add-message! "you" (trim text) :node node)
+(defun run-ask (text &key chat node group scope search effort emit)
+  (add-message! "you" (trim text) :chat chat :node node)
   (let ((*run* (list :node node :changes '() :artifacts '() :sources '() :emit emit)))
     (handler-case
-        (let* ((reply (converse (append (conversation-messages)
+        (let* ((reply (converse (append (conversation-messages chat)
                                         (list (list :role "user" :content (ask-turn text node group scope))))
                                 :system (getf (prompt 'converse) :system)
                                 :tools *buddy-tools*
@@ -324,31 +324,104 @@
                                 :effort (if (member effort '("low" "medium" "high") :test #'equal) effort *effort*)
                                 :on-event #'relay-event))
                (changed (run-changes))
-               (m (add-message! "buddy" (strip-quotes (trim reply)) :node node :changes changed
+               (m (add-message! "buddy" (strip-quotes (trim reply)) :chat chat :node node :changes changed
                                 :artifacts (reverse (getf *run* :artifacts))
                                 :sources (getf *run* :sources))))
           (emit-event "message" "html" (message-view m) "changed" (and changed t))
           m)
       (llm-error (e)
-        (let ((m (add-message! "error" (llm-error-message e) :node node)))
+        (let ((m (add-message! "error" (llm-error-message e) :chat chat :node node)))
           (emit-event "message" "html" (message-view m) "changed" (and (run-changes) t))
           m)))))
 
-;; `here` is the focus the learner asked from: "" (whole field), a group id, or an
-;; idea id. From the dock (`dock` set) the answer streams as server-sent events; a
-;; plain post waits and redirects back to `view`, the tab to land on.
-(defaction ask-buddy "/action/ask" (map-name here text search effort view dock)
+;; A new chat is named after its first exchange, as claude.ai names chats: a short
+;; title from the model, once the reply is in. Until then it wears its first words.
+(defprompt chat-title
+  :system "You name a chat between a learner and their study buddy. Given the learner's first message and the reply, write a title of two to five words that says what the chat is about: specific, plain, no quotes, no trailing punctuation, no leading 'Chat about'. Title case for names only."
+  :schema (:object (:title :string "two to five words")))
+
+;; (name-chat! chat text reply) → the renamed chat, or NIL if the model could not be asked.
+(defun name-chat! (chat text reply)
+  (handler-case
+      (let ((title (getf (ask-structured 'chat-title
+                                         (str "Field: " (map-title) #\Newline
+                                              "Learner's first message:" #\Newline (trim text) #\Newline #\Newline
+                                              "Reply (opening):" #\Newline
+                                              (let ((r (trim (or reply "")))) (subseq r 0 (min 1200 (length r))))))
+                         :title)))
+        (and (not (blankp title)) (rename-chat! (getf chat :id) (strip-quotes title))))
+    (llm-error () nil)))
+
+;; From the REPL: name every chat in the current field still wearing its first words
+;; (a title ending in …), from its first exchange. One model call per chat.
+(defun name-chats! ()
+  (loop for c in (remove-if-not (lambda (c) (and (equal (getf c :map) (map-id)) (not (getf c :deleted))
+                                                 (let ((title (getf c :title)))
+                                                   (and (plusp (length title)) (char= (char title (1- (length title))) #\…)))))
+                                (chats))
+        for ms = (chat-messages (getf c :id))
+        for you = (find "you" ms :key (lambda (m) (getf m :role)) :test #'equal)
+        for buddy = (find "buddy" ms :key (lambda (m) (getf m :role)) :test #'equal)
+        when (and you buddy)
+          collect (let ((named (name-chat! c (getf you :text) (getf buddy :text))))
+                    (format t "~&~a → ~a~%" (getf c :title) (if named (getf named :title) "(not named)"))
+                    named)))
+
+;; `here` is the place the learner asked from: "" (whole field), "timeline", "topics",
+;; or an idea id. `chat` is the chat to continue; blank starts one, titled from the
+;; first words, and the browser is told (a `chat` event) so its list can show it; once
+;; the reply is in, the model names it and a `title` event carries the name.
+;; From the dock (`dock` set) the answer streams as server-sent events; a plain post
+;; waits and redirects back to where the ask came from.
+(defaction ask-buddy "/action/ask" (map-name here chat text search effort dock)
   (unless (select-map map-name) (return-from ask-buddy (not-found "field")))
   (let* ((node (and (not (blankp here)) (find-node here) here))
          (group (and (not (blankp here)) (not node) (find-group here) here))
          (scope (and (member here '("timeline" "topics") :test #'equal) here))
-         (search (not (blankp search))))
-    (cond ((blankp dock)
-           (unless (blankp text) (run-ask text :node node :group group :scope scope :search search :effort effort))
-           (redirect (focus-url here)))
-          ((blankp text) "")
-          (t (sse-response (lambda (emit)
-                             (run-ask text :node node :group group :scope scope :search search :effort effort :emit emit)))))))
+         (search (not (blankp search)))
+         (existing (live-chat chat)))
+    (flet ((chat-for (text)
+             (or existing (new-chat! (or here "") (chat-title-from text))))
+           (run (chat emit)
+             (let ((m (run-ask text :chat (getf chat :id) :node node :group group :scope scope
+                                    :search search :effort effort :emit emit)))
+               (when (and (not existing) (equal (getf m :role) "buddy"))
+                 (let ((named (name-chat! chat text (getf m :text))))
+                   (when (and named emit)
+                     (funcall emit "title" (obj "id" (getf named :id) "title" (getf named :title)))))))))
+      (cond ((blankp dock)
+             (unless (blankp text) (run (chat-for text) nil))
+             (redirect (focus-url here)))
+            ((blankp text) "")
+            (t (sse-response (lambda (emit)
+                               (let ((c (chat-for text)))
+                                 (unless existing
+                                   (funcall emit "chat" (obj "id" (getf c :id) "title" (getf c :title)
+                                                             "html" (chat-item c t))))
+                                 (run c emit)))))))))
+
+;;; ---- Chats: the list beside the dock --------------------------------------
+
+;; The chats at one place, as the dock's rail shows them.
+(defpage chat-list-page "/chats" (map-name scope current)
+  (unless (select-map map-name) (return-from chat-list-page (not-found "field")))
+  (chat-list (or scope "") current))
+
+;; One chat's messages, as the dock's log shows them; "new" is the empty state for
+;; a chat not yet started at `scope`.
+(defpage chat-log-page "/chat/:id" (id map-name scope)
+  (unless (select-map map-name) (return-from chat-log-page (not-found "field")))
+  (dock-log (and (not (equal id "new")) (getf (live-chat id) :id)) (or scope "")))
+
+(defaction rename-chat "/action/rename-chat" (map-name id title)
+  (unless (select-map map-name) (return-from rename-chat (not-found "field")))
+  (let ((c (rename-chat! id title)))
+    (raw-response "text/plain; charset=utf-8" (if c (getf c :title) ""))))
+
+(defaction delete-chat "/action/delete-chat" (map-name id)
+  (unless (select-map map-name) (return-from delete-chat (not-found "field")))
+  (delete-chat! id)
+  (raw-response "text/plain; charset=utf-8" "ok"))
 
 ;;; ---- Write: check an explanation ---------------------------------------
 
@@ -378,7 +451,9 @@
                                         (str "Field: " (map-title) #\Newline (node-context node-id) #\Newline
                                              "Learner wrote:" #\Newline text))))
           (add-attempt! node-id (trim text) (clean-feedback feedback)))
-      (llm-error (e) (add-message! "error" (llm-error-message e) :node node-id))))
+      ;; The failure shows in the idea's chat, in the newest one or a fresh one.
+      (llm-error (e) (add-message! "error" (llm-error-message e) :node node-id
+                                   :chat (getf (or (newest-chat node-id) (new-chat! node-id "Checking an attempt")) :id)))))
   (redirect (node-url node-id)))
 
 ;;; ---- Hand edits (plain) ---------------------------------------------------

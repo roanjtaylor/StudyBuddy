@@ -100,6 +100,19 @@
             (:span :class "artifact-title" (getf a :title))
             (:span :class "artifact-kind" (artifact-meta a))))))
 
+;; In the chat, a visual artifact (a diagram, a page) shows itself, as claude.ai shows
+;; images inline: a framed preview with its card under it to open it on the stage.
+;; Anything else (cards, a quiz, a document, code) is its card alone.
+(defparameter *inline-artifact-types* '("svg" "mermaid" "html"))
+
+(defcomponent artifact-block (a)
+  (if (member (getf a :type) *inline-artifact-types* :test #'equal)
+      (html (:figure :class (str "artifact-inline artifact-inline-" (getf a :type)) :data-artifact (getf a :id)
+              (:iframe :class "artifact-preview" :src (artifact-view-url (getf a :id)) :title (getf a :title)
+                       :loading "lazy" :sandbox (if (equal (getf a :type) "svg") "" "allow-scripts"))
+              (artifact-card a)))
+      (artifact-card a)))
+
 ;; The artifact as text, for the model to read back.
 (defun artifact-text (a)
   (let ((c (getf a :content)))
@@ -116,6 +129,7 @@
 (defcomponent message-view (m)
   (let ((role (getf m :role)) (node (getf m :node)))
     (html (:article :class (str "msg msg-" role)
+            (when (equal role "buddy") (html (:span :class "msg-mark" (claude-mark "mark"))))
             (cond ((equal role "buddy") (markdown (getf m :text)))
                   (t (html (:p (getf m :text)))))
             (when (and node (equal role "you"))
@@ -123,7 +137,7 @@
             (when (getf m :artifacts)
               (html (:div :class "msg-artifacts"
                       (dolist (id (getf m :artifacts))
-                        (let ((a (find-artifact id))) (when a (artifact-card a)))))))
+                        (let ((a (find-artifact id))) (when a (artifact-block a)))))))
             (when (getf m :sources)
               (html (:details :class "sources"
                       (:summary (length (getf m :sources)) " sources")
@@ -133,55 +147,115 @@
             (when (getf m :changes)
               (html (:p :class "changes" "✻ map changed: " (getf m :changes))))))))
 
-;; The conversation, or, before there is one, a nudge and a few canned asks. The ask
-;; action returns exactly this, and dock.js swaps it into #dock-log.
-(defcomponent dock-log (focus)
-  (let ((ms (map-messages)))
+;; Small line icons, drawn once here so the dock borrows nothing.
+(defparameter *icons*
+  '(("rail"   . "M4 5h16M4 12h16M4 19h16")
+    ("new"    . "M12 5v14M5 12h14")
+    ("send"   . "M12 19V5M5 12l7-7 7 7")
+    ("stop"   . "M7 7h10v10H7z")
+    ("rename" . "M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17z")
+    ("trash"  . "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3")
+    ("check"  . "M5 12l5 5L20 7")
+    ("x"      . "M6 6l12 12M18 6L6 18")
+    ("open"   . "M14 4h6v6M20 4l-9 9M19 14v6H5V6h6")
+    ("wide"   . "M4 12h16M14 6l6 6-6 6")
+    ("globe"  . "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18")
+    ("spark"  . "M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4")))
+
+(defcomponent icon (name &optional (class "ico"))
+  (html (:svg :class class :viewBox "0 0 24 24" :fill "none" :stroke "currentColor"
+              :stroke-width "2" :stroke-linecap "round" :stroke-linejoin "round" :aria-hidden "true"
+          (:path :d (cdr (assoc name *icons* :test #'equal))))))
+
+;; One chat in the rail. Its title is a button; rename and delete appear on hover.
+(defcomponent chat-item (c &optional current)
+  (html (:li :class (str "chat-item" (if current " current" "")) :data-chat (getf c :id)
+          (:button :type "button" :class "chat-open" :title (getf c :title)
+            (:span :class "chat-title" (getf c :title)))
+          (:span :class "chat-tools"
+            (:button :type "button" :class "chat-rename" :title "Rename" :aria-label "Rename" (icon "rename"))
+            (:button :type "button" :class "chat-delete" :title "Delete" :aria-label "Delete" (icon "trash"))))))
+
+;; The chats at one place, newest first. /chats returns exactly this.
+(defcomponent chat-list (scope &optional current)
+  (let ((cs (scope-chats scope)))
+    (html (if cs
+              (dolist (c cs) (chat-item c (equal (getf c :id) current)))
+              (html (:li :class "rail-empty" "No chats here yet."))))))
+
+;; Before a chat has a message: a greeting for the place, and a few asks to start from.
+(defcomponent dock-empty (scope)
+  (let ((node (find-node scope)))
+    (html (:div :class "dock-empty"
+            (:p :class "greeting"
+              (cond (node (str "Let's go deep on " (getf node :title) "."))
+                    ((equal scope "timeline") "Let's work on the timeline.")
+                    ((equal scope "topics") "Let's shape the topics.")
+                    (t (str "What are we working on in " (map-title) "?"))))
+            (:div :class "dock-chips"
+              (loop for (label text) in (cond (node *node-chips*) ((equal scope "timeline") *timeline-chips*)
+                                              ((equal scope "topics") *topic-chips*) (t *field-chips*))
+                    do (html (:button :type "button" :class "chip" :data-text text label))))))))
+
+;; One chat's messages, or the empty state. /chat/:id returns exactly this and
+;; dock.js swaps it into #dock-log.
+(defcomponent dock-log (chat scope)
+  (let ((ms (and chat (chat-messages chat))))
     (html (if ms
               (dolist (m ms) (message-view m))
-              (html (:p :class "dock-empty" "Ask anything about this field, or tell me how to change the map.")
-                    (:div :class "dock-chips"
-                      (loop for (label text) in (cond ((find-node focus) *node-chips*) ((equal focus "timeline") *timeline-chips*) ((equal focus "topics") *topic-chips*) (t *field-chips*))
-                            do (html (:button :type "button" :class "chip" :data-text text label)))))))))
+              (dock-empty scope)))))
 
 (defcomponent claude-dock (focus)
-  (html (:button :type "button" :id "dock-open" :class "dock-launcher" :hidden t
-                 :aria-label "Ask Claude" :title "Ask Claude" (claude-mark "mark big"))
-        (:section :id "dock" :class "dock inline" :aria-label "Claude"
-          (:header
-            (:span :class "dock-badge" (claude-mark "mark"))
-            (:span :class "dock-title" "Claude")
-            (:button :type "button" :id "dock-wide" :class "dock-btn" :title "Widen" "⇥")
-            (:button :type "button" :id "dock-close" :class "dock-btn" :title "Close" :aria-label "Close" "×"))
-          (:div :class "dock-body"
-            (:div :class "dock-chat"
-              (:div :id "dock-log" :class "dock-log" (dock-log focus))
-              (:form :id "dock-form" :class "dock-form" :method "post" :action "/action/ask"
-                     :data-field (map-title)
-                (hidden "map-name" (map-id)) (hidden "dock" "1")
-                (:input :type "hidden" :name "here" :value focus)
-                (:div :class "dock-ctx"
-                  (:span :class "quiet" "Looking at")
-                  (:span :class "pill"
-                    (:span :class "pill-text" (focus-label focus))))
-                (:textarea :name "text" :rows 2 :spellcheck "false"
-                           :placeholder "Ask, ask for a change, or ask for cards, a quiz, a diagram, a page…")
-                (:div :class "dock-row"
-                  (:span :class "dock-opts"
-                    (:label :class "check" (:input :type "checkbox" :name "search" :value "1") " web")
-                    (:label :class "check" "think "
-                      (:select :name "effort" :id "dock-effort"
-                        (:option :value "" "off") (:option :value "low" "low")
-                        (:option :value "medium" "medium") (:option :value "high" "high"))))
-                  (:button :type "submit" :class "dock-send" "Send")
-                  (:button :type "button" :id "dock-stop" :class "dock-send dock-stop" :hidden t "Stop"))))
-            ;; The stage: where an artifact opens beside the chat, as on claude.ai.
-            (:aside :id "dock-stage" :class "dock-stage" :hidden t
-              (:header
-                (:span :id "stage-title" :class "stage-title")
-                (:a :id "stage-open" :class "dock-btn" :href "#" :target "_blank" :title "Open on its own page" "↗")
-                (:button :type "button" :id "stage-close" :class "dock-btn" :title "Close" "×"))
-              (:iframe :id "stage-frame" :class "stage-frame" :title "Artifact"))))))
+  (let* ((chat (newest-chat focus)) (chat-id (getf chat :id)))
+    (html (:button :type "button" :id "dock-open" :class "dock-launcher" :hidden t
+                   :aria-label "Ask Claude" :title "Ask Claude" (claude-mark "mark big"))
+          (:section :id "dock" :class "dock inline" :aria-label "Claude"
+            (:header
+              (:button :type "button" :id "dock-rail-toggle" :class "dock-btn" :title "Chats" :aria-label "Chats" (icon "rail"))
+              (:span :class "dock-badge" (claude-mark "mark"))
+              (:span :id "dock-title" :class "dock-title" (getf* chat :title "New chat"))
+              (:button :type "button" :id "dock-new" :class "dock-btn" :title "New chat" :aria-label "New chat" (icon "new"))
+              (:button :type "button" :id "dock-wide" :class "dock-btn" :title "Widen" :aria-label "Widen" (icon "wide"))
+              (:button :type "button" :id "dock-close" :class "dock-btn" :title "Close" :aria-label "Close" (icon "x")))
+            (:div :class "dock-body"
+              ;; The rail: this place's chats, as claude.ai lists them.
+              (:aside :id "dock-rail" :class "dock-rail" :aria-label "Chats"
+                (:div :class "rail-head"
+                  (:span :class "rail-title" "Chats")
+                  (:button :type "button" :id "rail-new" :class "rail-newbtn" (icon "new") " New chat"))
+                (:ul :id "chat-list" :class "chat-list" (chat-list focus chat-id)))
+              (:div :class "dock-chat"
+                (:div :id "dock-log" :class "dock-log" (dock-log chat-id focus))
+                ;; The composer: one card, as on claude.ai.
+                (:form :id "dock-form" :class "dock-form" :method "post" :action "/action/ask"
+                       :data-field (map-title)
+                  (hidden "map-name" (map-id)) (hidden "dock" "1")
+                  (:input :type "hidden" :name "here" :value focus)
+                  (:input :type "hidden" :name "chat" :value (or chat-id ""))
+                  (:div :class "composer"
+                    (:textarea :name "text" :rows 1 :spellcheck "false"
+                               :placeholder "Ask, ask for a change, or ask for cards, a quiz, a diagram, a page…")
+                    (:div :class "composer-row"
+                      (:span :class "composer-tools"
+                        (:span :class "pill" :title "What Claude is looking at"
+                          (:span :class "pill-text" (focus-label focus)))
+                        (:label :class "toggle" :title "Search the web"
+                          (:input :type "checkbox" :name "search" :value "1") (icon "globe") (:span "Web"))
+                        (:label :class "toggle select" :title "Extended thinking"
+                          (:span "Think")
+                          (:select :name "effort" :id "dock-effort"
+                            (:option :value "" "off") (:option :value "low" "low")
+                            (:option :value "medium" "medium") (:option :value "high" "high"))))
+                      (:button :type "submit" :class "dock-send" :title "Send" :aria-label "Send" (icon "send"))
+                      (:button :type "button" :id "dock-stop" :class "dock-send dock-stop" :hidden t
+                               :title "Stop" :aria-label "Stop" (icon "stop"))))))
+              ;; The stage: where an artifact opens beside the chat, as on claude.ai.
+              (:aside :id "dock-stage" :class "dock-stage" :hidden t
+                (:header
+                  (:span :id "stage-title" :class "stage-title")
+                  (:a :id "stage-open" :class "dock-btn" :href "#" :target "_blank" :title "Open on its own page" (icon "open"))
+                  (:button :type "button" :id "stage-close" :class "dock-btn" :title "Close" (icon "x")))
+                (:iframe :id "stage-frame" :class "stage-frame" :title "Artifact")))))))
 
 
 ;;; ---- Views of a field -----------------------------------------------------

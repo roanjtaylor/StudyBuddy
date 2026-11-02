@@ -1,8 +1,9 @@
 /* ---- Artifact frames: the thing itself, chromeless, in the app's colours ---- */
 body.artifact { padding: 1rem; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
-body.artifact-svg, body.artifact-mermaid { display: grid; place-items: center; min-height: 100vh; margin: 0; }
-.svg-wrap { max-width: 100%; }
-.svg-wrap svg { max-width: 100%; height: auto; }
+/* A drawing fills the frame, sized by its viewBox: the model writes SVGs with a viewBox and no width or height. */
+body.artifact-svg, body.artifact-mermaid { display: grid; place-items: center; min-height: 100vh; margin: 0; box-sizing: border-box; padding: .5rem; }
+.svg-wrap { width: 100%; }
+.svg-wrap svg { display: block; width: 100%; height: auto; max-height: calc(100vh - 1rem); }
 pre.mermaid { margin: 0; }
 .doc { max-width: 44rem; margin: 0 auto; font-size: 1.05rem; }
 pre.code { white-space: pre; overflow: auto; font-size: .9rem; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; }

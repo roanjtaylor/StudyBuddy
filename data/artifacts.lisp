@@ -193,3 +193,180 @@
   <text x=\"430\" y=\"168\" font-size=\"11\" fill=\"#b03030\">controls the path</text>
 </svg>"
  :AT "2026-11-01T00:05:40" :VERSION 1)
+(:ID "sr-latch-from-two-nor-gates" :MAP "computers" :NODE NIL :TYPE "svg" :TITLE
+ "SR latch from two NOR gates" :LANGUAGE NIL :CONTENT
+ "<svg viewBox=\"0 0 640 420\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"sans-serif\">
+  <style>
+    .lbl{font-size:16px;fill:#111}
+    .pin{font-size:14px;fill:#333}
+    .wire{stroke:#111;stroke-width:2;fill:none}
+    .fb{stroke:#c0392b;stroke-width:2;fill:none;stroke-dasharray:5 4}
+    .gate{fill:#eef3fb;stroke:#2c3e50;stroke-width:2}
+    .title{font-size:18px;fill:#111;font-weight:bold}
+    .note{font-size:13px;fill:#555}
+    .hdr{font-size:13px;fill:#111;font-weight:bold}
+    td,th{}
+  </style>
+
+  <text x=\"20\" y=\"28\" class=\"title\">SR latch: two NOR gates in a loop</text>
+
+  <!-- NOR gate 1 (top) -->
+  <g>
+    <path d=\"M200,70 q30,0 55,35 q-25,35 -55,35 q15,-35 0,-70 z\" class=\"gate\"/>
+    <circle cx=\"258\" cy=\"105\" r=\"5\" class=\"gate\"/>
+    <text x=\"215\" y=\"110\" class=\"pin\">NOR</text>
+  </g>
+  <!-- NOR gate 2 (bottom) -->
+  <g>
+    <path d=\"M200,230 q30,0 55,35 q-25,35 -55,35 q15,-35 0,-70 z\" class=\"gate\"/>
+    <circle cx=\"258\" cy=\"265\" r=\"5\" class=\"gate\"/>
+    <text x=\"215\" y=\"270\" class=\"pin\">NOR</text>
+  </g>
+
+  <!-- R input into top gate -->
+  <line x1=\"90\" y1=\"85\" x2=\"200\" y2=\"85\" class=\"wire\"/>
+  <text x=\"70\" y=\"90\" class=\"lbl\">R</text>
+  <!-- S input into bottom gate -->
+  <line x1=\"90\" y1=\"285\" x2=\"200\" y2=\"285\" class=\"wire\"/>
+  <text x=\"70\" y=\"290\" class=\"lbl\">S</text>
+
+  <!-- Q output from top -->
+  <line x1=\"263\" y1=\"105\" x2=\"430\" y2=\"105\" class=\"wire\"/>
+  <text x=\"440\" y=\"110\" class=\"lbl\">Q</text>
+  <!-- Q' output from bottom -->
+  <line x1=\"263\" y1=\"265\" x2=\"430\" y2=\"265\" class=\"wire\"/>
+  <text x=\"440\" y=\"270\" class=\"lbl\">Q&#772;</text>
+
+  <!-- Feedback Q -> bottom gate second input -->
+  <path d=\"M330,105 L330,160 L180,160 L180,250 L200,250\" class=\"fb\"/>
+  <!-- Feedback Q' -> top gate second input -->
+  <path d=\"M360,265 L360,200 L160,200 L160,120 L200,120\" class=\"fb\"/>
+
+  <text x=\"300\" y=\"150\" class=\"note\">red = feedback: each output steers the other gate</text>
+
+  <!-- State table -->
+  <text x=\"20\" y=\"345\" class=\"hdr\">S  R   →   Q</text>
+  <text x=\"20\" y=\"368\" class=\"note\">0  0   hold previous Q   ← this is the memory</text>
+  <text x=\"20\" y=\"388\" class=\"note\">1  0   Q = 1   (set)</text>
+  <text x=\"20\" y=\"408\" class=\"note\">0  1   Q = 0   (reset)</text>
+  <text x=\"330\" y=\"388\" class=\"note\">1  1   not allowed</text>
+</svg>"
+ :AT "2026-11-02T13:07:07" :VERSION 1)
+(:ID "d-flip-flop-timing" :MAP "computers" :NODE NIL :TYPE "svg" :TITLE "D flip-flop timing"
+ :LANGUAGE NIL :CONTENT
+ "<svg viewBox=\"0 0 640 420\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"sans-serif\">
+  <style>
+    .title{font-size:18px;fill:#111;font-weight:bold}
+    .lbl{font-size:15px;fill:#111}
+    .sig{stroke:#2c3e50;stroke-width:2.5;fill:none}
+    .d{stroke:#2980b9;stroke-width:2.5;fill:none}
+    .q{stroke:#c0392b;stroke-width:2.5;fill:none}
+    .edge{stroke:#27ae60;stroke-width:1.5;stroke-dasharray:4 4}
+    .note{font-size:13px;fill:#555}
+  </style>
+
+  <text x=\"20\" y=\"28\" class=\"title\">D flip-flop: Q copies D only on the rising edge</text>
+
+  <!-- clock -->
+  <text x=\"20\" y=\"90\" class=\"lbl\">CLK</text>
+  <path d=\"M70,110 L70,70 L130,70 L130,110 L190,110 L190,70 L250,70 L250,110 L310,110 L310,70 L370,70 L370,110 L430,110 L430,70 L490,70 L490,110 L550,110\"
+        class=\"sig\"/>
+
+  <!-- rising edge markers -->
+  <line x1=\"70\" y1=\"60\" x2=\"70\" y2=\"340\" class=\"edge\"/>
+  <line x1=\"190\" y1=\"60\" x2=\"190\" y2=\"340\" class=\"edge\"/>
+  <line x1=\"310\" y1=\"60\" x2=\"310\" y2=\"340\" class=\"edge\"/>
+  <line x1=\"430\" y1=\"60\" x2=\"430\" y2=\"340\" class=\"edge\"/>
+
+  <!-- D input (arbitrary) -->
+  <text x=\"20\" y=\"210\" class=\"lbl\">D</text>
+  <path d=\"M70,230 L120,230 L120,190 L260,190 L260,230 L350,230 L350,190 L470,190 L470,230 L550,230\" class=\"d\"/>
+
+  <!-- Q output: samples D at each green edge -->
+  <text x=\"20\" y=\"320\" class=\"lbl\">Q</text>
+  <!-- edge at 70: D=low -> Q low; edge 190: D high -> Q high; edge 310: D high -> Q high; edge 430: D low... wait D at 430 is low -->
+  <path d=\"M70,340 L190,340 L190,300 L430,300 L430,340 L550,340\" class=\"q\"/>
+
+  <text x=\"60\" y=\"380\" class=\"note\">At each green line (rising edge) Q grabs D's value and holds it until the next edge.</text>
+  <text x=\"60\" y=\"400\" class=\"note\">Between edges, D can wobble all it likes — Q ignores it. That lockstep is why the clock matters.</text>
+</svg>"
+ :AT "2026-11-02T13:07:16" :VERSION 1)
+(:ID "d-flip-flop-chip-and-innards" :MAP "computers" :NODE NIL :TYPE "svg" :TITLE
+ "D flip-flop: chip and innards" :LANGUAGE NIL :CONTENT
+ "<svg viewBox=\"0 0 860 520\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"sans-serif\">
+  <rect width=\"860\" height=\"520\" fill=\"#0f1117\"/>
+  <text x=\"430\" y=\"34\" fill=\"#e8e8f0\" font-size=\"22\" text-anchor=\"middle\" font-weight=\"bold\">A D flip-flop — the thing itself</text>
+
+  <!-- LEFT: the chip -->
+  <text x=\"210\" y=\"74\" fill=\"#9 aa\" font-size=\"15\" text-anchor=\"middle\" fill=\"#8891a8\">As a chip (7474-style package)</text>
+  <!-- body -->
+  <rect x=\"120\" y=\"100\" width=\"180\" height=\"300\" rx=\"8\" fill=\"#1c1f2b\" stroke=\"#3a4161\" stroke-width=\"2\"/>
+  <!-- notch -->
+  <path d=\"M190 100 a20 20 0 0 0 40 0\" fill=\"#0f1117\" stroke=\"#3a4161\" stroke-width=\"2\"/>
+  <circle cx=\"145\" cy=\"130\" r=\"6\" fill=\"#0f1117\" stroke=\"#3a4161\"/>
+  <!-- left pins -->
+  <g fill=\"#c9a94a\">
+    <rect x=\"90\" y=\"130\" width=\"30\" height=\"10\"/><rect x=\"90\" y=\"175\" width=\"30\" height=\"10\"/>
+    <rect x=\"90\" y=\"220\" width=\"30\" height=\"10\"/><rect x=\"90\" y=\"265\" width=\"30\" height=\"10\"/>
+    <rect x=\"90\" y=\"310\" width=\"30\" height=\"10\"/><rect x=\"90\" y=\"355\" width=\"30\" height=\"10\"/>
+  </g>
+  <!-- right pins -->
+  <g fill=\"#c9a94a\">
+    <rect x=\"300\" y=\"130\" width=\"30\" height=\"10\"/><rect x=\"300\" y=\"175\" width=\"30\" height=\"10\"/>
+    <rect x=\"300\" y=\"220\" width=\"30\" height=\"10\"/><rect x=\"300\" y=\"265\" width=\"30\" height=\"10\"/>
+    <rect x=\"300\" y=\"310\" width=\"30\" height=\"10\"/><rect x=\"300\" y=\"355\" width=\"30\" height=\"10\"/>
+  </g>
+  <!-- pin labels left -->
+  <g fill=\"#e8e8f0\" font-size=\"13\">
+    <text x=\"128\" y=\"139\">CLR</text>
+    <text x=\"128\" y=\"184\">D</text>
+    <text x=\"128\" y=\"229\">CLK</text>
+    <text x=\"128\" y=\"274\">PRE</text>
+    <text x=\"128\" y=\"319\">Q</text>
+    <text x=\"128\" y=\"364\">GND</text>
+  </g>
+  <g fill=\"#e8e8f0\" font-size=\"13\" text-anchor=\"end\">
+    <text x=\"292\" y=\"139\">Vcc</text>
+    <text x=\"292\" y=\"184\">·</text>
+    <text x=\"292\" y=\"229\">·</text>
+    <text x=\"292\" y=\"274\">·</text>
+    <text x=\"292\" y=\"319\">Q̄</text>
+    <text x=\"292\" y=\"364\">·</text>
+  </g>
+  <text x=\"210\" y=\"430\" fill=\"#8891a8\" font-size=\"12\" text-anchor=\"middle\">D in, CLK in → Q out. Power + ground.</text>
+  <text x=\"210\" y=\"448\" fill=\"#8891a8\" font-size=\"12\" text-anchor=\"middle\">The whole memory cell, pinned out.</text>
+
+  <!-- arrow -->
+  <path d=\"M345 250 L395 250\" stroke=\"#6b7bb8\" stroke-width=\"2\" marker-end=\"url(#a)\"/>
+  <defs><marker id=\"a\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"3\" orient=\"auto\"><path d=\"M0 0 L8 3 L0 6 Z\" fill=\"#6b7bb8\"/></marker></defs>
+  <text x=\"370\" y=\"240\" fill=\"#6b7bb8\" font-size=\"11\" text-anchor=\"middle\">open it</text>
+
+  <!-- RIGHT: standard symbol -->
+  <text x=\"640\" y=\"74\" fill=\"#8891a8\" font-size=\"15\" text-anchor=\"middle\">As the logic symbol</text>
+  <rect x=\"540\" y=\"130\" width=\"200\" height=\"200\" rx=\"4\" fill=\"#1c1f2b\" stroke=\"#5a6aa0\" stroke-width=\"2\"/>
+  <!-- D input -->
+  <line x1=\"490\" y1=\"170\" x2=\"540\" y2=\"170\" stroke=\"#7fd1b9\" stroke-width=\"2\"/>
+  <text x=\"482\" y=\"175\" fill=\"#7fd1b9\" font-size=\"16\" text-anchor=\"end\">D</text>
+  <text x=\"555\" y=\"176\" fill=\"#e8e8f0\" font-size=\"16\">D</text>
+  <!-- clock input with triangle (edge-trigger) -->
+  <line x1=\"490\" y1=\"290\" x2=\"540\" y2=\"290\" stroke=\"#c9a94a\" stroke-width=\"2\"/>
+  <text x=\"482\" y=\"295\" fill=\"#c9a94a\" font-size=\"16\" text-anchor=\"end\">CLK</text>
+  <polyline points=\"540,278 558,290 540,302\" fill=\"none\" stroke=\"#e8e8f0\" stroke-width=\"2\"/>
+  <!-- Q output -->
+  <line x1=\"740\" y1=\"170\" x2=\"790\" y2=\"170\" stroke=\"#f2a6a6\" stroke-width=\"2\"/>
+  <text x=\"724\" y=\"176\" fill=\"#e8e8f0\" font-size=\"16\" text-anchor=\"end\">Q</text>
+  <text x=\"798\" y=\"175\" fill=\"#f2a6a6\" font-size=\"16\">Q</text>
+  <!-- Qbar -->
+  <line x1=\"740\" y1=\"290\" x2=\"790\" y2=\"290\" stroke=\"#9fb0e0\" stroke-width=\"2\"/>
+  <text x=\"722\" y=\"296\" fill=\"#e8e8f0\" font-size=\"16\" text-anchor=\"end\">Q̄</text>
+  <text x=\"798\" y=\"295\" fill=\"#9fb0e0\" font-size=\"16\">Q̄</text>
+
+  <text x=\"640\" y=\"370\" fill=\"#8891a8\" font-size=\"12\" text-anchor=\"middle\">The small triangle on CLK means:</text>
+  <text x=\"640\" y=\"388\" fill=\"#8891a8\" font-size=\"12\" text-anchor=\"middle\">\"only act on the rising edge.\"</text>
+
+  <text x=\"640\" y=\"430\" fill=\"#7fd1b9\" font-size=\"13\" text-anchor=\"middle\">Inside this box lives the cross-wired loop</text>
+  <text x=\"640\" y=\"450\" fill=\"#7fd1b9\" font-size=\"13\" text-anchor=\"middle\">(your SR-latch diagram) plus a clock gate.</text>
+
+  <text x=\"430\" y=\"500\" fill=\"#c9a94a\" font-size=\"14\" text-anchor=\"middle\" font-style=\"italic\">One bit of memory. Thousands of these in a row = a register; millions in a grid = RAM.</text>
+</svg>"
+ :AT "2026-11-02T13:26:01" :VERSION 1)

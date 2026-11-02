@@ -13,6 +13,7 @@
 
 (defstore attempt  (:file "attempts.lisp"  :key :id :append t))
 (defstore message  (:file "messages.lisp"  :key :id :append t))
+(defstore chat     (:file "chats.lisp"     :key :id))
 (defstore setting  (:file "settings.lisp"  :key :key))
 (defstore artifact (:file "artifacts.lisp" :key :id))
 
@@ -209,19 +210,73 @@
                       :ref (node-ref id) :map (map-id) :node-id id
                       :at (now-iso) :text text :feedback feedback)))
 
-;;; ---- Messages: the conversation with the field -------------------------
-;;; One conversation per field, oldest first. A message may be about one node.
-;;; :role is "you", "buddy" or "error"; :changes is the one-line summary of what
-;;; the model changed in the map, when it did.
+;;; ---- Chats: the conversations, several per place ------------------------
+;;; A chat belongs to one place in a field — its :scope is "" (the field), "timeline",
+;;; "topics", or an idea id — the way claude.ai keeps a list of chats. Messages carry
+;;; the chat's id. Deleting marks the chat :deleted (the message file is append-only,
+;;; so nothing is rewritten); renaming puts a new title. Messages from before chats
+;;; existed (no :chat) show as one "Earlier conversation" chat of the field.
 
-(defun map-messages (&optional node)
+(defun earlier-chat-id () (str "earlier@" (map-id)))
+
+(defun earlier-chat ()
+  (let ((record (find-chat (earlier-chat-id))))
+    (when (and (not (getf record :deleted))
+               (find-if (lambda (m) (and (equal (getf m :map) (map-id)) (null (getf m :chat)))) (messages)))
+      (list :id (earlier-chat-id) :map (map-id) :scope ""
+            :title (getf* record :title "Earlier conversation") :at ""))))
+
+;; (scope-chats "ram") → the live chats at that place, newest first.
+(defun scope-chats (scope)
+  (let ((cs (remove-if-not (lambda (c) (and (equal (getf c :map) (map-id)) (equal (getf c :scope) scope)
+                                            (not (getf c :deleted)) (not (equal (getf c :id) (earlier-chat-id)))))
+                           (chats))))
+    (append (sort (copy-list cs) #'string> :key (lambda (c) (getf c :at)))
+            (when (equal scope "") (let ((e (earlier-chat))) (when e (list e)))))))
+
+(defun newest-chat (scope) (first (scope-chats scope)))
+
+(defun live-chat (id)
+  (cond ((blankp id) nil)
+        ((equal id (earlier-chat-id)) (earlier-chat))
+        (t (let ((c (find-chat id))) (and c (not (getf c :deleted)) (equal (getf c :map) (map-id)) c)))))
+
+;; "Quiz me across this field: five questions, answers…" → the first words, as a title.
+(defun chat-title-from (text)
+  (let* ((line (trim (or (first (lines (trim (or text "")))) "")))
+         (words (remove "" (uiop:split-string line :separator " ") :test #'equal))
+         (title (join " " (subseq words 0 (min 7 (length words))))))
+    (cond ((blankp title) "New chat")
+          ((< (length title) (length line)) (str (string-right-trim ",.;:" title) "…"))
+          (t title))))
+
+(defun new-chat! (scope title)
+  (put-chat! (list :id (str "chat-" (get-universal-time) "-" (length (chats)))
+                   :map (map-id) :scope scope :title (trim title) :at (now-iso))))
+
+(defun rename-chat! (id title)
+  (let ((c (or (find-chat id) (and (equal id (earlier-chat-id)) (earlier-chat)))))
+    (when (and c (not (blankp title)))
+      (put-chat! (plist-update c :title (trim title))))))
+
+(defun delete-chat! (id)
+  (let ((c (or (find-chat id) (and (equal id (earlier-chat-id)) (earlier-chat)))))
+    (when c (put-chat! (plist-update c :deleted t)))))
+
+;;; ---- Messages: what was said in a chat ----------------------------------
+;;; Oldest first. A message may be about one node. :role is "you", "buddy" or
+;;; "error"; :changes is the one-line summary of what the model changed in the map.
+
+(defun chat-messages (chat)
   (remove-if-not (lambda (m) (and (equal (getf m :map) (map-id))
-                                  (or (null node) (equal (getf m :node) node))))
+                                  (if (equal chat (earlier-chat-id))
+                                      (null (getf m :chat))
+                                      (equal (getf m :chat) chat))))
                  (messages)))
 
-(defun add-message! (role text &key node changes artifacts sources)
+(defun add-message! (role text &key chat node changes artifacts sources)
   (put-message! (list :id (str (now-iso) "#" (length (messages)))
-                      :map (map-id) :node node :role role :at (now-iso)
+                      :map (map-id) :chat chat :node node :role role :at (now-iso)
                       :text text :changes changes :artifacts artifacts :sources sources)))
 
 ;;; ---- Artifacts: things the model makes that are not prose ----------------
