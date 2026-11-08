@@ -524,7 +524,7 @@
     (remove-artifact! id)
     (redirect (cond ((and a (getf a :node) (select-map (getf a :map))) (node-url (getf a :node)))
                     (a (field-url (getf a :map)))
-                    (t "/fields")))))
+                    (t "/")))))
 
 (defaction about "/action/about" (text)
   (set-about-text! (or text ""))
@@ -546,7 +546,7 @@
                    (:nodes (:array #.*node-schema*))))
 
 (defaction seed "/action/seed" (field note)
-  (when (blankp field) (return-from seed (redirect "/fields")))
+  (when (blankp field) (return-from seed (redirect "/")))
   (let ((id (slugify field)))
     (when (map-exists-p id) (setf id (str id "-" (get-universal-time))))
     (let ((r (ask-with-search 'seed-map

@@ -1,4 +1,4 @@
-;;;; L5b — Pages. A directory: / (what this is for) → /fields → /computers →
+;;;; L5b — Pages. A directory: / (what this is for, and the fields) → /computers →
 ;;;; /computers/switches → /computers/switches/ram. Every page is live:
 ;;;; re-evaluate the form, refresh the browser.
 
@@ -518,30 +518,29 @@
           (dolist (m (list-maps))
             (html (:li (:a :href (field-url m) (getf (field-summary m) :title))))))))
 
-;;; ---- Home: what this is for ----------------------------------------------
+;;; ---- Home: what this is for, and the fields ------------------------------
 
-(defpage home "/" ()
+(defpage home "/" (new)
   (layout "StudyBuddy"
     (html (:div :class "home"
-            (markdown (about-text))))))
+            (:div :class "home-about" (markdown (about-text)))
+            (:aside :class "home-fields" :aria-label "Fields"
+              (:div :class "heading"
+                (:h2 "Fields")
+                (:a :class "round" :href (if new "/" "/?new=1")
+                    :title (if new "Cancel" "New field")
+                    (if new "×" "+")))
+              (when new
+                (html (:form :method "post" :action "/action/seed" :class "ask-form"
+                        (:label "Field" (:input :type "text" :name "field" :required t :placeholder "e.g. Thermodynamics"))
+                        (:label "What you already know, and why you want it"
+                                (:textarea :name "note" :rows 4))
+                        (:button :type "submit" :class "primary" "Create field"))))
+              (field-list))))))
 
-;;; ---- Fields ---------------------------------------------------------------
-
-(defpage fields-page "/fields" (new)
-  (let ((*crumbs* '(("fields"))))
-    (layout "Fields"
-      (html (:div :class "heading"
-              (:h1 "Fields")
-              (:a :class "round" :href (if new "/fields" "/fields?new=1")
-                  :title (if new "Cancel" "New field")
-                  (if new "×" "+")))
-            (when new
-              (html (:form :method "post" :action "/action/seed" :class "ask-form"
-                      (:label "Field" (:input :type "text" :name "field" :required t :placeholder "e.g. Thermodynamics"))
-                      (:label "What you already know, and why you want it"
-                              (:textarea :name "note" :rows 4))
-                      (:button :type "submit" :class "primary" "Create field"))))
-            (field-list)))))
+;; The old address folds into the home page.
+(defpage fields-page "/fields" ()
+  (redirect "/"))
 
 ;;; ---- A field, or one group of it -----------------------------------------
 
@@ -551,8 +550,7 @@
          (nodes (map-nodes))
          (*page-class* "field")
          (*focus* (if idea idea-id ""))
-         (*crumbs* (append (list (cons "fields" "/fields")
-                                 (cons (map-id) (and idea (field-url))))
+         (*crumbs* (append (list (cons (map-id) (and idea (field-url))))
                            (when idea (list (list (getf idea :title))))))
          (*nav-extra* (html (:span :class "tagline" (getf *map* :compression)))))
     (layout (if idea (str (getf idea :title) " · " (map-title)) (map-title))
@@ -646,7 +644,7 @@
     (unless a (return-from artifact-page (not-found "artifact")))
     (unless (select-map (getf a :map)) (return-from artifact-page (not-found "field")))
     (let ((*page-class* "field")
-          (*crumbs* (list (cons "fields" "/fields") (cons (map-id) (field-url)) (list (getf a :title)))))
+          (*crumbs* (list (cons (map-id) (field-url)) (list (getf a :title)))))
       (layout (getf a :title)
         (html (:div :class "artifact-head"
                 (:span :class "artifact-icon" (artifact-kind a))

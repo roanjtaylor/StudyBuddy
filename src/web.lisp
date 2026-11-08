@@ -14,7 +14,7 @@
 (defvar *routes* (make-hash-table) "name → route")
 (defvar *map* nil "The current field (see nodes.lisp); declared here so the dispatcher can rebind it.")
 ;; defparameter, not defvar: a reload must replace the nav in a live image.
-(defparameter *nav* '(("Fields" . "/fields"))
+(defparameter *nav* '()
   "Top-bar links, (label . href).")
 (defvar *focus* nil
   "Where the learner is in a field: \"\" the field, a group id, an idea id. NIL off a field's pages; set, it puts the Claude dock on the page.")
@@ -103,7 +103,7 @@
 
 (defun not-found (&optional (what "page"))
   (setf (ht:return-code*) ht:+http-not-found+)
-  (layout "Not found" (html (:h1 "No such " what) (:p (:a :href "/fields" "Back to your fields")))))
+  (layout "Not found" (html (:h1 "No such " what) (:p (:a :href "/" "Back home")))))
 
 ;; A response that is not a page: TYPE and the exact bytes of BODY.
 (defun raw-response (type body)
@@ -152,7 +152,7 @@
             ;; The "/" is always laid out, just invisible off a crumb path, so links never shift.
             (html (:span :class (if *crumbs* "sep" "sep hidden") "/")
                   (:a :class (and *crumbs* "current") :href (cdr link) (car link))))
-          (loop for (label . href) in (cdr *crumbs*)
+          (loop for (label . href) in *crumbs*
                 do (html (:span :class "sep" "/")
                          (if href (html (:a :href href label)) (html (:span :class "current" label)))))
           (when *nav-extra* (html (:raw *nav-extra*))))

@@ -44,7 +44,7 @@ The Space sleeps when idle, so the first call after a pause is slow. Creating a 
 ## Run it
 
 ```lisp
-;; ~/.sbclrc already pushes this folder onto asdf:*central-registry*
+;; ~/.sbclrc registers every subfolder of RoanTaylor/ with ASDF, so this loads by name
 (ql:quickload :studybuddy)
 (studybuddy:start)              ; opens http://localhost:8080/
 (in-package :studybuddy)        ; then edit any defpage / defaction / defprompt, re-evaluate, refresh

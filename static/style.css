@@ -90,6 +90,12 @@ a.round {
 a.round:hover { color: var(--fg); border-color: var(--fg); }
 
 /* Home: the articulation */
+.home { display: flex; gap: 4rem; align-items: flex-start; flex-wrap: wrap; }
+.home-about { flex: 1 1 24rem; }
+.home-fields { flex: 0 1 18rem; min-width: 12rem; }
+.home-fields h2 { margin: 0; font-size: 1.15rem; }
+.home-fields ul { list-style: disc; padding-left: 1.2rem; margin: .5rem 0; }
+.home-fields li { margin: .3rem 0; }
 .home .md { max-width: 44rem; font-size: 1.05rem; }
 .home .md h2 { font-size: 1.9rem; margin: 0 0 .75rem; }
 .home .md h3 { font-size: 1.15rem; margin-top: 1.75rem; }
