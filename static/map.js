@@ -2,7 +2,7 @@
 // (Ctrl/Cmd+Enter submits). The Claude dock is dock.js. The drawings are static
 // sheets: nothing here pans or zooms them.
 //
-// Opening an idea (a link to /field?idea=…) does not leave the page: the idea's detail is
+// Opening an idea (a link to /field/idea) does not leave the page: the idea's detail is
 // fetched and swapped in below the timeline and outline, which stay where they are.
 (function () {
   function wireForms(root) {
@@ -20,14 +20,15 @@
   var grid = document.querySelector('.stage.grid');
   if (!grid) return;
 
-  function load(url, push) {
+  // keepStudy: refresh the idea in place (after an approved edit) without touching the study chat.
+  function load(url, push, keepStudy) {
     return fetch(url, { headers: { 'X-Requested-With': 'fetch' } })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (text) {
         var doc = new DOMParser().parseFromString(text, 'text/html');
         if (!doc.getElementById('idea')) { location.href = url; return; }
         // Swap the idea and the writing box; the chat on the right stays as it is.
-        ['.idea-main', '.idea-study'].forEach(function (sel) {
+        (keepStudy ? ['.idea-main'] : ['.idea-main', '.idea-study']).forEach(function (sel) {
           var mine = document.querySelector(sel), theirs = doc.querySelector(sel);
           if (!mine || !theirs) return;
           var fresh = document.importNode(theirs, true);
@@ -60,6 +61,14 @@
           }
         }
 
+        if (keepStudy) {
+          // Names may have changed: refresh the topic outline's links in place.
+          doc.querySelectorAll('.outline li a').forEach(function (theirs) {
+            var mine = document.querySelector('.outline li a[href="' + theirs.getAttribute('href') + '"]');
+            if (mine) { mine.textContent = theirs.textContent; mine.title = theirs.title; }
+          });
+          return;
+        }
         document.dispatchEvent(new Event('idea-swapped'));
         if (push) history.pushState(null, '', url);
         // Bring the detail into view only if it is down below the fold.
@@ -74,11 +83,17 @@
       .catch(function () { location.href = url; });
   }
 
+  window.refreshIdea = function () { return load(location.pathname + location.search, false, true); };
+
+  // An idea is /field/idea. Any link of that shape within this field opens in place; if the
+  // answer turns out not to be an idea, load() falls back to a normal visit.
+  function segments(path) { return path.split('/').filter(Boolean); }
   document.addEventListener('click', function (e) {
-    var a = e.target.closest && e.target.closest('a[href*="?idea="]');
+    var a = e.target.closest && e.target.closest('a[href]');
     if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || a.target) return;
     var u = new URL(a.href, location.href);
-    if (u.origin !== location.origin || u.pathname !== location.pathname) return;
+    var here = segments(location.pathname), there = segments(u.pathname);
+    if (u.origin !== location.origin || there.length !== 2 || here[0] !== there[0]) return;
     e.preventDefault();
     u.hash = '';
     load(u.pathname + u.search, true);

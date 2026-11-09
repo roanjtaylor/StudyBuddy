@@ -68,7 +68,6 @@
 
 ;;; ---- Artifacts: cards in the chat, pages of their own ----------------------
 
-(defun artifact-url (id) (str "/artifact/" id))
 (defun artifact-view-url (id) (str "/artifact/" id "/view"))
 
 (defparameter *artifact-kinds*
@@ -93,7 +92,7 @@
 
 ;; Opens in the dock's stage when the dock is there, on its own page otherwise.
 (defcomponent artifact-card (a)
-  (html (:a :class "artifact-card" :href (artifact-url (getf a :id))
+  (html (:a :class "artifact-card" :href (artifact-view-url (getf a :id))
             :data-artifact (getf a :id) :data-type (getf a :type) :data-title (getf a :title)
           (:span :class "artifact-icon" (artifact-kind a))
           (:span :class "artifact-meta"
@@ -110,6 +109,8 @@
       (html (:figure :class (str "artifact-inline artifact-inline-" (getf a :type)) :data-artifact (getf a :id)
               (:iframe :class "artifact-preview" :src (artifact-view-url (getf a :id)) :title (getf a :title)
                        :loading "lazy" :sandbox (if (equal (getf a :type) "svg") "" "allow-scripts"))
+              ;; The frame swallows clicks, so the way to full screen is a button over its corner.
+              (:button :type "button" :class "artifact-expand" :title "Full screen" :aria-label "Full screen" (icon "expand"))
               (artifact-card a)))
       (artifact-card a)))
 
@@ -159,6 +160,7 @@
     ("x"      . "M6 6l12 12M18 6L6 18")
     ("open"   . "M14 4h6v6M20 4l-9 9M19 14v6H5V6h6")
     ("wide"   . "M4 12h16M14 6l6 6-6 6")
+    ("expand" . "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5")
     ("globe"  . "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18")
     ("spark"  . "M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4")))
 
@@ -232,6 +234,8 @@
                   (hidden "map-name" (map-id)) (hidden "dock" "1")
                   (:input :type "hidden" :name "here" :value focus)
                   (:input :type "hidden" :name "chat" :value (or chat-id ""))
+                  ;; The artifact open on the stage, so the model knows what "this" is.
+                  (:input :type "hidden" :name "artifact" :value "")
                   (:div :class "composer"
                     (:textarea :name "text" :rows 1 :spellcheck "false"
                                :placeholder (if (find-node focus)
@@ -241,21 +245,17 @@
                       (:span :class "composer-tools"
                         (:span :class "pill" :title "What Claude is looking at"
                           (:span :class "pill-text" (focus-label focus)))
-                        (:label :class "toggle" :title "Search the web"
-                          (:input :type "checkbox" :name "search" :value "1") (icon "globe") (:span "Web"))
-                        (:label :class "toggle select" :title "Extended thinking"
-                          (:span "Think")
-                          (:select :name "effort" :id "dock-effort"
-                            (:option :value "" "off") (:option :value "low" "low")
-                            (:option :value "medium" "medium") (:option :value "high" "high"))))
+                        (model-effort-controls))
                       (:button :type "submit" :class "dock-send" :title "Send" :aria-label "Send" (icon "send"))
                       (:button :type "button" :id "dock-stop" :class "dock-send dock-stop" :hidden t
                                :title "Stop" :aria-label "Stop" (icon "stop"))))))
               ;; The stage: where an artifact opens beside the chat, as on claude.ai.
               (:aside :id "dock-stage" :class "dock-stage" :hidden t
                 (:header
+                  ;; Full screen only: the X at the top left puts the topic back in view.
+                  (:button :type "button" :id "stage-x" :class "dock-btn stage-x" :title "Close (Esc)" :aria-label "Close" (icon "x"))
                   (:span :id "stage-title" :class "stage-title")
-                  (:a :id "stage-open" :class "dock-btn" :href "#" :target "_blank" :title "Open on its own page" (icon "open"))
+                  (:button :type "button" :id "stage-focus" :class "dock-btn" :title "Full screen" :aria-label "Full screen" (icon "expand"))
                   (:button :type "button" :id "stage-close" :class "dock-btn" :title "Close" (icon "x")))
                 (:iframe :id "stage-frame" :class "stage-frame" :title "Artifact")))))))
 
@@ -343,11 +343,13 @@
                 (html (:details :class "outline-group" :open (equal id open)
                         (:summary
                           (:span :class "outline-title" id)
-                          (:span :class "outline-sub" " — " (getf* g :compression "")))
+                          (:span :class "outline-sub" " — " (getf* g :compression ""))
+                          (scope-mini id id))
                         (:ul
                           (dolist (n mine)
                             (html (:li (:a :href (node-url (getf n :id)) :title (getf n :compression)
-                                        (getf n :title))))))))))))))
+                                        (getf n :title))
+                                       (scope-mini (getf n :id) (getf n :title))))))))))))))
 
 ;;; -- Timeline: years along the x axis, a lane per group -----------------------
 
@@ -419,7 +421,11 @@
                               (:title (getf* g :compression ""))
                               (if flip
                                   (html (:text :x (- b 8) :y 22 :class "bar-title" :text-anchor "end" id))
-                                  (html (:text :x (+ a 8) :y 22 :class "bar-title" id)))))
+                                  (html (:text :x (+ a 8) :y 22 :class "bar-title" id))))
+                            ;; Just after the bar's name (before it when the name is flipped), as a share of the width.
+                            (scope-mini id id
+                                        (format nil "left: ~,2f%"
+                                                (* 100 (/ (if flip (- b 8 name-w 24) (+ a 8 name-w 6)) w)))))
                           (with-canvas (w (+ 8 (* 30 rows)))
                             (grid (+ 8 (* 30 rows)))
                             (dolist (it placed)
@@ -439,11 +445,24 @@
 ;;; -- The field at a glance: a 2x2 grid ------------------------------------------
 ;;; Two columns: the timeline on the left (an expandable bar per group), the outline of groups on the right.
 
-(defcomponent scope-button (scope what)
-  (html (:button :type "button" :class "scope-claude" :data-scope scope :data-label (str (map-title) " / " scope)
-                 :title (str "Ask Claude about the " what) :aria-label (str "Ask Claude about the " what)
-           (claude-mark "mark"))
-        (:div :class "dock-anchor")))
+;; The one Claude button for the breadth section, centred under its banner. Its popover is
+;; the anchor every mini button below opens into.
+(defcomponent scope-button ()
+  (html (:div :class "scope-main"
+          (:button :type "button" :class "scope-claude" :data-scope "" :data-anchor "breadth-anchor"
+                   :data-label (map-title)
+                   :title "Ask Claude about the whole field" :aria-label "Ask Claude about the whole field"
+            (claude-mark "mark"))
+          (:div :id "breadth-anchor" :class "dock-anchor"))))
+
+;; A small Claude button beside one breadth item (a group or an idea), shown on hover.
+;; It points the same chat at that item.
+(defcomponent scope-mini (scope what &optional style)
+  (html (:button :type "button" :class "scope-claude scope-mini" :data-scope scope :data-anchor "breadth-anchor"
+                 :style style
+                 :data-label (str (map-title) " / " what)
+                 :title (str "Ask Claude about " what) :aria-label (str "Ask Claude about " what)
+           (claude-mark "mark"))))
 
 ;;; ---- The study pane: a compact, throw-away chat about the open idea -----------
 ;;; Same look as the dock, none of its furniture (no rail, header or saved chats).
@@ -459,7 +478,7 @@
     (html (:section :class "dock inline study" :aria-label "Study"
             (:div :class "dock-log study-log"
               (:div :class "study-empty"
-                (:p :class "study-hint" "Explain it in your own words and press Enter: I'll mark it. Or ask anything. Nothing here is saved.")
+                (:p :class "study-hint" "Explain it in your own words and press Enter: I'll mark it. Or ask anything. The chat isn't saved; any edit to this idea waits for your approval.")
                 (:div :class "dock-chips"
                   (loop for (label text) in *study-chips*
                         do (html (:button :type "button" :class "chip" :data-text text label))))))
@@ -470,29 +489,36 @@
                            :placeholder (str "Explain " (getf n :title) " in your own words, or ask about it…"))
                 (:div :class "composer-row"
                   (:span :class "composer-tools"
-                    (:label :class "toggle" :title "Search the web"
-                      (:input :type "checkbox" :name "search" :value "1") (icon "globe") (:span "Web"))
-                    (:label :class "toggle select" :title "Extended thinking"
-                      (:span "Think")
-                      (:select :name "effort"
-                        (:option :value "" "off") (:option :value "low" "low")
-                        (:option :value "medium" "medium") (:option :value "high" "high"))))
+                    (model-effort-controls))
                   (:button :type "submit" :class "dock-send" :title "Send" :aria-label "Send" (icon "send"))
                   (:button :type "button" :class "dock-send dock-stop" :hidden t
                            :title "Stop" :aria-label "Stop" (icon "stop")))))))))
+
+;; The two choices beside every composer: which model answers, and how hard it thinks.
+;; static/dock.js and static/study.js remember them; web search is always available.
+(defcomponent model-effort-controls ()
+  (html (:label :class "toggle select" :title "Model"
+          (:select :name "model"
+            (let ((current (preferred-model)))
+              (loop for (id label) in *models*
+                    do (html (:option :value id :selected (equal id current) label))))))
+        (:label :class "toggle select" :title "Effort"
+          (:span "Effort")
+          (:select :name "effort" :data-pref "dock-effort"
+            (loop for e in *efforts*
+                  do (html (:option :value e :selected (equal e *effort*) e)))))))
 
 (defcomponent field-view (nodes &optional idea)
   (let ((open (and idea (getf idea :group))))
     (html (if (null nodes)
               (html (:div :class "stage empty" (:p :class "quiet" "No ideas here yet.")))
-              (html (:div :class "section-wrap"
+              (html (:div :class "section-wrap breadth"
                       (:div :class "section-label" (:span "Breadth-first"))
+                      (scope-button)
                       (:div :class "stage grid"
                         (:section :class "cell timeline" :aria-label "Timeline"
-                          (scope-button "timeline" "timeline")
                           (timeline nodes *half-w* open))
                         (:section :class "cell" :aria-label "Topics"
-                          (scope-button "topics" "topics")
                           (breadth-map nodes *half-w* open))))))
           ;; Below: the open idea on the left; on the right, writing and the chat pinned to it.
           (:section :id "idea" :class "idea-below section-wrap"
@@ -559,14 +585,18 @@
 
 (defpage field-page "/:name" (name idea)
   (unless (select-map name) (return-from field-page (not-found "field")))
-  (render-field idea))
+  ;; The old /field?idea=x address becomes /field/x.
+  (if (and (not (blankp idea)) (find-node idea))
+      (redirect (node-url idea))
+      (render-field)))
 
-;; Old group and idea addresses fold back into the one page.
+;; An idea lives at /field/idea, below the field's timeline and outline; an old group
+;; address folds back into the field.
 (defpage group-page "/:name/:group" (name group)
   (unless (select-map name) (return-from group-page (not-found "field")))
-  (cond ((find-group group) (redirect (field-url)))
-        ((find-node group) (redirect (node-url group)))
-        (t (not-found "group"))))
+  (cond ((find-node group) (render-field group))
+        ((find-group group) (redirect (field-url)))
+        (t (not-found "idea"))))
 
 ;;; ---- An idea --------------------------------------------------------------
 
@@ -586,7 +616,7 @@
           (:pre :class "wrote" (getf a :text))
           (feedback-view (getf a :feedback)))))
 
-;;; ---- An artifact on its own page, and the thing itself for the frame --------
+;;; ---- The thing itself, for the frame --------
 
 ;; JSON safe to sit inside a <script> element.
 (defun script-json (x)
@@ -639,27 +669,6 @@
       "allow-scripts allow-forms allow-popups allow-modals allow-downloads"
       nil))
 
-(defpage artifact-page "/artifact/:id" (id)
-  (let ((a (find-artifact id)))
-    (unless a (return-from artifact-page (not-found "artifact")))
-    (unless (select-map (getf a :map)) (return-from artifact-page (not-found "field")))
-    (let ((*page-class* "field")
-          (*crumbs* (list (cons (map-id) (field-url)) (list (getf a :title)))))
-      (layout (getf a :title)
-        (html (:div :class "artifact-head"
-                (:span :class "artifact-icon" (artifact-kind a))
-                (:span :class "artifact-title" (getf a :title))
-                (:span :class "quiet small" (artifact-meta a) " · " (getf a :at))
-                (when (getf a :node)
-                  (html (:a :class "quiet small" :href (node-url (getf a :node)) "about " (node-title (getf a :node)))))
-                (:span :class "gap")
-                (:a :class "quiet small" :href (artifact-view-url id) :target "_blank" "open the thing itself ↗")
-                (:form :method "post" :action "/action/remove-artifact" :class "inline"
-                  (hidden "id" id)
-                  (:button :type "submit" :class "danger small" "Remove")))
-              (:iframe :class "artifact-full" :src (artifact-view-url id) :sandbox (artifact-sandbox a)
-                       :title (getf a :title)))))))
-
 (defcomponent node-detail (n)
   (let ((id (getf n :id)))
     (html (:div :class "node"
@@ -670,21 +679,18 @@
                          (:h1 (getf n :title))
                          (:p :class "compression" (getf n :compression))
                          (:p :class "why" (getf n :why))
-                         (when (getf n :prereqs)
-                           (html (:p :class "quiet" "Builds on: "
-                                     (loop for (p . rest) on (getf n :prereqs)
-                                           do (node-link p) (when rest (html ", "))))))
-                         (let ((d (dependents id)))
-                           (when d
-                             (html (:p :class "quiet" "Leads to: "
-                                       (loop for (m . rest) on d
-                                             do (node-link (getf m :id)) (when rest (html ", ")))))))
                          (unless (blankp (getf n :notes))
                            (html (:section :class "notes" (:h2 "Notes") (markdown (getf n :notes)))))
                          (let ((as (map-artifacts id)))
                            (when as
                              (html (:h2 "Made for this idea")
-                                   (:div :class "artifact-list" (dolist (a as) (artifact-card a))))))
+                                   (:div :class "artifact-list"
+                                     (dolist (a as)
+                                       (html (:div :class "artifact-tile"
+                                               (artifact-block a)
+                                               (:form :method "post" :action "/action/remove-artifact" :class "inline"
+                                                 (hidden "id" (getf a :id))
+                                                 (:button :type "submit" :class "danger small" "Remove")))))))))
                          )))))
 
 (defpage node-page "/:name/:group/:id" (name group id)

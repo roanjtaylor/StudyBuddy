@@ -1,9 +1,7 @@
-Field understanding requires grasping core ideas.
+Field understanding requires core ideas.
 
-Map them breadth-first. (historically & topically)
+Map them breadth-first across history.
 
-Study them depth-first.
+Study them depth-first per topic.
 
-Write to form thoughts, with LLM feedback.
-
-Explore, pin resources, shape it to suit my learning.
+Write and pin resources to streamline my learning.

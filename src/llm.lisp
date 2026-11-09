@@ -26,8 +26,27 @@
   "Sent as x-app-secret. STUDYBUDDY_APP_SECRET; read at start, never from a file.")
 (defvar *model* "claude-opus-4-8"
   "Any model the subscription can use; the relay's /api/models lists them live.")
-(defvar *effort* nil
-  "nil = reasoning off; or \"low\" \"medium\" \"high\" — passed to the relay.")
+(defparameter *models*
+  '(("claude-opus-4-8" "Opus 4.8")
+    ("claude-fable-5-1" "Fable 5.1")
+    ("claude-opus-5-5" "Opus 5.5")
+    ("claude-sonnet-5-5" "Sonnet 5.5")
+    ("claude-haiku-5-5" "Haiku 5.5"))
+  "(id label) for the model picker; the relay rejects any the subscription cannot use.")
+(defparameter *efforts* '("low" "medium" "high"))
+(defvar *effort* "medium"
+  "Default reasoning effort, as Claude Code's: \"low\" \"medium\" \"high\" — passed to the relay.")
+
+;; The model last used (kept in the settings store), else the built-in default.
+(defun preferred-model ()
+  (let ((saved (setting "model")))
+    (if (and saved (assoc saved *models* :test #'equal)) saved *model*)))
+(defun pick-model (id) (if (assoc id *models* :test #'equal) id (preferred-model)))
+;; Call when a model is actually used: it becomes the default everywhere.
+(defun remember-model! (id)
+  (unless (equal id (setting "model")) (set-setting! "model" id))
+  id)
+(defun pick-effort (e) (if (member e *efforts* :test #'equal) e *effort*))
 (defvar *llm-timeout* 1800 "Seconds to wait for one answer. Web-searched calls are slow.")
 (defvar *prompts* (make-hash-table) "name → (:system … :schema …)")
 (defvar *tools* (make-hash-table) "name → (:name \"add_nodes\" :description … :schema … :fn …)")
@@ -298,13 +317,13 @@
 ;; newest last. Each relay event is passed to ON-EVENT as (name data) where data is the
 ;; parsed JSON (a hash-table); the app renders them as it likes. Tool calls are answered
 ;; from TOOLS (deftool names) before the model carries on. Returns the full reply text.
-(defun converse (messages &key system tools on-event search (effort *effort*) (max-turns 40))
+(defun converse (messages &key system tools on-event (model *model*) (effort *effort*) (max-turns 40))
   (let ((body (obj "messages" (coerce (mapcar (lambda (m) (obj "role" (getf m :role) "content" (getf m :content)))
                                               messages)
                                       'vector)
-                   "model" *model*
+                   "model" model
                    "maxTurns" max-turns
-                   "builtinTools" (if search (vector "WebSearch" "WebFetch") (vector))
+                   "builtinTools" (vector "WebSearch" "WebFetch")
                    "toolTimeoutMs" 60000
                    "previewChars" 200
                    "thinkingDisplay" "summarized"))

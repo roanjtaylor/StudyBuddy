@@ -21,7 +21,7 @@
   var list = document.getElementById('chat-list');
   var sendBtn = form.querySelector('.dock-send:not(.dock-stop)'), stopBtn = document.getElementById('dock-stop');
   var stage = document.getElementById('dock-stage'), frame = document.getElementById('stage-frame');
-  var stageTitle = document.getElementById('stage-title'), stageOpen = document.getElementById('stage-open');
+  var stageTitle = document.getElementById('stage-title');
 
   function keep(store, key, value) {
     try { if (value === undefined) return window[store].getItem(key); window[store].setItem(key, value); } catch (e) {}
@@ -56,6 +56,7 @@
 
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    if (dock.classList.contains('focus')) { closeStage(); return; }
     if (inline) { if (dock.classList.contains('popover')) goHome(); }
     else if (!dock.hidden) show(false);
   });
@@ -177,30 +178,75 @@
 
   // ---- The stage: one artifact open beside the chat ----
   var sandboxed = { html: 1, svg: 1, mermaid: 1 };
-  function openArtifact(id, type, name) {
+  var artifactField = form.elements.artifact, stageFocus = document.getElementById('stage-focus');
+  var openId = '', openType = '';
+  function openArtifact(id, type, name, full) {
     stageTitle.textContent = name || id;
-    stageOpen.href = '/artifact/' + id;
     // The model's own documents run cut off from the app; the app's viewers run as the app.
     if (sandboxed[type]) frame.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals allow-downloads');
     else frame.removeAttribute('sandbox');
-    frame.src = '/artifact/' + id + '/view';
     stage.hidden = false;
     dock.classList.add('staged');
+    if (full) setFocus(true);   // before the frame loads: moving the dock reloads it
+    // The same artifact again (a new version) must load afresh.
+    frame.src = '/artifact/' + id + '/view' + (id === openId ? '?t=' + Date.now() : '');
+    openId = id; openType = type;
+    if (artifactField) artifactField.value = id;
     keep('sessionStorage', 'dock-stage', JSON.stringify({ id: id, type: type, title: name }));
   }
   function closeStage() {
-    stage.hidden = true; dock.classList.remove('staged');
+    // All at once: blank the frame first (moving the dock would reload it), then drop the
+    // scrim and the dock's full-screen state in the same tick.
     frame.src = 'about:blank';
+    stage.hidden = true; dock.classList.remove('staged');
+    setFocus(false);
+    scrim.hidden = true; document.body.classList.remove('dock-focus');
+    openId = ''; if (artifactField) artifactField.value = '';
     keep('sessionStorage', 'dock-stage', '');
   }
   document.getElementById('stage-close').addEventListener('click', closeStage);
+
+  // ---- Full screen: the artifact large on the left, the chat on the right, the page greyed behind ----
+  // The dock may sit in a hidden part of the page (the idea's own section), so full screen
+  // lifts it to <body> and puts it back afterwards.
+  var scrim = document.createElement('div'); scrim.className = 'dock-scrim'; scrim.hidden = true;
+  document.body.appendChild(scrim);
+  var restore = null;
+  function setFocus(on) {
+    var now = dock.classList.contains('focus');
+    if (on === now) return;
+    if (on) {
+      restore = { parent: dock.parentNode, next: dock.nextSibling };
+      document.body.appendChild(dock);
+      dock.hidden = false; launcher.hidden = true;
+    } else if (restore) {
+      restore.parent.insertBefore(dock, restore.next && restore.next.parentNode === restore.parent ? restore.next : null);
+      restore = null;
+    }
+    dock.classList.toggle('focus', on);
+    scrim.hidden = !on;
+    document.body.classList.toggle('dock-focus', on);
+    stageFocus.title = on ? 'Exit full screen' : 'Full screen';
+    stageFocus.setAttribute('aria-label', stageFocus.title);
+    if (on) { log.scrollTop = log.scrollHeight; input.focus(); }
+  }
+  stageFocus.addEventListener('click', function () { setFocus(true); });
+  // X, Esc or a click on the greyed page closes the artifact and leaves you where you were.
+  document.getElementById('stage-x').addEventListener('click', closeStage);
+  scrim.addEventListener('click', closeStage);
+
+  // A click on an artifact's card, or on the expand button over its preview, opens it over
+  // the page, wherever the card is. It never leaves the page for the artifact's own address.
   document.addEventListener('click', function (e) {
-    var card = e.target.closest('.artifact-card');
-    if (!card || !dock.contains(card)) return;
-    e.preventDefault();
-    show(true);
-    openArtifact(card.dataset.artifact, card.dataset.type, card.dataset.title);
-  });
+    var t = e.target.closest && (e.target.closest('.artifact-expand') || e.target.closest('.artifact-card'));
+    if (!t) return;
+    var card = t.classList.contains('artifact-card') ? t : t.parentNode.querySelector('.artifact-card');
+    if (!card || !card.dataset.artifact) return;
+    e.preventDefault(); e.stopPropagation();
+    window.openInDock(card.dataset.artifact, card.dataset.type, card.dataset.title, true);
+  }, true);
+  // The idea study pane opens its artifacts here too.
+  window.openInDock = function (id, type, name, full) { show(true); openArtifact(id, type, name, full); };
 
   // Another idea was opened in place: the chat follows it.
   document.addEventListener('idea-swapped', function () { if (!dock.classList.contains('popover')) loadScope(); });
@@ -218,9 +264,11 @@
   }
   function goHome() { moveTo(home, form.dataset.homeHere, form.dataset.homeLabel, false); }
   document.querySelectorAll('.scope-claude').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var anchor = btn.nextElementSibling;
-      if (dock.parentNode === anchor) { goHome(); return; }
+    btn.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation(); // buttons inside a <summary> must not fold it
+      var anchor = document.getElementById(btn.dataset.anchor);
+      // Pressing the button the chat hangs from closes it; any other button points it there.
+      if (dock.parentNode === anchor && here.value === btn.dataset.scope) { goHome(); return; }
       moveTo(anchor, btn.dataset.scope, btn.dataset.label, true);
       btn.classList.add('on');
       input.focus();
@@ -241,13 +289,12 @@
   input.addEventListener('input', grow);
   grow();
 
-  var effort = document.getElementById('dock-effort');
-  function noteEffort() { effort.closest('.toggle').classList.toggle('on', effort.value !== ''); }
-  if (effort) {
-    effort.value = keep('localStorage', 'dock-effort') || '';
-    effort.addEventListener('change', function () { keep('localStorage', 'dock-effort', effort.value); noteEffort(); });
-    noteEffort();
-  }
+  // Model and effort are remembered (the select's own default stands until chosen).
+  form.querySelectorAll('select[data-pref]').forEach(function (s) {
+    var k = s.dataset.pref, v = keep('localStorage', k);
+    if (v && Array.prototype.some.call(s.options, function (o) { return o.value === v; })) s.value = v;
+    s.addEventListener('change', function () { keep('localStorage', k, s.value); });
+  });
 
   // ---- The live reply: built up from events, replaced by the stored one at the end ----
   var frames = ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'];
@@ -304,7 +351,9 @@
         if (old) old.replaceWith(block); else cards.appendChild(block);
         log.scrollTop = log.scrollHeight;
         // A visual shows itself in the chat; anything else opens on the stage. A click on a card opens either.
-        if (block === card) openArtifact(card.dataset.artifact, card.dataset.type, card.dataset.title);
+        // In full screen, whatever it makes or changes appears on the stage at once.
+        if (block === card || dock.classList.contains('focus') || card.dataset.artifact === openId)
+          openArtifact(card.dataset.artifact, card.dataset.type, card.dataset.title);
       },
       finish: function (html) {
         clearInterval(timer); if (renderTimer) clearTimeout(renderTimer);

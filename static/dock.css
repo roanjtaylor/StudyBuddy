@@ -220,6 +220,44 @@ body.field { --gutter: calc(200px + 1rem); }
 }
 .dock.inline.popover #dock-close { display: grid; }
 
+/* ---- Full screen: the artifact large on the left, the chat on the right, the page greyed ---- */
+.dock-scrim {
+  position: fixed; inset: 0; z-index: 70; background: rgba(24,24,22,.6);
+}
+.dock-scrim[hidden] { display: none; }
+body.dock-focus { overflow: hidden; }
+.dock.focus, .dock.inline.focus, .dock.inline.staged.focus, .dock.inline.popover.focus {
+  position: fixed; inset: 1rem; z-index: 71; width: auto; height: auto; max-width: none;
+  transform: none; margin: 0; box-shadow: var(--cl-shadow);
+}
+.dock.focus .dock-rail, .dock.inline.staged.focus .dock-rail { display: none; }
+.dock.focus .dock-body { flex-direction: row; }
+.dock.focus .dock-stage, .dock.inline.staged.focus .dock-stage {
+  order: -1; flex: 1 1 auto; border-left: 0; border-top: 0; border-right: 1px solid var(--cl-line);
+}
+.dock.focus .dock-chat, .dock.inline.staged.focus .dock-chat { flex: 0 0 min(28rem, 36vw); min-width: 20rem; }
+.dock.inline.focus #dock-close { display: grid; }
+.dock.focus .composer-tools { display: none; }
+.dock.focus .composer-row { justify-content: flex-end; }
+.dock.focus .dock-chips { display: none; }
+.stage-x { display: none; }
+.dock.focus .stage-x { display: grid; }
+.dock.focus #stage-close, .dock.focus #stage-focus { display: none; }
+.artifact-inline { position: relative; }
+.artifact-inline .artifact-expand {
+  position: absolute; top: .4rem; right: .4rem; display: grid; place-items: center;
+  width: 1.8rem; height: 1.8rem; padding: 0; color: var(--cl-ink); cursor: pointer;
+  background: var(--cl-panel); border: 1px solid var(--cl-line-strong); border-radius: .5rem;
+  opacity: 0; transition: opacity .12s;
+}
+.artifact-inline:hover .artifact-expand, .artifact-expand:focus-visible { opacity: 1; }
+@media (hover: none) { .artifact-expand { opacity: .85; } }
+@media (max-width: 900px) {
+  .dock.focus .dock-body { flex-direction: column; }
+  .dock.focus .dock-stage, .dock.inline.staged.focus .dock-stage { flex: 1 1 60%; border-right: 0; border-bottom: 1px solid var(--cl-line); }
+  .dock.focus .dock-chat, .dock.inline.staged.focus .dock-chat { flex: 0 0 40%; min-width: 0; }
+}
+
 @media (max-width: 900px) {
   .dock.staged .dock-body { flex-direction: column; }
   .dock.staged .dock-chat { flex: 0 0 45%; }
@@ -230,3 +268,8 @@ body.field { --gutter: calc(200px + 1rem); }
   #dock-wide { display: none; }
   .dock-rail { position: absolute; top: 0; bottom: 0; left: 0; z-index: 2; box-shadow: 8px 0 24px rgba(0,0,0,.15); }
 }
+
+/* Depth-first: what was made for an idea, as its preview with the title as caption. */
+.artifact-tile { display: flex; flex-direction: column; gap: .3rem; width: min(100%, 22rem); }
+.artifact-tile .artifact-inline { max-width: none; }
+.artifact-tile form { align-self: flex-end; }

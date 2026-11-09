@@ -370,3 +370,107 @@
   <text x=\"430\" y=\"500\" fill=\"#c9a94a\" font-size=\"14\" text-anchor=\"middle\" font-style=\"italic\">One bit of memory. Thousands of these in a row = a register; millions in a grid = RAM.</text>
 </svg>"
  :AT "2026-11-02T13:26:01" :VERSION 1)
+(:ID "transistor-switch-three-states" :MAP "computers" :NODE "transistor" :TYPE "svg" :TITLE
+ "Transistor switch: three states" :LANGUAGE NIL :CONTENT
+ "<svg viewBox=\"0 0 900 420\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"sans-serif\">
+  <style>
+    .wire{stroke:#555;stroke-width:3;fill:none}
+    .live{stroke:#e8491d;stroke-width:4;fill:none}
+    .dead{stroke:#bbb;stroke-width:3;fill:none;stroke-dasharray:5 5}
+    .lbl{font-size:13px;fill:#333}
+    .title{font-size:16px;font-weight:bold;fill:#222}
+    .note{font-size:12px;fill:#666}
+    .flow{fill:#e8491d}
+  </style>
+
+  <!-- ===== PANEL 1: OFF (no supply) ===== -->
+  <g transform=\"translate(20,0)\">
+    <text x=\"130\" y=\"28\" text-anchor=\"middle\" class=\"title\">1 · No supply</text>
+
+    <!-- collector top rail -->
+    <line x1=\"130\" y1=\"60\" x2=\"130\" y2=\"140\" class=\"dead\"/>
+    <text x=\"140\" y=\"55\" class=\"note\">+V off</text>
+    <circle cx=\"130\" cy=\"58\" r=\"4\" fill=\"#bbb\"/>
+
+    <!-- transistor body -->
+    <line x1=\"90\" y1=\"150\" x2=\"90\" y2=\"230\" class=\"wire\"/>
+    <line x1=\"90\" y1=\"170\" x2=\"130\" y2=\"140\" class=\"dead\"/>
+    <line x1=\"90\" y1=\"210\" x2=\"130\" y2=\"240\" class=\"dead\"/>
+    <!-- base -->
+    <line x1=\"40\" y1=\"190\" x2=\"90\" y2=\"190\" class=\"dead\"/>
+    <text x=\"10\" y=\"194\" class=\"lbl\">base</text>
+    <circle cx=\"40\" cy=\"190\" r=\"4\" fill=\"#bbb\"/>
+    <text x=\"10\" y=\"210\" class=\"note\">off</text>
+
+    <!-- emitter down to ground -->
+    <line x1=\"130\" y1=\"240\" x2=\"130\" y2=\"320\" class=\"dead\"/>
+    <line x1=\"112\" y1=\"320\" x2=\"148\" y2=\"320\" class=\"wire\"/>
+    <line x1=\"118\" y1=\"328\" x2=\"142\" y2=\"328\" class=\"wire\"/>
+    <line x1=\"124\" y1=\"336\" x2=\"136\" y2=\"336\" class=\"wire\"/>
+
+    <text x=\"130\" y=\"375\" text-anchor=\"middle\" class=\"note\">Nothing connected.</text>
+    <text x=\"130\" y=\"392\" text-anchor=\"middle\" class=\"note\">No current anywhere.</text>
+  </g>
+
+  <!-- ===== PANEL 2: supply on, base off ===== -->
+  <g transform=\"translate(320,0)\">
+    <text x=\"130\" y=\"28\" text-anchor=\"middle\" class=\"title\">2 · +V on, base off</text>
+
+    <line x1=\"130\" y1=\"60\" x2=\"130\" y2=\"140\" class=\"live\"/>
+    <text x=\"140\" y=\"55\" class=\"note\" fill=\"#e8491d\">+V</text>
+    <circle cx=\"130\" cy=\"58\" r=\"4\" class=\"flow\"/>
+
+    <line x1=\"90\" y1=\"150\" x2=\"90\" y2=\"230\" class=\"wire\"/>
+    <!-- collector arm live down to channel -->
+    <line x1=\"90\" y1=\"170\" x2=\"130\" y2=\"140\" class=\"live\"/>
+    <!-- emitter arm dead -->
+    <line x1=\"90\" y1=\"210\" x2=\"130\" y2=\"240\" class=\"dead\"/>
+    <line x1=\"40\" y1=\"190\" x2=\"90\" y2=\"190\" class=\"dead\"/>
+    <text x=\"10\" y=\"194\" class=\"lbl\">base</text>
+    <circle cx=\"40\" cy=\"190\" r=\"4\" fill=\"#bbb\"/>
+    <text x=\"10\" y=\"210\" class=\"note\">0 V</text>
+
+    <line x1=\"130\" y1=\"240\" x2=\"130\" y2=\"320\" class=\"dead\"/>
+    <line x1=\"112\" y1=\"320\" x2=\"148\" y2=\"320\" class=\"wire\"/>
+    <line x1=\"118\" y1=\"328\" x2=\"142\" y2=\"328\" class=\"wire\"/>
+    <line x1=\"124\" y1=\"336\" x2=\"136\" y2=\"336\" class=\"wire\"/>
+
+    <!-- block marker at channel -->
+    <line x1=\"78\" y1=\"190\" x2=\"102\" y2=\"190\" stroke=\"#e8491d\" stroke-width=\"3\"/>
+    <text x=\"108\" y=\"178\" class=\"note\" fill=\"#e8491d\">gap: no path</text>
+
+    <text x=\"130\" y=\"375\" text-anchor=\"middle\" class=\"note\">Voltage present, but the</text>
+    <text x=\"130\" y=\"392\" text-anchor=\"middle\" class=\"note\">channel is closed. 0 current.</text>
+  </g>
+
+  <!-- ===== PANEL 3: supply on, base on ===== -->
+  <g transform=\"translate(620,0)\">
+    <text x=\"130\" y=\"28\" text-anchor=\"middle\" class=\"title\">3 · +V on, base on</text>
+
+    <line x1=\"130\" y1=\"60\" x2=\"130\" y2=\"140\" class=\"live\"/>
+    <text x=\"140\" y=\"55\" class=\"note\" fill=\"#e8491d\">+V</text>
+    <circle cx=\"130\" cy=\"58\" r=\"4\" class=\"flow\"/>
+
+    <line x1=\"90\" y1=\"150\" x2=\"90\" y2=\"230\" class=\"live\"/>
+    <line x1=\"90\" y1=\"170\" x2=\"130\" y2=\"140\" class=\"live\"/>
+    <line x1=\"90\" y1=\"210\" x2=\"130\" y2=\"240\" class=\"live\"/>
+    <!-- base driven -->
+    <line x1=\"40\" y1=\"190\" x2=\"90\" y2=\"190\" class=\"live\"/>
+    <text x=\"8\" y=\"194\" class=\"lbl\" fill=\"#e8491d\">base</text>
+    <circle cx=\"40\" cy=\"190\" r=\"4\" class=\"flow\"/>
+    <text x=\"10\" y=\"210\" class=\"note\" fill=\"#e8491d\">+ small V</text>
+
+    <line x1=\"130\" y1=\"240\" x2=\"130\" y2=\"320\" class=\"live\"/>
+    <line x1=\"112\" y1=\"320\" x2=\"148\" y2=\"320\" class=\"wire\"/>
+    <line x1=\"118\" y1=\"328\" x2=\"142\" y2=\"328\" class=\"wire\"/>
+    <line x1=\"124\" y1=\"336\" x2=\"136\" y2=\"336\" class=\"wire\"/>
+
+    <!-- flow arrows -->
+    <polygon points=\"130,110 125,100 135,100\" class=\"flow\"/>
+    <polygon points=\"130,290 125,280 135,280\" class=\"flow\"/>
+
+    <text x=\"130\" y=\"375\" text-anchor=\"middle\" class=\"note\" fill=\"#e8491d\">Base opens the channel.</text>
+    <text x=\"130\" y=\"392\" text-anchor=\"middle\" class=\"note\">Current flows top → ground.</text>
+  </g>
+</svg>"
+ :AT "2026-11-09T11:31:01" :VERSION 1)

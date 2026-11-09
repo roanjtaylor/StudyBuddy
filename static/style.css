@@ -130,11 +130,6 @@ details.edit textarea { width: 100%; margin-top: .5rem; }
 .artifact-title { font-weight: 600; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .artifact-kind { font-size: .75rem; color: var(--muted); }
 .artifact-list { display: flex; flex-wrap: wrap; gap: .5rem; }
-.artifact-head { display: flex; align-items: center; gap: .75rem; padding: .75rem 1rem; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-.artifact-head .artifact-title { font-size: 1.05rem; }
-.artifact-head .gap { flex: 1; }
-.artifact-head button.danger { margin: 0; padding: .2rem .6rem; font-size: .8rem; }
-.artifact-full { flex: 1; width: 100%; border: 0; background: var(--bg); }
 
 /* Navbar extras: subtitle */
 nav.top .tagline { font-size: .8rem; margin-left: .75rem; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -190,12 +185,12 @@ svg a:hover .dot, svg a:hover .span { stroke: var(--fg); stroke-width: 2; }
 .ask-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: .4rem; flex-wrap: wrap; }
 label.check { display: inline-flex; align-items: center; gap: .3rem; color: var(--muted); font-size: .85rem; margin: 0; }
 form.pending button { opacity: .5; cursor: progress; }
-form.pending::after { content: "thinking…"; color: var(--muted); font-size: .85rem; font-style: italic; }
+form.pending::after { content: "thinking…"; color: var(--muted); font-size: .85rem; }
 
 /* Node page */
 .node { max-width: 46rem; }
 .compression { font-size: 1.45rem; line-height: 1.35; margin: .5rem 0; }
-.why { color: var(--muted); font-style: italic; }
+.why { color: var(--muted); }
 .notes { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: .75rem 1.25rem; margin-top: 1.25rem; }
 .notes h2 { margin-top: .25rem; }
 
@@ -212,7 +207,7 @@ form.inline { display: inline; }
 .attempt { border-top: 1px solid var(--line); padding: 1rem 0; }
 pre.wrote { white-space: pre-wrap; font: inherit; margin: .5rem 0; }
 .feedback { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: .75rem 1rem; }
-.feedback .verdict { font-style: italic; margin-top: 0; }
+.feedback .verdict { margin-top: 0; }
 .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
 @media (max-width: 700px) { .three { grid-template-columns: 1fr; } }
 .three ul { padding-left: 1.1rem; margin: 0; font-size: .9rem; }
@@ -257,12 +252,34 @@ svg .bar-title { font-family: ui-monospace, Menlo, Consolas, monospace; font-siz
 /* A Claude button at the top right of a section; it opens the chat pinned to that section. */
 .stage .cell { position: relative; }
 .scope-claude {
-  position: absolute; top: .4rem; right: .4rem; z-index: 5; display: grid; place-items: center;
+  display: grid; place-items: center;
   width: 1.9rem; height: 1.9rem; padding: 0; border: 0; border-radius: 50%;
   background: var(--tt-claude, #d97757); color: #fff;
 }
 .scope-claude:hover { border: 0; filter: brightness(1.08); }
 .scope-claude .mark { width: 1rem; height: 1rem; }
+/* The breadth section's one Claude button, centred under its banner; the chat opens beneath it. */
+.scope-main {
+  position: absolute; top: 3.1rem; left: 0; right: 0; z-index: 7;
+  display: flex; justify-content: center; pointer-events: none;
+}
+.scope-main > .scope-claude { pointer-events: auto; }
+.scope-main .dock-anchor { position: absolute; top: 0; left: 0; right: 0; pointer-events: none; }
+.scope-main .dock.inline.popover {
+  pointer-events: auto; top: 2.4rem; right: auto; left: 50%; transform: translateX(-50%);
+}
+.section-wrap.breadth { padding-top: 5.6rem; }
+/* Mini buttons: one beside each group and idea, shown on hover (and while the chat is on it). */
+.scope-mini {
+  display: inline-grid; vertical-align: middle; margin-left: .45rem;
+  width: 1.2rem; height: 1.2rem; opacity: 0; transition: opacity .12s;
+}
+.scope-mini .mark { width: .7rem; height: .7rem; }
+.outline-group summary:hover > .scope-mini, .outline-group li:hover > .scope-mini,
+.tl-group summary:hover > .scope-mini, .scope-mini:focus-visible, .scope-mini.on { opacity: 1; }
+.tl-group summary { position: relative; }
+.tl-group summary > .scope-mini { position: absolute; top: 8px; margin: 0; } /* left is set inline, beside the name */
+@media (hover: none) { .scope-mini { opacity: .7; } }
 
 /* Section banners: a blue, Pokemon-menu style plate overlaid at the top middle of each section. */
 .section-wrap { position: relative; padding-top: 3.4rem; }
@@ -284,11 +301,30 @@ svg .hit { fill: transparent; }
 .tl-group svg a.tl-idea:hover .box-title { text-decoration: underline; }
 
 /* The study chat: the dock's look, compact, with no furniture. */
-.idea-side.has-idea .idea-dock { display: none; }
+/* The dock lives in the breadth section's popovers; the depth section has the study pane only. */
+.idea-side .idea-dock { display: none; }
 .dock.inline.study { height: auto; }
 .study .study-log { flex: 0 1 auto; max-height: min(28rem, 60dvh); padding: .6rem .75rem .2rem; gap: .7rem; }
 .study .study-log:has(.study-empty:only-child) { overflow: visible; }
 .study-empty { padding: 0; text-align: left; }
+
+/* A proposed edit: a code-review style diff the learner approves or rejects. */
+.proposal { margin: .6rem 0 .2rem; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; }
+.proposal-head { margin: 0; padding: .4rem .7rem; font-size: .85rem; font-weight: 600; border-bottom: 1px solid var(--line); }
+.proposal-field { padding: .45rem .7rem 0; }
+.proposal-field.off { opacity: .45; }
+.proposal-label { display: flex; align-items: center; gap: .4rem; margin: 0 0 .25rem; font-size: .8rem; color: var(--muted); }
+.diff { font: .8rem/1.45 ui-monospace, Menlo, Consolas, monospace; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.diff-line { display: flex; gap: .5rem; padding: 0 .5rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.diff-sign { flex: none; width: .8rem; text-align: center; user-select: none; }
+.diff-add { background: rgba(46, 160, 67, .2); }
+.diff-add .diff-sign { color: #2ea043; font-weight: 700; }
+.diff-del { background: rgba(248, 81, 73, .2); }
+.diff-del .diff-sign { color: #f85149; font-weight: 700; }
+.diff-fold { padding: 0 .5rem; color: var(--muted); background: rgba(128, 128, 128, .1); }
+.proposal-actions { display: flex; align-items: center; gap: .5rem; padding: .55rem .7rem; }
+.proposal.applied { border-color: #2ea043; }
+.proposal.rejected { opacity: .7; }
 .study-hint { margin: 0 0 .5rem; font-size: .8rem; color: var(--cl-muted); }
 .study .dock-chips { justify-content: flex-start; gap: .3rem; }
 .study .dock-form { padding: .3rem .5rem .5rem; }
