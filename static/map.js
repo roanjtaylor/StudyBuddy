@@ -3,7 +3,7 @@
 // sheets: nothing here pans or zooms them.
 //
 // Opening an idea (a link to /field/idea) does not leave the page: the idea's detail is
-// fetched and swapped in below the timeline and outline, which stay where they are.
+// fetched and swapped in below the timeline, which stays where they are.
 (function () {
   function wireForms(root) {
     root.querySelectorAll('form:not(.dock-form)').forEach(function (form) {
@@ -16,6 +16,16 @@
     });
   }
   wireForms(document);
+
+  // An artifact's bin: a click adds "Delete? Delete / Cancel" beside it; only that Delete deletes.
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.artifact-del, .artifact-del-no');
+    if (!b) return;
+    var form = b.closest('.artifact-del-form'), bin = form.querySelector('.artifact-del'),
+        ask = form.querySelector('.artifact-del-confirm');
+    ask.hidden = b !== bin || !ask.hidden;
+    bin.setAttribute('aria-expanded', String(!ask.hidden));
+  });
 
   var grid = document.querySelector('.stage.grid');
   if (!grid) return;
@@ -35,13 +45,13 @@
           mine.replaceWith(fresh);
           wireForms(fresh);
         });
-        // With an idea open the study chat shows; with none, the field's own chat does.
+        // The study chat shows only with an idea open.
         var side = document.querySelector('.idea-side'), newSide = doc.querySelector('.idea-side');
         if (side && newSide) side.classList.toggle('has-idea', newSide.classList.contains('has-idea'));
         var node = document.getElementById('idea');
 
         // Open the groups the new idea sits in; leave the ones the learner opened.
-        ['.outline-group', '.tl-group'].forEach(function (sel) {
+        ['.tl-group'].forEach(function (sel) {
           var theirs = doc.querySelectorAll(sel), mine = document.querySelectorAll(sel);
           theirs.forEach(function (d, i) { if (d.open && mine[i]) mine[i].open = true; });
         });
@@ -50,25 +60,14 @@
         var nav = document.querySelector('nav.top'), newNav = doc.querySelector('nav.top');
         if (nav && newNav) nav.innerHTML = newNav.innerHTML;
         document.title = doc.title;
-        // The chat under the idea now looks at the new idea (unless it is hanging from a section).
+        // The field chat now looks at the new idea.
         var form = document.getElementById('dock-form'), newForm = doc.getElementById('dock-form');
         if (form && newForm) {
-          form.dataset.homeHere = newForm.elements.here.value;
-          form.dataset.homeLabel = newForm.querySelector('.pill-text').textContent;
-          if (!document.getElementById('dock').classList.contains('popover')) {
-            form.elements.here.value = form.dataset.homeHere;
-            form.querySelector('.pill-text').textContent = form.dataset.homeLabel;
-          }
+          form.elements.here.value = newForm.elements.here.value;
+          form.querySelector('.pill-text').textContent = newForm.querySelector('.pill-text').textContent;
         }
 
-        if (keepStudy) {
-          // Names may have changed: refresh the topic outline's links in place.
-          doc.querySelectorAll('.outline li a').forEach(function (theirs) {
-            var mine = document.querySelector('.outline li a[href="' + theirs.getAttribute('href') + '"]');
-            if (mine) { mine.textContent = theirs.textContent; mine.title = theirs.title; }
-          });
-          return;
-        }
+        if (keepStudy) return;
         document.dispatchEvent(new Event('idea-swapped'));
         if (push) history.pushState(null, '', url);
         // Bring the detail into view only if it is down below the fold.
@@ -83,7 +82,14 @@
       .catch(function () { location.href = url; });
   }
 
-  window.refreshIdea = function () { return load(location.pathname + location.search, false, true); };
+  // A full page load of an idea (a direct visit, or a redirect after an action) used to rely
+  // on a #idea fragment to land on the detail; do it here so the URL stays clean.
+  if (document.querySelector('.idea-side.has-idea')) {
+    var detail = document.getElementById('idea');
+    if (detail) detail.scrollIntoView();
+  }
+
+  window.refreshIdea =function () { return load(location.pathname + location.search, false, true); };
 
   // An idea is /field/idea. Any link of that shape within this field opens in place; if the
   // answer turns out not to be an idea, load() falls back to a normal visit.

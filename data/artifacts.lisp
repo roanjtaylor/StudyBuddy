@@ -474,3 +474,35 @@
   </g>
 </svg>"
  :AT "2026-11-09T11:31:01" :VERSION 1)
+(:ID "4-bit-ripple-adder" :MAP "computers" :NODE "adder" :TYPE "html" :TITLE "4-bit ripple adder"
+ :LANGUAGE NIL :CONTENT "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:16px;color:#222;max-width:640px}
+.row{display:flex;gap:8px;justify-content:center;margin:6px 0}
+.col{width:130px;border:2px solid #888;border-radius:8px;padding:6px;text-align:center;font-size:13px}
+button{font-size:20px;width:44px;height:44px;border-radius:8px;border:2px solid #444;cursor:pointer}
+.on{background:#2a9d4a;color:#fff}.off{background:#eee}
+.bit{display:inline-block;width:30px;height:30px;line-height:30px;border-radius:50%;font-weight:bold;color:#fff}
+.b1{background:#2a9d4a}.b0{background:#999}
+.carry{color:#c0392b;font-weight:bold}
+h3{margin:4px 0}
+</style></head><body>
+<h3>Add two 4-bit numbers</h3>
+<p style=\"font-size:14px\">Click bits to flip them. Each column is a full adder: it takes A, B and the carry from its right, and outputs a sum bit and a carry to its left.</p>
+<div>A: <span id=\"A\"></span> = <b id=\"an\"></b></div><div>B: <span id=\"B\"></span> = <b id=\"bn\"></b></div>
+<div class=\"row\" id=\"cols\" style=\"flex-direction:row\"></div>
+<div id=\"out\" style=\"text-align:center;font-size:18px;margin-top:10px\"></div>
+<script>
+let A=[0,1,1,0],B=[0,0,1,1]; // index 0 = leftmost (bit3)
+function mk(id,arr){const s=document.getElementById(id);s.innerHTML='';arr.forEach((v,i)=>{const b=document.createElement('button');b.textContent=v;b.className=v?'on':'off';b.onclick=()=>{arr[i]^=1;draw()};s.appendChild(b)})}
+function draw(){mk('A',A);mk('B',B);
+const val=a=>parseInt(a.join(''),2);an.textContent=val(A);bn.textContent=val(B);
+let c=0,sums=[],html=[];
+for(let i=3;i>=0;i--){const a=A[i],b=B[i],x=a^b,s=x^c,co=(a&b)|(c&x);
+html[i]=`<div class=\"col\"><b>bit ${3-i}</b><br>A=${a} B=${b}<br>carry in=<span class=\"carry\">${c}</span><br>a XOR b = ${x}<br><b>sum = ${x} XOR ${c} = ${s}</b><br>carry out = (${a}&amp;${b}) OR (${c}&amp;${x}) = <span class=\"carry\">${co}</span></div>`;
+sums[i]=s;c=co}
+cols.innerHTML=html.join('');
+const r=(c<<4)+val(sums);
+out.innerHTML=`Result: <span class=\"bit b${c}\">${c}</span> `+sums.map(s=>`<span class=\"bit b${s}\">${s}</span>`).join(' ')+` = <b>${r}</b> &nbsp;(${val(A)} + ${val(B)} = ${val(A)+val(B)})`}
+draw();
+</script></body></html>"
+ :AT "2026-11-09T15:34:06" :VERSION 1)

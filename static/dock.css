@@ -1,7 +1,7 @@
 /* ---- The Claude dock, in claude.ai's clothes ----------------------------------------
    Warm paper, dark ink, one orange, hairline borders; a serif for the greeting, a sans
-   for everything else. Three parts side by side: the rail (this place's chats), the
-   chat (messages above one composer card), and the stage (an open artifact). */
+   for everything else. Two parts side by side: the chat (messages above one composer
+   card) and the stage (an open artifact). */
 :root {
   --cl-bg: #f5f4ee; --cl-panel: #faf9f5; --cl-sunk: #f0eee6; --cl-hover: #e8e6dc;
   --cl-ink: #1f1e1d; --cl-muted: #6e6c66; --cl-line: rgba(0,0,0,.09); --cl-line-strong: rgba(0,0,0,.18);
@@ -53,42 +53,7 @@ body.field { --gutter: calc(200px + 1rem); }
 .dock-btn { display: grid; place-items: center; width: 1.9rem; height: 1.9rem; color: var(--cl-muted); }
 .dock-btn:hover { background: var(--cl-hover); color: var(--cl-ink); }
 
-.dock > header {
-  display: flex; align-items: center; gap: .3rem; flex-shrink: 0;
-  height: 2.75rem; padding: 0 .5rem; border-bottom: 1px solid var(--cl-line); background: var(--cl-bg);
-}
-.dock-badge { display: grid; place-items: center; width: 1.4rem; height: 1.4rem; margin-left: .15rem; border-radius: 50%; background: var(--cl-orange); color: #fff; }
-.dock-title { flex: 1; min-width: 0; padding: 0 .35rem; font-size: .85rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 .dock-body { flex: 1; min-height: 0; display: flex; position: relative; }
-
-/* ---- The rail: chats at this place ---- */
-.dock-rail {
-  flex: 0 0 12rem; min-width: 0; display: flex; flex-direction: column;
-  border-right: 1px solid var(--cl-line); background: var(--cl-bg);
-}
-.dock:not(.rail-open) .dock-rail { display: none; }
-.rail-head { display: flex; flex-direction: column; gap: .25rem; padding: .6rem .5rem .35rem; }
-.rail-title { padding: 0 .4rem; font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--cl-muted); }
-.rail-newbtn { display: flex; align-items: center; gap: .4rem; padding: .35rem .5rem; font-size: .82rem; font-weight: 500; color: var(--cl-orange-ink); }
-.rail-newbtn:hover { background: var(--cl-orange-soft); }
-.chat-list { flex: 1; min-height: 0; overflow-y: auto; margin: 0; padding: 0 .5rem .5rem; list-style: none; scrollbar-width: thin; scrollbar-color: var(--cl-line-strong) transparent; }
-.rail-empty { padding: .35rem .5rem; font-size: .78rem; color: var(--cl-muted); }
-.chat-item { position: relative; display: flex; align-items: center; border-radius: .5rem; }
-.chat-item:hover, .chat-item.current, .chat-item.editing, .chat-item.confirming { background: var(--cl-sunk); }
-.chat-item.current { font-weight: 500; }
-.chat-open { flex: 1; min-width: 0; padding: .4rem .55rem; text-align: left; font-size: .82rem; border-radius: .5rem; }
-.chat-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-tools { display: none; align-items: center; gap: .1rem; padding-right: .2rem; }
-.chat-item:hover .chat-tools, .chat-item:focus-within .chat-tools { display: flex; }
-.chat-item.editing .chat-tools, .chat-item.editing .chat-open, .chat-item.confirming .chat-tools, .chat-item.confirming .chat-open { display: none; }
-.chat-tools button, .chat-confirm button { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; color: var(--cl-muted); border-radius: .35rem; }
-.chat-tools button:hover, .chat-confirm button:hover { background: var(--cl-hover); color: var(--cl-ink); }
-.chat-tools .ico, .chat-confirm .ico { width: .85rem; height: .85rem; }
-.chat-edit { flex: 1; min-width: 0; margin: .15rem .2rem; padding: .25rem .4rem; font: inherit; font-size: .82rem; color: var(--cl-ink); background: var(--cl-panel); border: 1px solid var(--cl-orange); border-radius: .4rem; outline: none; }
-.chat-confirm { display: flex; align-items: center; gap: .15rem; flex: 1; min-width: 0; padding: .2rem .3rem .2rem .55rem; font-size: .78rem; color: var(--cl-muted); }
-.chat-confirm span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-confirm .yes:hover { color: #b42318; }
 
 /* ---- The chat ---- */
 .dock-chat { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--cl-bg); }
@@ -97,11 +62,6 @@ body.field { --gutter: calc(200px + 1rem); }
   flex: 1; min-height: 0; overflow-y: auto; padding: 1rem .9rem .5rem; display: flex; flex-direction: column; gap: 1.1rem;
   scrollbar-width: thin; scrollbar-color: var(--cl-line-strong) transparent;
 }
-.dock-empty { margin: auto 0; padding: 1rem .5rem; text-align: center; }
-.dock-empty .greeting { margin: 0 0 1rem; font-family: var(--cl-serif); font-size: 1.4rem; line-height: 1.3; letter-spacing: -.01em; color: var(--cl-ink); }
-.dock-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem; }
-.dock .chip { padding: .35rem .8rem; font-size: .78rem; color: var(--cl-ink); background: var(--cl-panel); border: 1px solid var(--cl-line); border-radius: 999px; }
-.dock .chip:hover { background: var(--cl-sunk); border-color: var(--cl-line-strong); }
 
 .msg { position: relative; font-size: .9rem; line-height: 1.6; }
 .msg p { margin: 0; }
@@ -147,14 +107,29 @@ body.field { --gutter: calc(200px + 1rem); }
 .dock .artifact-card { background: var(--cl-panel); border: 1px solid var(--cl-line); border-radius: .75rem; }
 .dock .artifact-card:hover { border-color: var(--cl-line-strong); background: var(--cl-sunk); }
 .dock .artifact-icon { background: var(--cl-sunk); }
-/* A visual artifact shows itself in the chat: a framed preview with its card as the caption. */
+/* A visual artifact shows itself: a framed preview, its name over the top right corner. */
 .artifact-inline { margin: 0; max-width: 28rem; }
 .artifact-preview {
-  display: block; width: 100%; height: 15rem; border: 1px solid var(--cl-line); border-bottom: 0;
-  border-radius: .75rem .75rem 0 0; background: var(--cl-panel);
+  display: block; width: 100%; height: 15rem; border: 1px solid var(--cl-line);
+  border-radius: .75rem; background: var(--cl-panel);
 }
 .artifact-inline-html .artifact-preview { height: 22rem; }
-.artifact-inline .artifact-card { max-width: none; border-radius: 0 0 .75rem .75rem; }
+/* Its card stays in the page for the scripts to read (id, type, title) but is not shown. */
+.artifact-inline .artifact-card { display: none; }
+/* Over the top right corner, in a row: the bin (where it may be deleted), the name, full screen. */
+.artifact-tools {
+  position: absolute; top: .4rem; right: .4rem; max-width: calc(100% - .8rem);
+  display: flex; align-items: center; gap: .3rem;
+}
+.artifact-name {
+  min-width: 0; height: 1.8rem; padding: 0 .55rem; line-height: 1.8rem; font-size: .75rem; color: var(--cl-ink);
+  background: var(--cl-panel); border: 1px solid var(--cl-line); border-radius: .5rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity .12s;
+}
+/* Like the buttons beside it, the name shows only while the pointer is over the artifact. */
+.artifact-inline:hover .artifact-name { opacity: 1; }
+@media (hover: none) { .artifact-name { opacity: .85; } }
 .msg-error { padding: .5rem .75rem; border: 1px solid #f3c6c0; border-radius: .6rem; background: #fdf1ef; color: #9a2f1f; font-size: .8rem; }
 @media (prefers-color-scheme: dark) { .msg-error { background: #3a211d; border-color: #6b2f27; color: #f0a899; } }
 .dock-status { display: flex; align-items: center; gap: .4rem; margin: .25rem 0 0; font-size: .78rem; color: var(--cl-muted); }
@@ -194,6 +169,10 @@ body.field { --gutter: calc(200px + 1rem); }
 .dock .dock-send .ico { width: 1rem; height: 1rem; }
 .dock .dock-stop { background: var(--cl-ink); color: var(--cl-bg); }
 .dock .dock-send[hidden] { display: none; }
+/* Clear chat: quieter than send, to its left. */
+.composer-row .dock-clear { margin-left: auto; background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.composer-row .dock-clear + .dock-send { margin-left: .4rem; }
+.dock .dock-clear:hover { color: var(--fg); filter: none; }
 .composer:has(textarea:placeholder-shown) .dock-send:not(.dock-stop) { opacity: .35; }
 .dock-form.busy .dock-send:not(.dock-stop) { opacity: .35; pointer-events: none; }
 
@@ -205,47 +184,34 @@ body.field { --gutter: calc(200px + 1rem); }
 .dock-stage a.dock-btn { text-decoration: none; }
 .stage-frame { flex: 1; width: 100%; border: 0; background: var(--bg); }
 
-/* ---- Built in: the chat sits in the page, and can hang from a section's corner ---- */
+/* ---- Built in: the chat sits in the page ---- */
 .dock.inline { position: static; width: auto; height: min(42rem, calc(100dvh - 5rem)); box-shadow: none; }
-.dock.inline #dock-close, .dock.inline #dock-wide { display: none; }
-/* With an artifact on the stage, the built-in dock splits in two and folds its rail away. */
 .dock.inline.staged { width: auto; height: min(52rem, calc(100dvh - 5rem)); }
-.dock.inline.staged .dock-rail { display: none; }
 .dock.inline.staged .dock-chat { flex: 1 1 50%; }
 .dock.inline.staged .dock-stage { flex: 1 1 50%; }
-.dock.inline.popover {
-  position: absolute; top: 2.6rem; right: .4rem; z-index: 60;
-  width: min(36rem, calc(100% - .8rem)); height: min(34rem, 72dvh);
-  box-shadow: var(--cl-shadow);
-}
-.dock.inline.popover #dock-close { display: grid; }
-
 /* ---- Full screen: the artifact large on the left, the chat on the right, the page greyed ---- */
 .dock-scrim {
   position: fixed; inset: 0; z-index: 70; background: rgba(24,24,22,.6);
 }
 .dock-scrim[hidden] { display: none; }
 body.dock-focus { overflow: hidden; }
-.dock.focus, .dock.inline.focus, .dock.inline.staged.focus, .dock.inline.popover.focus {
+.dock.focus, .dock.inline.focus, .dock.inline.staged.focus {
   position: fixed; inset: 1rem; z-index: 71; width: auto; height: auto; max-width: none;
   transform: none; margin: 0; box-shadow: var(--cl-shadow);
 }
-.dock.focus .dock-rail, .dock.inline.staged.focus .dock-rail { display: none; }
 .dock.focus .dock-body { flex-direction: row; }
 .dock.focus .dock-stage, .dock.inline.staged.focus .dock-stage {
   order: -1; flex: 1 1 auto; border-left: 0; border-top: 0; border-right: 1px solid var(--cl-line);
 }
 .dock.focus .dock-chat, .dock.inline.staged.focus .dock-chat { flex: 0 0 min(28rem, 36vw); min-width: 20rem; }
-.dock.inline.focus #dock-close { display: grid; }
 .dock.focus .composer-tools { display: none; }
 .dock.focus .composer-row { justify-content: flex-end; }
-.dock.focus .dock-chips { display: none; }
 .stage-x { display: none; }
 .dock.focus .stage-x { display: grid; }
 .dock.focus #stage-close, .dock.focus #stage-focus { display: none; }
 .artifact-inline { position: relative; }
 .artifact-inline .artifact-expand {
-  position: absolute; top: .4rem; right: .4rem; display: grid; place-items: center;
+  display: grid; place-items: center; flex-shrink: 0;
   width: 1.8rem; height: 1.8rem; padding: 0; color: var(--cl-ink); cursor: pointer;
   background: var(--cl-panel); border: 1px solid var(--cl-line-strong); border-radius: .5rem;
   opacity: 0; transition: opacity .12s;
@@ -265,11 +231,31 @@ body.dock-focus { overflow: hidden; }
 }
 @media (max-width: 640px) {
   .dock, .dock.wide, .dock.staged { left: .5rem; right: .5rem; bottom: .5rem; width: auto; }
-  #dock-wide { display: none; }
-  .dock-rail { position: absolute; top: 0; bottom: 0; left: 0; z-index: 2; box-shadow: 8px 0 24px rgba(0,0,0,.15); }
 }
 
 /* Depth-first: what was made for an idea, as its preview with the title as caption. */
-.artifact-tile { display: flex; flex-direction: column; gap: .3rem; width: min(100%, 22rem); }
+.artifact-tile { position: relative; display: flex; flex-direction: column; gap: .3rem; width: min(100%, 22rem); }
+/* A visual one takes the column's full width, and a height to match. */
+.artifact-tile:has(.artifact-inline) { width: 100%; }
 .artifact-tile .artifact-inline { max-width: none; }
-.artifact-tile form { align-self: flex-end; }
+.artifact-tile .artifact-preview { height: auto; aspect-ratio: 16 / 10; }
+/* Deleting: a red bin that shows on hover; clicked, it grows "Delete? Delete / Cancel" beside it. */
+.artifact-del-form { display: flex; align-items: center; gap: .3rem; margin: 0; flex-shrink: 0; }
+.artifact-del-form.pending::after { content: none; }
+.artifact-del-form button { margin: 0; cursor: pointer; }
+.artifact-del {
+  display: grid; place-items: center; width: 1.8rem; height: 1.8rem; padding: 0; color: #d73a31;
+  background: var(--panel); border: 1px solid #d73a31; border-radius: .5rem;
+  opacity: 0; transition: opacity .12s;
+}
+.artifact-del:hover { background: #d73a31; color: #fff; border-color: #d73a31; }
+.artifact-tile:hover .artifact-del, .artifact-del:focus-visible, .artifact-del[aria-expanded="true"] { opacity: 1; }
+@media (hover: none) { .artifact-del { opacity: .85; } }
+.artifact-del-confirm {
+  display: flex; align-items: center; gap: .3rem; height: 1.8rem; padding: 0 .25rem 0 .5rem; font-size: .75rem;
+  color: var(--fg); background: var(--panel); border: 1px solid #d73a31; border-radius: .5rem; white-space: nowrap;
+}
+.artifact-del-confirm[hidden] { display: none; }
+.artifact-del-confirm button { padding: .05rem .45rem; font-size: .75rem; border-radius: .35rem; }
+.artifact-del-yes, .artifact-del-yes:hover { background: #d73a31; color: #fff; border-color: #d73a31; }
+

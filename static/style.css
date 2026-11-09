@@ -141,15 +141,8 @@ body.field main { flex: 1; min-height: 0; max-width: none; margin: 0; padding: 0
 /* No scrollbars inside the grid: rows are as tall as their tallest cell and the page scrolls. */
 body.field main { overflow-y: auto; }
 .stage { padding: 0; }
-.stage.grid {
-  display: grid; gap: 2px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: auto auto;
-}
+.stage.grid { display: grid; grid-template-columns: minmax(0, 1fr); }
 .stage .cell { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-@media (max-width: 800px) {
-  .stage.grid { grid-template-columns: minmax(0, 1fr); }
-}
 /* Each drawing is a sheet at its natural size; a shorter cell's sheet stretches to fill its row. */
 .stage .map-wrap { flex: 1 0 auto; overflow: hidden; }
 body.field > main > .warn { margin: .5rem 1rem 0; }
@@ -165,7 +158,7 @@ svg .box { stroke: var(--line); stroke-width: 1.5; }
 /* Breadth boxes: light grey with black text in either theme. */
 svg rect.box.group-box { fill: #e4e4df; stroke: #bdbdb6; }
 svg a:hover rect.box.group-box { stroke: #1a1a1a; }
-svg .box-title { font-size: 17px; fill: var(--fg); pointer-events: none; }
+svg .box-title { font-size: 14.4px; fill: var(--fg); pointer-events: none; }
 svg a:hover .box { stroke: var(--fg); }
 svg .gridline { stroke: var(--line); stroke-dasharray: 2 4; }
 svg .lane { stroke: var(--line); }
@@ -189,10 +182,9 @@ form.pending::after { content: "thinking…"; color: var(--muted); font-size: .8
 
 /* Node page */
 .node { max-width: 46rem; }
-.compression { font-size: 1.45rem; line-height: 1.35; margin: .5rem 0; }
-.why { color: var(--muted); }
-.notes { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: .75rem 1.25rem; margin-top: 1.25rem; }
-.notes h2 { margin-top: .25rem; }
+/* pre-line: a line break written into the text shows as one. */
+.compression { font-size: 1.45rem; line-height: 1.35; margin: .5rem 0; white-space: pre-line; }
+.idea-main .body > :first-child { margin-top: 0; }
 
 button {
   font: inherit; font-size: .9rem; cursor: pointer;
@@ -220,14 +212,6 @@ label input, label textarea { display: block; margin-top: .25rem; }
 svg text.gb-text, svg .group-title.gb-text, svg .box-title.gb-text { fill: #1a1a1a; }
 svg text.gb-meta, svg .group-comp.gb-meta { fill: #444; }
 
-/* Breadth: an outline of groups; each opens like a folder to list its ideas. */
-.outline { padding: .6rem 1rem; border: 1px solid var(--line); background: var(--panel); }
-.outline-group { margin-bottom: .4rem; }
-.outline-group summary { cursor: pointer; }
-.outline-title { font: 600 .95rem ui-monospace, Menlo, Consolas, monospace; color: var(--fg); text-decoration: none; }
-.outline-sub { font-size: .85rem; color: var(--muted); font-style: italic; }
-.outline-group ul { margin: .15rem 0 .2rem; padding-left: 2rem; font-size: .9rem; line-height: 1.35; }
-
 /* Timeline: bars per group on one shared axis; a bar opens to show its ideas. */
 .tl { border: 1px solid var(--line); background: var(--panel); }
 .tl .map-wrap { border: 0; background: none; }
@@ -236,10 +220,10 @@ svg text.gb-meta, svg .group-comp.gb-meta { fill: #444; }
 .tl-group .chev { font-size: 14px; fill: var(--muted); }
 .tl-group .chev-open, .tl-group[open] .chev-closed { display: none; }
 .tl-group[open] .chev-open { display: inline; }
-svg .bar-title { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 600; fill: var(--fg); pointer-events: none; }
+svg .bar-title { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15.2px; font-weight: 600; fill: var(--fg); pointer-events: none; }
 .tl-group summary:hover .span { stroke: var(--fg); stroke-width: 2; }
 
-/* The open idea sits below the timeline and outline, on the same page. */
+/* The open idea sits below the timeline, on the same page. */
 .idea-below {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.5rem;
   padding: 1rem; border-top: 1px solid var(--line); align-items: start;
@@ -249,50 +233,7 @@ svg .bar-title { font-family: ui-monospace, Menlo, Consolas, monospace; font-siz
 .idea-side .three { grid-template-columns: 1fr; }
 @media (max-width: 800px) { .idea-below { grid-template-columns: minmax(0, 1fr); } }
 
-/* A Claude button at the top right of a section; it opens the chat pinned to that section. */
-.stage .cell { position: relative; }
-.scope-claude {
-  display: grid; place-items: center;
-  width: 1.9rem; height: 1.9rem; padding: 0; border: 0; border-radius: 50%;
-  background: var(--tt-claude, #d97757); color: #fff;
-}
-.scope-claude:hover { border: 0; filter: brightness(1.08); }
-.scope-claude .mark { width: 1rem; height: 1rem; }
-/* The breadth section's one Claude button, centred under its banner; the chat opens beneath it. */
-.scope-main {
-  position: absolute; top: 3.1rem; left: 0; right: 0; z-index: 7;
-  display: flex; justify-content: center; pointer-events: none;
-}
-.scope-main > .scope-claude { pointer-events: auto; }
-.scope-main .dock-anchor { position: absolute; top: 0; left: 0; right: 0; pointer-events: none; }
-.scope-main .dock.inline.popover {
-  pointer-events: auto; top: 2.4rem; right: auto; left: 50%; transform: translateX(-50%);
-}
-.section-wrap.breadth { padding-top: 5.6rem; }
-/* Mini buttons: one beside each group and idea, shown on hover (and while the chat is on it). */
-.scope-mini {
-  display: inline-grid; vertical-align: middle; margin-left: .45rem;
-  width: 1.2rem; height: 1.2rem; opacity: 0; transition: opacity .12s;
-}
-.scope-mini .mark { width: .7rem; height: .7rem; }
-.outline-group summary:hover > .scope-mini, .outline-group li:hover > .scope-mini,
-.tl-group summary:hover > .scope-mini, .scope-mini:focus-visible, .scope-mini.on { opacity: 1; }
-.tl-group summary { position: relative; }
-.tl-group summary > .scope-mini { position: absolute; top: 8px; margin: 0; } /* left is set inline, beside the name */
-@media (hover: none) { .scope-mini { opacity: .7; } }
-
-/* Section banners: a blue, Pokemon-menu style plate overlaid at the top middle of each section. */
-.section-wrap { position: relative; padding-top: 3.4rem; }
-.section-label { position: absolute; top: .55rem; left: 0; right: 0; z-index: 6; display: flex; justify-content: center; pointer-events: none; }
-.section-label span {
-  font: 700 .95rem ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase;
-  color: #fff; text-shadow: 1px 1px 0 #1b2f6b;
-  padding: .3rem 1.6rem; border-radius: 10px;
-  background: linear-gradient(#4f86e8, #2a56b8);
-  border: 3px solid #fff; outline: 3px solid #1b2f6b; outline-offset: 0;
-  box-shadow: 0 2px 0 3px #14234f;
-}
-.idea-below.section-wrap { padding-top: 4.2rem; }
+.idea-below.breadth { border-top: 0; }
 
 /* Timeline ideas: the dot, its label and the space around them all click. */
 svg .hit { fill: transparent; }
@@ -300,33 +241,50 @@ svg .hit { fill: transparent; }
 .tl-group svg a.tl-idea { cursor: pointer; }
 .tl-group svg a.tl-idea:hover .box-title { text-decoration: underline; }
 
-/* The study chat: the dock's look, compact, with no furniture. */
-/* The dock lives in the breadth section's popovers; the depth section has the study pane only. */
-.idea-side .idea-dock { display: none; }
-.dock.inline.study { height: auto; }
-.study .study-log { flex: 0 1 auto; max-height: min(28rem, 60dvh); padding: .6rem .75rem .2rem; gap: .7rem; }
-.study .study-log:has(.study-empty:only-child) { overflow: visible; }
-.study-empty { padding: 0; text-align: left; }
+/* The chat pane: one look for both chats (breadth: the dock under the timeline; depth: the study pane). */
+.dock.inline.pane { height: auto; }
+.pane .dock-log { flex: 0 1 auto; max-height: min(28rem, 60dvh); padding: .6rem .75rem .2rem; gap: .7rem; }
+/* Before the first message there is only the composer. */
+.pane .dock-log:empty { display: none; }
+/* The study chat, once asked something: as tall as the window (static/study.js adds .grown). */
+.dock.inline.pane.study { transition: height .4s ease; }
+/* Less the 3rem bar at the top of the page, and a little air. */
+.dock.inline.pane.study.grown { height: calc(100dvh - 4rem); }
+.pane.study.grown .dock-log { flex: 1 1 auto; max-height: none; }
+@media (prefers-reduced-motion: reduce) { .dock.inline.pane.study { transition: none; } }
+/* With an artifact on the stage beside it, the pane needs a height of its own. */
+.dock.inline.pane.staged { height: min(34rem, 72dvh); }
+.pane.staged .dock-log { flex: 1 1 auto; max-height: none; }
 
-/* A proposed edit: a code-review style diff the learner approves or rejects. */
-.proposal { margin: .6rem 0 .2rem; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; }
-.proposal-head { margin: 0; padding: .4rem .7rem; font-size: .85rem; font-weight: 600; border-bottom: 1px solid var(--line); }
-.proposal-field { padding: .45rem .7rem 0; }
-.proposal-field.off { opacity: .45; }
-.proposal-label { display: flex; align-items: center; gap: .4rem; margin: 0 0 .25rem; font-size: .8rem; color: var(--muted); }
-.diff { font: .8rem/1.45 ui-monospace, Menlo, Consolas, monospace; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
-.diff-line { display: flex; gap: .5rem; padding: 0 .5rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-.diff-sign { flex: none; width: .8rem; text-align: center; user-select: none; }
-.diff-add { background: rgba(46, 160, 67, .2); }
-.diff-add .diff-sign { color: #2ea043; font-weight: 700; }
-.diff-del { background: rgba(248, 81, 73, .2); }
-.diff-del .diff-sign { color: #f85149; font-weight: 700; }
-.diff-fold { padding: 0 .5rem; color: var(--muted); background: rgba(128, 128, 128, .1); }
-.proposal-actions { display: flex; align-items: center; gap: .5rem; padding: .55rem .7rem; }
-.proposal.applied { border-color: #2ea043; }
-.proposal.rejected { opacity: .7; }
-.study-hint { margin: 0 0 .5rem; font-size: .8rem; color: var(--cl-muted); }
-.study .dock-chips { justify-content: flex-start; gap: .3rem; }
-.study .dock-form { padding: .3rem .5rem .5rem; }
-.study .composer { padding: .45rem .45rem .35rem .75rem; border-radius: .9rem; }
-.study .composer textarea { margin-bottom: .3rem; }
+/* A proposed edit, side by side: the idea on the left with its cuts in red; on the right, in
+   place of the chat, the idea as it would read with what is new in green, under Approve / Reject. */
+.idea-study.reviewing > .study { display: none; }
+/* The bar takes no room above the text, so both columns start level: it floats over the
+   foot of the diff, pinned to the bottom of the window while the diff runs past it. */
+.review-bar {
+  position: sticky; bottom: 1rem; z-index: 2; display: flex; justify-content: center; gap: .6rem;
+  width: max-content; margin: .6rem auto 0; padding: .45rem .6rem;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .18);
+}
+.review-bar button { color: #fff; font-weight: 600; }
+.review-bar .approve { background: #2ea043; border-color: #2ea043; }
+.review-bar .reject { background: #d73a31; border-color: #d73a31; }
+.review-bar button:hover { filter: brightness(1.1); }
+.review-bar button:disabled { opacity: .5; cursor: progress; }
+.review-note { margin: .4rem 0 0; text-align: center; }
+.review-note:empty { display: none; }
+.review .node { max-width: none; }
+.review .body > :first-child { margin-top: 0; }
+.proposal-note { margin: .4rem 0 0; }
+.previewing ins, .previewing del { text-decoration: none; border-radius: 3px; padding: 0 .1em; }
+.previewing ins { background: rgba(46, 160, 67, .25); }
+.previewing del { background: rgba(248, 81, 73, .25); }
+.previewing .chg { margin: .3rem 0; padding: 0 .6rem; border-left: 3px solid; border-radius: 3px; }
+.previewing .chg-add { background: rgba(46, 160, 67, .14); border-color: #2ea043; }
+.previewing .chg-del { background: rgba(248, 81, 73, .14); border-color: #f85149; }
+.previewing .chg > :first-child { margin-top: .3rem; }
+.previewing .chg > :last-child { margin-bottom: .3rem; }
+.pane .dock-form { padding: .3rem .5rem .5rem; }
+.pane .composer { padding: .45rem .45rem .35rem .75rem; border-radius: .9rem; }
+.pane .composer textarea { margin-bottom: .3rem; }

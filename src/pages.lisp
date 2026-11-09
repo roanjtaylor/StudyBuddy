@@ -24,31 +24,9 @@
   (html (:div :class "md" (:raw (markdown->html text)))))
 
 ;;; ---- The Claude dock: the one way to talk to the field --------------------
-;;; A round button bottom-right of the content opens a chat panel on every page of a
-;;; field (the tastetrainer dock, in s-expressions). `focus` is where the learner is:
+;;; One chat per field, never stored (the tastetrainer dock, in s-expressions). `focus` is where the learner is:
 ;;; "" for the field, a group id, an idea id. It rides along as the form's `here`, so
 ;;; the model is told what you are looking at; static/dock.js does the rest.
-
-(defparameter *field-chips*
-  '(("What am I weakest on?" "Looking at my attempts, which ideas in this field am I weakest on, and what should I do next?")
-    ("Fill the gaps" "What core ideas is this map missing? Add them, breadth first.")
-    ("Quiz me" "Quiz me across this field: five questions, answers hidden at the end.")))
-
-(defparameter *timeline-chips*
-  '(("Date the undated" "Give every idea without a date a sensible era, using your tools.")
-    ("Fill time gaps" "Where does this timeline have long gaps with no ideas? Add the core ideas that belong there, breadth first.")))
-
-(defparameter *topic-chips*
-  '(("Fill the gaps" "What core ideas is this map missing? Add them, breadth first.")
-    ("Regroup" "Is anything in the wrong group, or are the groups badly chosen? Fix it with your tools.")
-    ("Tighten" "Merge or remove ideas that are examples, remixes or padding rather than core ideas.")))
-
-(defparameter *node-chips*
-  '(("Explain it to me" "Explain this idea to me from first principles, mechanism first. Then record the explanation in its notes.")
-    ("Go deeper" "Expand this idea into the sub-ideas I would need to write out to own it, one level down.")
-    ("Quiz me" "Quiz me on this idea and its neighbours: five questions, answers hidden at the end.")
-    ("Questions to answer" "Give me five questions about mechanism that I should be able to answer in a paragraph each, hardest gap first given my attempts.")
-    ("Why does it matter?" "Why does this idea matter for the rest of the field? What does it unlock, and what breaks without it?")))
 
 ;; A plain eight-point spark: reads as "Claude" without borrowing the real logo.
 (defcomponent claude-mark (&optional (class "mark"))
@@ -60,7 +38,7 @@
 
 ;; The "Looking at" chip: the field, a group of it, or one idea.
 (defun focus-label (focus)
-  (cond ((equal focus "timeline") (str (map-title) " / timeline"))
+  (cond ((equal focus "timeline") (str (map-title) " timeline"))
         ((equal focus "topics") (str (map-title) " / topics"))
         ((find-group focus) (str (map-title) " / " focus))
         ((find-node focus) (node-title focus))
@@ -100,19 +78,38 @@
             (:span :class "artifact-kind" (artifact-meta a))))))
 
 ;; In the chat, a visual artifact (a diagram, a page) shows itself, as claude.ai shows
-;; images inline: a framed preview with its card under it to open it on the stage.
+;; images inline: a framed preview, named in its corner; its card is there unseen, for
+;; the scripts to read what to open on the stage.
 ;; Anything else (cards, a quiz, a document, code) is its card alone.
 (defparameter *inline-artifact-types* '("svg" "mermaid" "html"))
 
-(defcomponent artifact-block (a)
+;; The way to delete an artifact: a red bin that shows on hover; a click on it adds
+;; "Delete? Delete / Cancel" beside it (static/map.js), and only that Delete deletes.
+(defcomponent artifact-remove (a)
+  (html (:form :method "post" :action "/action/remove-artifact" :class "artifact-del-form"
+          (hidden "id" (getf a :id))
+          (:button :type "button" :class "artifact-del" :title "Delete" :aria-label "Delete"
+                   :aria-expanded "false" (icon "trash"))
+          (:span :class "artifact-del-confirm" :hidden t
+            "Delete?"
+            (:button :type "submit" :class "artifact-del-yes" "Delete")
+            (:button :type "button" :class "artifact-del-no" "Cancel")))))
+
+;; removable: where it may be deleted from (under its idea), the bin joins the corner tools.
+(defcomponent artifact-block (a &optional removable)
   (if (member (getf a :type) *inline-artifact-types* :test #'equal)
       (html (:figure :class (str "artifact-inline artifact-inline-" (getf a :type)) :data-artifact (getf a :id)
               (:iframe :class "artifact-preview" :src (artifact-view-url (getf a :id)) :title (getf a :title)
                        :loading "lazy" :sandbox (if (equal (getf a :type) "svg") "" "allow-scripts"))
-              ;; The frame swallows clicks, so the way to full screen is a button over its corner.
-              (:button :type "button" :class "artifact-expand" :title "Full screen" :aria-label "Full screen" (icon "expand"))
+              ;; Over the top right corner: the bin, the name, and the way to full screen
+              ;; (the frame swallows clicks, so that has to be a button over it).
+              (:div :class "artifact-tools"
+                (when removable (artifact-remove a))
+                (:span :class "artifact-name" (getf a :title))
+                (:button :type "button" :class "artifact-expand" :title "Full screen" :aria-label "Full screen" (icon "expand")))
               (artifact-card a)))
-      (artifact-card a)))
+      (html (artifact-card a)
+            (when removable (html (:div :class "artifact-tools" (artifact-remove a)))))))
 
 ;; The artifact as text, for the model to read back.
 (defun artifact-text (a)
@@ -159,6 +156,7 @@
     ("check"  . "M5 12l5 5L20 7")
     ("x"      . "M6 6l12 12M18 6L6 18")
     ("open"   . "M14 4h6v6M20 4l-9 9M19 14v6H5V6h6")
+    ("trash"  . "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3")
     ("wide"   . "M4 12h16M14 6l6 6-6 6")
     ("expand" . "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5")
     ("globe"  . "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18")
@@ -169,86 +167,42 @@
               :stroke-width "2" :stroke-linecap "round" :stroke-linejoin "round" :aria-hidden "true"
           (:path :d (cdr (assoc name *icons* :test #'equal))))))
 
-;; One chat in the rail. Its title is a button; rename and delete appear on hover.
-(defcomponent chat-item (c &optional current)
-  (html (:li :class (str "chat-item" (if current " current" "")) :data-chat (getf c :id)
-          (:button :type "button" :class "chat-open" :title (getf c :title)
-            (:span :class "chat-title" (getf c :title)))
-          (:span :class "chat-tools"
-            (:button :type "button" :class "chat-rename" :title "Rename" :aria-label "Rename" (icon "rename"))
-            (:button :type "button" :class "chat-delete" :title "Delete" :aria-label "Delete" (icon "trash"))))))
+;; The composer both chats share: one card with the box, what Claude is looking at, the
+;; model and effort, and send/stop. Only the placeholder and the "looking at" label differ.
+(defcomponent composer (placeholder looking-at &optional clearable)
+  (html (:div :class "composer"
+          (:textarea :name "text" :rows 2 :spellcheck "false" :placeholder placeholder)
+          (:div :class "composer-row"
+            (:span :class "composer-tools"
+              (:span :class "pill" :title "What Claude is looking at"
+                (:span :class "pill-text" looking-at))
+              (model-effort-controls))
+            ;; Shown by static/study.js once a first exchange has finished.
+            (when clearable
+              (html (:button :type "button" :class "dock-send dock-clear" :hidden t
+                             :title "Clear chat" :aria-label "Clear chat" (icon "trash"))))
+            (:button :type "submit" :class "dock-send" :title "Send" :aria-label "Send" (icon "send"))
+            (:button :type "button" :class "dock-send dock-stop" :hidden t
+                     :title "Stop" :aria-label "Stop" (icon "stop"))))))
 
-;; The chats at one place, newest first. /chats returns exactly this.
-(defcomponent chat-list (scope &optional current)
-  (let ((cs (scope-chats scope)))
-    (html (if cs
-              (dolist (c cs) (chat-item c (equal (getf c :id) current)))
-              (html (:li :class "rail-empty" "No chats here yet."))))))
-
-;; Before a chat has a message: a greeting for the place, and a few asks to start from.
-(defcomponent dock-empty (scope)
-  (let ((node (find-node scope)))
-    (html (:div :class "dock-empty"
-            (:p :class "greeting"
-              (cond (node (str "Explain " (getf node :title) " in your own words."))
-                    ((equal scope "timeline") "Let's work on the timeline.")
-                    ((equal scope "topics") "Let's shape the topics.")
-                    (t (str "What are we working on in " (map-title) "?"))))
-            (:div :class "dock-chips"
-              (loop for (label text) in (cond (node *node-chips*) ((equal scope "timeline") *timeline-chips*)
-                                              ((equal scope "topics") *topic-chips*) (t *field-chips*))
-                    do (html (:button :type "button" :class "chip" :data-text text label))))))))
-
-;; One chat's messages, or the empty state. /chat/:id returns exactly this and
-;; dock.js swaps it into #dock-log.
-(defcomponent dock-log (chat scope)
-  (let ((ms (and chat (chat-messages chat))))
-    (html (if ms
-              (dolist (m ms) (message-view m))
-              (dock-empty scope)))))
-
+;; The field chat. Not stored: static/dock.js keeps its turns in the page and sends them
+;; back with every ask, so the log starts empty and only the composer shows.
 (defcomponent claude-dock (focus)
-  (let* ((chat (newest-chat focus)) (chat-id (getf chat :id)))
+  (progn
     (html (:button :type "button" :id "dock-open" :class "dock-launcher" :hidden t
                    :aria-label "Ask Claude" :title "Ask Claude" (claude-mark "mark big"))
-          (:section :id "dock" :class "dock inline" :aria-label "Claude"
-            (:header
-              (:button :type "button" :id "dock-rail-toggle" :class "dock-btn" :title "Chats" :aria-label "Chats" (icon "rail"))
-              (:span :class "dock-badge" (claude-mark "mark"))
-              (:span :id "dock-title" :class "dock-title" (getf* chat :title "New chat"))
-              (:button :type "button" :id "dock-new" :class "dock-btn" :title "New chat" :aria-label "New chat" (icon "new"))
-              (:button :type "button" :id "dock-wide" :class "dock-btn" :title "Widen" :aria-label "Widen" (icon "wide"))
-              (:button :type "button" :id "dock-close" :class "dock-btn" :title "Close" :aria-label "Close" (icon "x")))
+          (:section :id "dock" :class "dock inline pane" :aria-label "Claude"
             (:div :class "dock-body"
-              ;; The rail: this place's chats, as claude.ai lists them.
-              (:aside :id "dock-rail" :class "dock-rail" :aria-label "Chats"
-                (:div :class "rail-head"
-                  (:span :class "rail-title" "Chats")
-                  (:button :type "button" :id "rail-new" :class "rail-newbtn" (icon "new") " New chat"))
-                (:ul :id "chat-list" :class "chat-list" (chat-list focus chat-id)))
               (:div :class "dock-chat"
-                (:div :id "dock-log" :class "dock-log" (dock-log chat-id focus))
-                ;; The composer: one card, as on claude.ai.
+                (:div :id "dock-log" :class "dock-log")
                 (:form :id "dock-form" :class "dock-form" :method "post" :action "/action/ask"
                        :data-field (map-title)
-                  (hidden "map-name" (map-id)) (hidden "dock" "1")
+                  (hidden "map-name" (map-id))
                   (:input :type "hidden" :name "here" :value focus)
-                  (:input :type "hidden" :name "chat" :value (or chat-id ""))
                   ;; The artifact open on the stage, so the model knows what "this" is.
                   (:input :type "hidden" :name "artifact" :value "")
-                  (:div :class "composer"
-                    (:textarea :name "text" :rows 1 :spellcheck "false"
-                               :placeholder (if (find-node focus)
-                                                "Explain it in your own words and I'll mark it — or ask anything about it…"
-                                                "Ask, ask for a change, or ask for cards, a quiz, a diagram, a page…"))
-                    (:div :class "composer-row"
-                      (:span :class "composer-tools"
-                        (:span :class "pill" :title "What Claude is looking at"
-                          (:span :class "pill-text" (focus-label focus)))
-                        (model-effort-controls))
-                      (:button :type "submit" :class "dock-send" :title "Send" :aria-label "Send" (icon "send"))
-                      (:button :type "button" :id "dock-stop" :class "dock-send dock-stop" :hidden t
-                               :title "Stop" :aria-label "Stop" (icon "stop"))))))
+                  (composer "Ask, ask for a change, or ask for cards, a quiz, a diagram, a page…"
+                            (focus-label focus))))
               ;; The stage: where an artifact opens beside the chat, as on claude.ai.
               (:aside :id "dock-stage" :class "dock-stage" :hidden t
                 (:header
@@ -261,8 +215,8 @@
 
 
 ;;; ---- Views of a field -----------------------------------------------------
-;;; One page shows it all: breadth (the groups) as a timeline and a map side by side,
-;;; and depth (every idea) underneath.
+;;; One page shows it all: breadth (the groups) as a timeline with the field's chat,
+;;; and depth (the open idea and its study chat) underneath.
 ;;;
 ;;; Every view is a sheet of paper: a fixed width, text at its natural size, and as tall
 ;;; as it needs to be. Nothing pans or zooms; what does not fit the width wraps onto the
@@ -270,13 +224,9 @@
 
 (defparameter *views* '("map" "timeline"))  ; actions.lisp still checks a ?view= on redirect
 
-(defparameter *paper-w* 1480 "Width of the depth sheet (the bottom, full-width cell).")
-(defparameter *half-w* 740 "Width of a breadth sheet (one of the two top cells).")
+(defparameter *paper-w* 1480 "Width of the full-width sheet.")
+(defparameter *half-w* 740 "Width of the timeline sheet (the left half).")
 (defparameter *margin* 20)
-
-(defun nodes-in-group (nodes group-id)
-  (stable-sort (remove group-id nodes :key (lambda (n) (getf n :group)) :test-not #'equal)
-               #'< :key (lambda (n) (node-depth (getf n :id)))))
 
 ;; (wrap-words "a long title here" 8) → ("a long" "title" "here…") at most 2 lines
 (defun wrap-words (s width &optional (max-lines 2))
@@ -309,74 +259,26 @@
                  :viewBox (str "0 0 " ,w " " ,h) :width ,w :height ,h
              ,@body))))
 
-;;; -- Breadth map: the groups as an outline -----------------------------------------
-;;; Each group is a title with its one-line compression underneath; opening it lists its
-;;; ideas in prerequisite order, like a folder in a file tree.
-
-;; The groups a group's ideas build on, other than itself.
-(defun group-prereqs (nodes group-id)
-  (remove group-id
-          (remove-duplicates
-           (loop for n in nodes
-                 when (equal (getf n :group) group-id)
-                   append (loop for p in (getf n :prereqs)
-                                for pn = (find-node p)
-                                when pn collect (getf pn :group)))
-           :test #'equal)
-          :test #'equal))
-
-;; Layer of a group: 0 with nothing before it, else one past its latest prerequisite group.
-(defun group-layer (nodes group-id &optional seen)
-  (let ((ps (remove-if (lambda (g) (member g seen :test #'equal)) (group-prereqs nodes group-id))))
-    (if ps
-        (1+ (reduce #'max (mapcar (lambda (g) (group-layer nodes g (cons group-id seen))) ps)))
-        0)))
-
-(defcomponent breadth-map (nodes &optional (w *half-w*) open)
-  (declare (ignore w))
-  (let ((groups (stable-sort (copy-list (visible-groups nodes)) #'<
-                             :key (lambda (g) (group-layer nodes (getf g :id))))))
-    (html (:div :class "outline"
-            (dolist (g groups)
-              (let* ((id (getf g :id))
-                     (mine (nodes-in-group nodes id)))
-                (html (:details :class "outline-group" :open (equal id open)
-                        (:summary
-                          (:span :class "outline-title" id)
-                          (:span :class "outline-sub" " — " (getf* g :compression ""))
-                          (scope-mini id id))
-                        (:ul
-                          (dolist (n mine)
-                            (html (:li (:a :href (node-url (getf n :id)) :title (getf n :compression)
-                                        (getf n :title))
-                                       (scope-mini (getf n :id) (getf n :title))))))))))))))
-
 ;;; -- Timeline: years along the x axis, a lane per group -----------------------
 
 (defparameter *tl-left* 40 "Where the years start; room for the expand arrow.")
 (defparameter *tl-top* 52)
-(defparameter *label-px* 9 "Width of one character of a dot's label.")
+(defparameter *label-px* 7.5 "Width of one character of a dot's label (14.4px text).")
+(defparameter *row-h* 20 "Height of one row of ideas, as tight as the old outline list.")
 
 ;; A tick every 10 years, or wider when the span is long.
 (defun tick-step (span) (cond ((<= span 150) 10) ((<= span 600) 50) (t 500)))
 
-;; Greedy rows for labels along a line: each item takes the first row whose last label
-;; has ended before it starts. → list of (item x row), and the number of rows used.
-(defun pack-rows (items x-of width-of)
-  (let ((ends '()) (placed '()))
-    (dolist (it items)
-      (let* ((x (funcall x-of it))
-             (row (or (position-if (lambda (e) (<= e x)) ends) (length ends)))
-             (end (+ x (funcall width-of it))))
-        (if (< row (length ends))
-            (setf (nth row ends) end)
-            (setf ends (append ends (list end))))
-        (push (list it x row) placed)))
-    (values (nreverse placed) (max 1 (length ends)))))
+;; One row per item, in order, so every idea sits on its own line.
+;; → list of (item x row), and the number of rows used.
+(defun pack-rows (items x-of)
+  (values (loop for it in items for row from 0
+                collect (list it (funcall x-of it) row))
+          (max 1 (length items))))
 
 ;; One shared year axis across the full width. Each group is a bar from its first to its
 ;; last idea, named inside; clicking it opens the group's ideas as dots on the same axis.
-(defcomponent timeline (nodes &optional (w *paper-w*) open)
+(defcomponent timeline (nodes &optional (w *half-w*) open)
   (let* ((dated (remove-if-not (lambda (n) (getf n :era)) nodes))
          (groups (remove-if-not (lambda (g) (some (lambda (n) (equal (getf n :group) (getf g :id))) dated))
                                 (visible-groups nodes)))
@@ -391,7 +293,6 @@
           (labels ((x (year) (round (+ *tl-left* (* (- right *tl-left*) (/ (- year lo) (- hi lo))))))
                    (label (n) (truncate-string (getf n :title)
                                                (max 6 (floor (- w (x (getf n :era)) 24) *label-px*))))
-                   (label-w (n) (+ 20 (* *label-px* (length (label n)))))
                    (grid (h)
                      (loop for year from lo to hi by step
                            do (html (:line :class "gridline" :x1 (x year) :y1 0 :x2 (x year) :y2 h)))))
@@ -409,90 +310,48 @@
                          (b (max (x (getf (car (last gn)) :era)) (+ a 8)))
                          (name-w (* 9 (length id)))
                          (flip (> (+ a 28 name-w) (- w 10))))
-                    (multiple-value-bind (placed rows) (pack-rows gn (lambda (n) (x (getf n :era))) #'label-w)
+                    (multiple-value-bind (placed rows) (pack-rows gn (lambda (n) (x (getf n :era))))
                       (html
                         (:details :class "tl-group" :open (equal id open)
                           (:summary
-                            (with-canvas (w 34)
-                              (grid 34)
-                              (:text :x 8 :y 22 :class "chev chev-closed" "▸")
-                              (:text :x 8 :y 22 :class "chev chev-open" "▾")
-                              (:rect :x a :y 5 :width (- b a) :height 24 :rx 4 :class "span")
+                            (with-canvas (w 28)
+                              (grid 28)
+                              (:text :x 8 :y 19 :class "chev chev-closed" "▸")
+                              (:text :x 8 :y 19 :class "chev chev-open" "▾")
+                              (:rect :x a :y 4 :width (- b a) :height 20 :rx 4 :class "span")
                               (:title (getf* g :compression ""))
                               (if flip
-                                  (html (:text :x (- b 8) :y 22 :class "bar-title" :text-anchor "end" id))
-                                  (html (:text :x (+ a 8) :y 22 :class "bar-title" id))))
-                            ;; Just after the bar's name (before it when the name is flipped), as a share of the width.
-                            (scope-mini id id
-                                        (format nil "left: ~,2f%"
-                                                (* 100 (/ (if flip (- b 8 name-w 24) (+ a 8 name-w 6)) w)))))
-                          (with-canvas (w (+ 8 (* 30 rows)))
-                            (grid (+ 8 (* 30 rows)))
+                                  (html (:text :x (- b 8) :y 19 :class "bar-title" :text-anchor "end" id))
+                                  (html (:text :x (+ a 8) :y 19 :class "bar-title" id)))))
+                          (with-canvas (w (+ 6 (* *row-h* rows)))
+                            (grid (+ 6 (* *row-h* rows)))
                             (dolist (it placed)
                               (destructuring-bind (n nx row) it
                                 (html (:a :href (node-url (getf n :id)) :class "tl-idea"
                                         ;; An invisible target over the dot and its label, so the whole thing clicks.
-                                        (:rect :x (- nx 10) :y (+ 4 (* 30 row)) :width (+ 22 (* *label-px* (length (label n))))
-                                               :height 24 :class "hit")
-                                        (:circle :cx nx :cy (+ 16 (* 30 row)) :r 6 :class "dot")
+                                        (:rect :x (- nx 10) :y (+ 2 (* *row-h* row)) :width (ceiling (+ 22 (* *label-px* (length (label n)))))
+                                               :height 18 :class "hit")
+                                        (:circle :cx nx :cy (+ 11 (* *row-h* row)) :r 4 :class "dot")
                                         (:title (getf n :era) " — " (getf n :title) " — " (getf n :compression))
-                                        (:text :x (+ nx 12) :y (+ 22 (* 30 row)) :class "box-title"
+                                        (:text :x (+ nx 10) :y (+ 16 (* *row-h* row)) :class "box-title"
                                                (label n)))))))))))))
             (let ((undated (- (length nodes) (length dated))))
               (when (> undated 0)
                 (html (:p :class "quiet small" undated " ideas have no date and are left out here."))))))))))
 
-;;; -- The field at a glance: a 2x2 grid ------------------------------------------
-;;; Two columns: the timeline on the left (an expandable bar per group), the outline of groups on the right.
-
-;; The one Claude button for the breadth section, centred under its banner. Its popover is
-;; the anchor every mini button below opens into.
-(defcomponent scope-button ()
-  (html (:div :class "scope-main"
-          (:button :type "button" :class "scope-claude" :data-scope "" :data-anchor "breadth-anchor"
-                   :data-label (map-title)
-                   :title "Ask Claude about the whole field" :aria-label "Ask Claude about the whole field"
-            (claude-mark "mark"))
-          (:div :id "breadth-anchor" :class "dock-anchor"))))
-
-;; A small Claude button beside one breadth item (a group or an idea), shown on hover.
-;; It points the same chat at that item.
-(defcomponent scope-mini (scope what &optional style)
-  (html (:button :type "button" :class "scope-claude scope-mini" :data-scope scope :data-anchor "breadth-anchor"
-                 :style style
-                 :data-label (str (map-title) " / " what)
-                 :title (str "Ask Claude about " what) :aria-label (str "Ask Claude about " what)
-           (claude-mark "mark"))))
-
 ;;; ---- The study pane: a compact, throw-away chat about the open idea -----------
-;;; Same look as the dock, none of its furniture (no rail, header or saved chats).
+;;; The same pane as the breadth chat (the `composer` above, the `.pane` styles).
 ;;; static/study.js keeps the conversation in memory; the server stores nothing.
-
-(defparameter *study-chips*
-  '(("Mark what I know" "Ask me to explain it, then mark my answer.")
-    ("Quiz me" "Quiz me on this idea: three questions, one at a time.")
-    ("Why does it matter?" "Why does this idea matter for the rest of the field? What breaks without it?")))
 
 (defcomponent study-pane (n)
   (let ((id (getf n :id)))
-    (html (:section :class "dock inline study" :aria-label "Study"
-            (:div :class "dock-log study-log"
-              (:div :class "study-empty"
-                (:p :class "study-hint" "Explain it in your own words and press Enter: I'll mark it. Or ask anything. The chat isn't saved; any edit to this idea waits for your approval.")
-                (:div :class "dock-chips"
-                  (loop for (label text) in *study-chips*
-                        do (html (:button :type "button" :class "chip" :data-text text label))))))
+    (html (:section :class "dock inline pane study" :aria-label "Study"
+            ;; Empty until the first message: only the composer shows.
+            (:div :class "dock-log study-log")
             (:form :class "dock-form study-form" :method "post" :action "/action/study"
               (hidden "map-name" (map-id)) (hidden "here" id)
-              (:div :class "composer"
-                (:textarea :name "text" :rows 2 :spellcheck "false"
-                           :placeholder (str "Explain " (getf n :title) " in your own words, or ask about it…"))
-                (:div :class "composer-row"
-                  (:span :class "composer-tools"
-                    (model-effort-controls))
-                  (:button :type "submit" :class "dock-send" :title "Send" :aria-label "Send" (icon "send"))
-                  (:button :type "button" :class "dock-send dock-stop" :hidden t
-                           :title "Stop" :aria-label "Stop" (icon "stop")))))))))
+              (composer (str "Explain " (getf n :title) " in your own words, or ask about it…")
+                        (getf n :title) t))))))
 
 ;; The two choices beside every composer: which model answers, and how hard it thinks.
 ;; static/dock.js and static/study.js remember them; web search is always available.
@@ -512,25 +371,22 @@
   (let ((open (and idea (getf idea :group))))
     (html (if (null nodes)
               (html (:div :class "stage empty" (:p :class "quiet" "No ideas here yet.")))
-              (html (:div :class "section-wrap breadth"
-                      (:div :class "section-label" (:span "Breadth-first"))
-                      (scope-button)
+              (html (:section :class "idea-below breadth"
                       (:div :class "stage grid"
                         (:section :class "cell timeline" :aria-label "Timeline"
-                          (timeline nodes *half-w* open))
-                        (:section :class "cell" :aria-label "Topics"
-                          (breadth-map nodes *half-w* open))))))
+                          (timeline nodes *half-w* open)))
+                      ;; The field's chat, where the depth section has the study chat. Its context is
+                      ;; always the whole field's timeline, whichever idea is open below.
+                      (:aside :class "idea-side"
+                        (claude-dock "timeline")))))
           ;; Below: the open idea on the left; on the right, writing and the chat pinned to it.
-          (:section :id "idea" :class "idea-below section-wrap"
-            (:div :class "section-label" (:span "Depth-first"))
+          (:section :id "idea" :class "idea-below"
             (:div :class "idea-main"
               (if idea
                   (node-detail idea)
                   (html (:p :class "quiet" "Open an idea above to read it here."))))
-            ;; With an idea open: a throw-away study chat about it. Otherwise the field's own chat.
             (:aside :class (str "idea-side" (if idea " has-idea" ""))
-              (:div :class "idea-study" (when idea (study-pane idea)))
-              (:div :class "idea-dock" (claude-dock (if idea (getf idea :id) ""))))))))
+              (:div :class "idea-study" (when idea (study-pane idea))))))))
 
 (defcomponent map-warnings ()
   (let ((bad (check-map)))
@@ -570,7 +426,7 @@
 
 ;;; ---- A field, or one group of it -----------------------------------------
 
-;; The field page: timeline and outline, and below them the idea (if one is open).
+;; The field page: the timeline and its chat, and below them the idea (if one is open).
 (defun render-field (&optional idea-id)
   (let* ((idea (and (not (blankp idea-id)) (find-node idea-id)))
          (nodes (map-nodes))
@@ -590,7 +446,7 @@
       (redirect (node-url idea))
       (render-field)))
 
-;; An idea lives at /field/idea, below the field's timeline and outline; an old group
+;; An idea lives at /field/idea, below the field's timeline; an old group
 ;; address folds back into the field.
 (defpage group-page "/:name/:group" (name group)
   (unless (select-map name) (return-from group-page (not-found "field")))
@@ -673,24 +529,23 @@
   (let ((id (getf n :id)))
     (html (:div :class "node"
             (:section :class "node-main"
+                         ;; data-field marks each editable text, so static/study.js can draw a
+                         ;; proposed edit as a diff right here, in the text itself.
                          (:p :class "crumb"
                              (getf n :group)
-                             (when (getf n :era) (html " · " (getf n :era))))
-                         (:h1 (getf n :title))
-                         (:p :class "compression" (getf n :compression))
-                         (:p :class "why" (getf n :why))
-                         (unless (blankp (getf n :notes))
-                           (html (:section :class "notes" (:h2 "Notes") (markdown (getf n :notes)))))
+                             (:span :data-field "era" (when (getf n :era) (html " · " (getf n :era)))))
+                         (:h1 :data-field "title" (getf n :title))
+                         (:p :class "compression" :data-field "compression" (getf n :compression))
+                         ;; The whole explanation, one piece: no separate "why" line or notes box.
+                         (:div :class "body md" :data-field "body" :hidden (blankp (getf n :body))
+                           (:raw (markdown->html (getf n :body))))
                          (let ((as (map-artifacts id)))
                            (when as
                              (html (:h2 "Made for this idea")
                                    (:div :class "artifact-list"
                                      (dolist (a as)
                                        (html (:div :class "artifact-tile"
-                                               (artifact-block a)
-                                               (:form :method "post" :action "/action/remove-artifact" :class "inline"
-                                                 (hidden "id" (getf a :id))
-                                                 (:button :type "submit" :class "danger small" "Remove")))))))))
+                                               (artifact-block a t))))))))
                          )))))
 
 (defpage node-page "/:name/:group/:id" (name group id)

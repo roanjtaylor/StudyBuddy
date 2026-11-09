@@ -1,19 +1,19 @@
-;;;; L5a — Data. Field (a map), Node, Level, Attempt, Message, View.
+;;;; L5a — Data. Field (a map), Node, Level, Attempt, Artifact, View.
 ;;;;
 ;;;; A field is one file under data/maps/, one form per line:
 ;;;;   (:map :id "computers" :title "Computers" :compression "…")
 ;;;;   (:group :id "switches" :compression "A switch can control another switch.")
-;;;;   (:node :id "flip-flop" :title "…" :compression "…" :why "…" :notes "…"
+;;;;   (:node :id "flip-flop" :title "…" :compression "…" :body "…"
 ;;;;          :group "switches" :prereqs ("logic-gates") :era 1918)
+;;;; :body is the idea's whole explanation in markdown, one piece read top to bottom: it
+;;;; opens with why the idea matters and grows by being rewritten, never appended to.
 ;;;; The map is the shared object the learner and the model both edit. Everything
-;;;; the learner does (levels, attempts, conversation) lives in its own store keyed
+;;;; the learner does (levels, attempts) lives in its own store keyed
 ;;;; by :ref = "map/node-id" so the map file stays a clean description of the field.
 
 (in-package :studybuddy)
 
 (defstore attempt  (:file "attempts.lisp"  :key :id :append t))
-(defstore message  (:file "messages.lisp"  :key :id :append t))
-(defstore chat     (:file "chats.lisp"     :key :id))
 (defstore setting  (:file "settings.lisp"  :key :key))
 (defstore artifact (:file "artifacts.lisp" :key :id))
 
@@ -171,8 +171,10 @@
   (list :id (slugify (getf* p :id (getf* p :title "")))
         :title (trim (getf* p :title ""))
         :compression (trim (getf* p :compression ""))
-        :why (trim (getf* p :why ""))
-        :notes (trim (getf* p :notes ""))
+        ;; One body of text per idea. Older files kept :why and :notes apart; they fold into it.
+        :body (trim (or (getf p :body)
+                        (join (str #\Newline #\Newline)
+                              (remove-if #'blankp (list (getf p :why) (getf p :notes))))))
         :group (slugify (getf* p :group "misc"))
         :prereqs (mapcar #'slugify (remove-if #'blankp (let ((pr (getf p :prereqs)))
                                                          (if (stringp pr) (split #\, pr) pr))))
@@ -209,75 +211,6 @@
   (put-attempt! (list :id (str (now-iso) "#" (length (attempts)))
                       :ref (node-ref id) :map (map-id) :node-id id
                       :at (now-iso) :text text :feedback feedback)))
-
-;;; ---- Chats: the conversations, several per place ------------------------
-;;; A chat belongs to one place in a field — its :scope is "" (the field), "timeline",
-;;; "topics", or an idea id — the way claude.ai keeps a list of chats. Messages carry
-;;; the chat's id. Deleting marks the chat :deleted (the message file is append-only,
-;;; so nothing is rewritten); renaming puts a new title. Messages from before chats
-;;; existed (no :chat) show as one "Earlier conversation" chat of the field.
-
-(defun earlier-chat-id () (str "earlier@" (map-id)))
-
-(defun earlier-chat ()
-  (let ((record (find-chat (earlier-chat-id))))
-    (when (and (not (getf record :deleted))
-               (find-if (lambda (m) (and (equal (getf m :map) (map-id)) (null (getf m :chat)))) (messages)))
-      (list :id (earlier-chat-id) :map (map-id) :scope ""
-            :title (getf* record :title "Earlier conversation") :at ""))))
-
-;; (scope-chats "ram") → the live chats at that place, newest first.
-(defun scope-chats (scope)
-  (let ((cs (remove-if-not (lambda (c) (and (equal (getf c :map) (map-id)) (equal (getf c :scope) scope)
-                                            (not (getf c :deleted)) (not (equal (getf c :id) (earlier-chat-id)))))
-                           (chats))))
-    (append (sort (copy-list cs) #'string> :key (lambda (c) (getf c :at)))
-            (when (equal scope "") (let ((e (earlier-chat))) (when e (list e)))))))
-
-(defun newest-chat (scope) (first (scope-chats scope)))
-
-(defun live-chat (id)
-  (cond ((blankp id) nil)
-        ((equal id (earlier-chat-id)) (earlier-chat))
-        (t (let ((c (find-chat id))) (and c (not (getf c :deleted)) (equal (getf c :map) (map-id)) c)))))
-
-;; "Quiz me across this field: five questions, answers…" → the first words, as a title.
-(defun chat-title-from (text)
-  (let* ((line (trim (or (first (lines (trim (or text "")))) "")))
-         (words (remove "" (uiop:split-string line :separator " ") :test #'equal))
-         (title (join " " (subseq words 0 (min 7 (length words))))))
-    (cond ((blankp title) "New chat")
-          ((< (length title) (length line)) (str (string-right-trim ",.;:" title) "…"))
-          (t title))))
-
-(defun new-chat! (scope title)
-  (put-chat! (list :id (str "chat-" (get-universal-time) "-" (length (chats)))
-                   :map (map-id) :scope scope :title (trim title) :at (now-iso))))
-
-(defun rename-chat! (id title)
-  (let ((c (or (find-chat id) (and (equal id (earlier-chat-id)) (earlier-chat)))))
-    (when (and c (not (blankp title)))
-      (put-chat! (plist-update c :title (trim title))))))
-
-(defun delete-chat! (id)
-  (let ((c (or (find-chat id) (and (equal id (earlier-chat-id)) (earlier-chat)))))
-    (when c (put-chat! (plist-update c :deleted t)))))
-
-;;; ---- Messages: what was said in a chat ----------------------------------
-;;; Oldest first. A message may be about one node. :role is "you", "buddy" or
-;;; "error"; :changes is the one-line summary of what the model changed in the map.
-
-(defun chat-messages (chat)
-  (remove-if-not (lambda (m) (and (equal (getf m :map) (map-id))
-                                  (if (equal chat (earlier-chat-id))
-                                      (null (getf m :chat))
-                                      (equal (getf m :chat) chat))))
-                 (messages)))
-
-(defun add-message! (role text &key chat node changes artifacts sources)
-  (put-message! (list :id (str (now-iso) "#" (length (messages)))
-                      :map (map-id) :chat chat :node node :role role :at (now-iso)
-                      :text text :changes changes :artifacts artifacts :sources sources)))
 
 ;;; ---- Artifacts: things the model makes that are not prose ----------------
 ;;; What claude.ai calls an artifact: a page, a diagram, a deck of cards, a quiz, a

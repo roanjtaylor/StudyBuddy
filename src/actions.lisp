@@ -6,9 +6,17 @@
 
 (defparameter *rules*
   "Rules you must obey:
-1. Core ideas, not examples. A node is one idea with a one-sentence compression and why it matters. Favour the few ideas that generate the rest; never pad with remixes, tools or trivia.
+1. Core ideas, not examples. A node is one idea with a one-sentence compression (to which the learner may ask for further lines, such as the same sentence in other languages) and a body that explains it. Favour the few ideas that generate the rest; never pad with remixes, tools or trivia.
 2. Theory is learned from the originator, products by using them. When you cite, cite primary sources.
 3. Nothing is understood until it has been written out and checked.")
+
+;; How an idea's body is written and, above all, rewritten. Every prompt that can touch a
+;; body carries this, so new material is worked into the text rather than added under it.
+(defparameter *body-rule*
+  (str "An idea's body is its whole explanation in markdown, read top to bottom as one piece: it opens with why the idea matters, in a sentence or two of plain prose, then gives the mechanism, then whatever depth has been earned. "
+       "A body is always sent complete and replaces the old one, so changing it means REWRITING it: put new material where it belongs in the explanation, reword and reorder what is there so the whole reads as if written in one sitting, and cut what the new version makes redundant. "
+       "Never append: no add-on section at the end, no 'Notes', 'Update', 'Addendum' or 'Why it matters' heading tacked on, nothing that repeats what the body already says. "
+       "The body is about the idea, never about the edit: do not describe what changed or what an earlier version lacked. Keep what was correct and useful unless the learner asks to drop it."))
 
 ;; Read-time available (#.) so the prompt schemas below can splice it in.
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -16,8 +24,7 @@
     '(:object (:id :string "lowercase slug, hyphens only")
               (:title :string "a short name for the idea, five words or fewer")
               (:compression :string "one sentence that compresses the idea")
-              (:why :string "one or two sentences on why it matters")
-              (:notes :string "deeper notes in markdown, grown over time; empty string when there are none")
+              (:body :string "the idea's explanation in markdown, one piece; at its shortest, one or two sentences on why it matters")
               (:group :string "group id this node belongs to")
               (:era :integer "year the idea was first had; negative for BC; 0 if unknown"))))
 
@@ -28,7 +35,7 @@
 (defun field-url (&optional (map (map-id))) (str "/" map))
 (defun group-url (group &optional (map (map-id))) (declare (ignore group)) (field-url map))
 ;; An idea opens below the field's timeline and outline, on the field's own page.
-(defun node-url (id &optional (map (map-id))) (str "/" map "/" id "#idea"))
+(defun node-url (id &optional (map (map-id))) (str "/" map "/" id))
 ;; Where a focus (group id, idea id, or empty) lives.
 (defun focus-url (focus)
   (cond ((blankp focus) (field-url))
@@ -42,10 +49,9 @@
   (let* ((n (find-node id)) (g (find-group (getf n :group))))
     (str "Idea in focus: " (getf n :title) " (id " id ")" #\Newline
          "Group: " (getf n :group) " — " (getf g :compression) #\Newline
-         "Compression: " (getf n :compression) #\Newline
-         "Why it matters: " (getf n :why) #\Newline
-         (unless (blankp (getf n :notes)) (str "Notes so far:" #\Newline (getf n :notes) #\Newline))
-         )))
+         "Compression (the subtitle shown under the title; every line from here to \"Body\" is this one field):"
+         #\Newline (getf n :compression) #\Newline
+         "Body (the whole explanation as it stands):" #\Newline (getf n :body) #\Newline)))
 
 (defun attempts-context (id &optional (limit 3))
   (let ((as (subseq (node-attempts id) 0 (min limit (length (node-attempts id))))))
@@ -81,21 +87,6 @@
                                      as)))
         "No artifacts made in this field yet.")))
 
-;; One chat so far as proper turns for the model, newest last. A buddy turn
-;; carries, after its text, what it did (map changes, artifacts) so later turns can
-;; refer to them by id.
-(defun conversation-messages (chat &optional (limit 20))
-  (let ((ms (last (remove "error" (chat-messages chat) :key (lambda (m) (getf m :role)) :test #'equal) limit)))
-    (mapcar (lambda (m)
-              (list :role (if (equal (getf m :role) "you") "user" "assistant")
-                    :content (str (when (and (getf m :node) (equal (getf m :role) "you"))
-                                    (str "(looking at " (getf m :node) ") "))
-                                  (getf m :text)
-                                  (when (getf m :changes) (str #\Newline "[map changed: " (getf m :changes) "]"))
-                                  (when (getf m :artifacts)
-                                    (str #\Newline "[artifacts: " (join ", " (getf m :artifacts)) "]")))))
-            ms)))
-
 ;;; ---- Ask: the one channel --------------------------------------------------
 ;;; The learner's words go to the model with the map and the focus; the reply streams
 ;;; back; and the model acts on the map and makes artifacts through the tools below,
@@ -119,8 +110,7 @@
     '(:object (:id :string "id of the idea to change")
               (:title (:maybe :string))
               (:compression (:maybe :string) "one sentence")
-              (:why (:maybe :string))
-              (:notes (:maybe :string) "deeper notes in markdown; replaces the old notes wholesale")
+              (:body (:maybe :string) "the complete rewritten body in markdown; replaces the old one, with new material worked in, not appended")
               (:group (:maybe :string))
               (:era (:maybe :integer) "year; 0 if unknown"))))
 
@@ -138,7 +128,7 @@
          " The map now has " (length (map-nodes)) " ideas.")))
 
 (deftool update-nodes
-  "Change existing ideas. Give the id and only the fields you are changing; the rest keep their current values. Use notes for depth the learner has earned: a longer explanation in markdown, the distinctions that matter, what to remember."
+  "Change existing ideas. Give the id and only the fields you are changing; the rest keep their current values. The body holds the depth the learner has earned: the mechanism, the distinctions that matter, what to remember. To change a body, read the idea first (read_node) unless you already have its full body, then send the whole body rewritten with the new material worked in where it belongs; never the old text with a section added at the end."
   (:object (:nodes (:array #.*node-patch-schema*)))
   (input)
   (let ((done '()) (missing '()))
@@ -174,7 +164,7 @@
     (str "Added groups: " (join ", " done) ".")))
 
 (deftool read-node
-  "Read one idea in full, including its notes and the learner's written attempts at it."
+  "Read one idea in full, including its body and the learner's written attempts at it."
   (:object (:id :string))
   (input)
   (let ((id (getf input :id)))
@@ -262,11 +252,11 @@
 
 (defprompt converse
   :system (str "You are the learner's study buddy, living inside their knowledge map of one field. "
-               "The map is the shared object: groups of ideas; each idea has a one-sentence compression, why it matters, optional deeper notes, and the verdict on the learner's latest written explanation."
-               #\Newline *rules* #\Newline
+               "The map is the shared object: groups of ideas; each idea has a one-sentence compression, a body that explains it, and the verdict on the learner's latest written explanation."
+               #\Newline *rules* #\Newline *body-rule* #\Newline
                "The learner writes to you to learn, to reshape the map, and to have things made. You have tools for the last two; use them, do not describe what you could do." #\Newline
                "Reply in markdown: concise, no preamble, no sign-off, mechanism over vocabulary. Headings, lists, tables and code fences all render. Refer to ideas by title. When you used a tool, say what you did in one line at the end." #\Newline
-               "Changing the map: when asked, fill gaps, go deeper on one idea (breadth first: three to six sub-ideas one level down, each independent, with no links between ideas),remove, merge, regroup, rename, or record what they have learned in notes. "
+               "Changing the map: when asked, fill gaps, go deeper on one idea (breadth first: three to six sub-ideas one level down, each independent, with no links between ideas), remove, merge, regroup, rename, or work what they have learned into an idea's body. "
                "Ids are lowercase slugs. Group ids must exist in the map or be added with add_groups first. Era is a year, 0 if unknown. Keep compression one sentence. If asked where the learner is weak, say so with reasons." #\Newline
                *making-things* #\Newline
                "You can search the web and fetch pages: do so when you need current or primary information, and cite primary sources when you cite."))
@@ -274,7 +264,7 @@
 ;; The learner's turn: the map and where they are, then their words.
 (defun scope-note (scope)
   (cond ((equal scope "timeline")
-         "The learner is working on the TIMELINE of this field: one bar per group spanning the years of its ideas, and the dated ideas inside. Requests here are about dates (era), which group an idea sits in, and what is missing in time. Make the changes with your tools.")
+         "The learner is working on the TIMELINE of this field: one bar per group spanning the years of its ideas, and the dated ideas inside. This chat is about the field as a whole, not any one idea (the learner studies single ideas in a separate chat). Requests here are about the field's breadth: dates (era), which group an idea sits in, and what is missing in time. Make the changes with your tools.")
         ((equal scope "topics")
          "The learner is working on the TOPIC LIST of this field: the groups and the ideas inside each. Requests here are about adding, renaming, regrouping, removing and reordering topics. Make the changes with your tools.")))
 
@@ -304,95 +294,50 @@
                        (coerce (gethash "sources" data) 'list))))
         ((equal name "warning") (emit-event "status" "text" (gethash "message" data)))))
 
-;; One ask, start to finish: store the learner's message, run the conversation with
-;; tools, store the reply. EMIT, when given, is where the live events go.
-(defun run-ask (text &key chat node group scope model effort artifact emit)
-  (add-message! "you" (trim text) :chat chat :node node)
+;; One ask, start to finish: run the conversation with tools and send the reply. Nothing
+;; is stored: HISTORY is the chat so far, kept by the browser and sent back with each ask.
+;; The reply's "text" is what the browser remembers of it: the words, then what was done
+;; (map changes, artifacts) so later turns can refer to them by id.
+(defun run-ask (text &key history node group scope model effort artifact emit)
   (let ((*run* (list :node node :changes '() :artifacts '() :sources '() :emit emit)))
     (handler-case
-        (let* ((reply (converse (append (conversation-messages chat)
-                                        (list (list :role "user" :content (ask-turn text node group scope artifact))))
-                                :system (getf (prompt 'converse) :system)
-                                :tools *buddy-tools*
-                                :model (remember-model! (pick-model model))
-                                :effort (pick-effort effort)
-                                :on-event #'relay-event))
+        (let* ((reply (strip-quotes
+                       (trim (converse (append history
+                                               (list (list :role "user" :content (ask-turn text node group scope artifact))))
+                                       :system (getf (prompt 'converse) :system)
+                                       :tools *buddy-tools*
+                                       :model (remember-model! (pick-model model))
+                                       :effort (pick-effort effort)
+                                       :on-event #'relay-event))))
                (changed (run-changes))
-               (m (add-message! "buddy" (strip-quotes (trim reply)) :chat chat :node node :changes changed
-                                :artifacts (reverse (getf *run* :artifacts))
-                                :sources (getf *run* :sources))))
-          (emit-event "message" "html" (message-view m) "changed" (and changed t))
-          m)
+               (made (reverse (getf *run* :artifacts))))
+          (emit-event "message"
+                      "html" (message-view (list :role "buddy" :text reply :changes changed :artifacts made
+                                                 :sources (getf *run* :sources)))
+                      "text" (str reply
+                                  (when changed (str #\Newline "[map changed: " changed "]"))
+                                  (when made (str #\Newline "[artifacts: " (join ", " made) "]")))
+                      "changed" (and changed t)))
       (llm-error (e)
-        (let ((m (add-message! "error" (llm-error-message e) :chat chat :node node)))
-          (emit-event "message" "html" (message-view m) "changed" (and (run-changes) t))
-          m)))))
-
-;; A new chat is named after its first exchange, as claude.ai names chats: a short
-;; title from the model, once the reply is in. Until then it wears its first words.
-(defprompt chat-title
-  :system "You name a chat between a learner and their study buddy. Given the learner's first message and the reply, write a title of two to five words that says what the chat is about: specific, plain, no quotes, no trailing punctuation, no leading 'Chat about'. Title case for names only."
-  :schema (:object (:title :string "two to five words")))
-
-;; (name-chat! chat text reply) → the renamed chat, or NIL if the model could not be asked.
-(defun name-chat! (chat text reply)
-  (handler-case
-      (let ((title (getf (ask-structured 'chat-title
-                                         (str "Field: " (map-title) #\Newline
-                                              "Learner's first message:" #\Newline (trim text) #\Newline #\Newline
-                                              "Reply (opening):" #\Newline
-                                              (let ((r (trim (or reply "")))) (subseq r 0 (min 1200 (length r))))))
-                         :title)))
-        (and (not (blankp title)) (rename-chat! (getf chat :id) (strip-quotes title))))
-    (llm-error () nil)))
-
-;; From the REPL: name every chat in the current field still wearing its first words
-;; (a title ending in …), from its first exchange. One model call per chat.
-(defun name-chats! ()
-  (loop for c in (remove-if-not (lambda (c) (and (equal (getf c :map) (map-id)) (not (getf c :deleted))
-                                                 (let ((title (getf c :title)))
-                                                   (and (plusp (length title)) (char= (char title (1- (length title))) #\…)))))
-                                (chats))
-        for ms = (chat-messages (getf c :id))
-        for you = (find "you" ms :key (lambda (m) (getf m :role)) :test #'equal)
-        for buddy = (find "buddy" ms :key (lambda (m) (getf m :role)) :test #'equal)
-        when (and you buddy)
-          collect (let ((named (name-chat! c (getf you :text) (getf buddy :text))))
-                    (format t "~&~a → ~a~%" (getf c :title) (if named (getf named :title) "(not named)"))
-                    named)))
+        (emit-event "message"
+                    "html" (message-view (list :role "error" :text (llm-error-message e)))
+                    "text" ""
+                    "changed" (and (run-changes) t))))))
 
 ;; `here` is the place the learner asked from: "" (whole field), "timeline", "topics",
-;; or an idea id. `chat` is the chat to continue; blank starts one, titled from the
-;; first words, and the browser is told (a `chat` event) so its list can show it; once
-;; the reply is in, the model names it and a `title` event carries the name.
-;; From the dock (`dock` set) the answer streams as server-sent events; a plain post
-;; waits and redirects back to where the ask came from.
-(defaction ask-buddy "/action/ask" (map-name here chat text model effort artifact dock)
+;; a group id or an idea id. `history` is the chat so far as JSON, [{role, content}…].
+;; The answer streams as server-sent events.
+(defaction ask-buddy "/action/ask" (map-name here text history model effort artifact)
   (unless (select-map map-name) (return-from ask-buddy (not-found "field")))
   (let* ((node (and (not (blankp here)) (find-node here) here))
          (group (and (not (blankp here)) (not node) (find-group here) here))
-         (scope (and (member here '("timeline" "topics") :test #'equal) here))
-         (existing (live-chat chat)))
-    (flet ((chat-for (text)
-             (or existing (new-chat! (or here "") (chat-title-from text))))
-           (run (chat emit)
-             (let ((m (run-ask text :chat (getf chat :id) :node node :group group :scope scope
-                                    :model model :effort effort
-                                    :artifact (and (not (blankp artifact)) artifact) :emit emit)))
-               (when (and (not existing) (equal (getf m :role) "buddy"))
-                 (let ((named (name-chat! chat text (getf m :text))))
-                   (when (and named emit)
-                     (funcall emit "title" (obj "id" (getf named :id) "title" (getf named :title)))))))))
-      (cond ((blankp dock)
-             (unless (blankp text) (run (chat-for text) nil))
-             (redirect (focus-url here)))
-            ((blankp text) "")
-            (t (sse-response (lambda (emit)
-                               (let ((c (chat-for text)))
-                                 (unless existing
-                                   (funcall emit "chat" (obj "id" (getf c :id) "title" (getf c :title)
-                                                             "html" (chat-item c t))))
-                                 (run c emit)))))))))
+         (scope (and (member here '("timeline" "topics") :test #'equal) here)))
+    (if (blankp text)
+        ""
+        (sse-response (lambda (emit)
+                        (run-ask text :history (study-messages history) :node node :group group :scope scope
+                                      :model model :effort effort
+                                      :artifact (and (not (blankp artifact)) artifact) :emit emit))))))
 
 ;;; ---- Study: a throw-away conversation about one idea ---------------------------
 ;;; The conversation is not stored: the browser keeps it in memory and sends it back with
@@ -401,19 +346,17 @@
 ;;; (/action/apply-edit).
 
 (defparameter *editable-fields*
-  '(("title" "Title") ("compression" "Compression") ("why" "Why it matters")
-    ("notes" "Notes") ("era" "Era")))
+  '(("title" "Title") ("compression" "Compression") ("body" "Body") ("era" "Era")))
 
 (defun field-text (node key)
   (let ((v (getf node key)))
     (cond ((null v) "") ((stringp v) v) (t (princ-to-string v)))))
 
 (deftool propose-node-edit
-  "Propose a change to the idea the learner has open. Nothing is changed until the learner approves it in a diff. Give only the fields you want to change; notes replace the old notes wholesale, so send the complete new notes in markdown. Use this when the learner asks for an edit, or when notes would usefully capture what they have just worked out."
+  "Propose a change to the idea the learner has open. Nothing is changed until the learner approves it in a diff. Give only the fields you want to change. Each field you give replaces the old one whole. The compression is the subtitle under the title: usually one sentence, but the learner may keep several lines in it (the same sentence in other languages, for instance), so to add or change a line send every line of it, old and new, separated by newlines. It is the learner's map: when they ask for a change to a field, propose it even if it departs from the field's usual shape. A new body replaces the old one, so send the complete body, rewritten so that what is new sits where it belongs in the explanation and the whole reads as one piece; never the old body with a section added at the end. Use this when the learner asks for an edit, or when the body would be better for what they have just worked out."
   (:object (:title (:maybe :string))
-           (:compression (:maybe :string) "one sentence")
-           (:why (:maybe :string))
-           (:notes (:maybe :string) "the complete new notes, markdown")
+           (:compression (:maybe :string) "the whole subtitle: one sentence, or every one of its lines separated by newlines when the learner keeps several")
+           (:body (:maybe :string) "the complete rewritten body in markdown, new material worked in, not appended")
            (:era (:maybe :integer) "year; 0 if unknown"))
   (input)
   (let* ((id (getf *run* :node)) (old (and id (find-node id))) (changes '()))
@@ -454,8 +397,8 @@
             (reply t))))))
 
 (defprompt study
-  :system (str "You are a tutor helping a learner study one idea from a knowledge map. This conversation is not saved. You can see the idea's data above; you cannot change it, but you can propose an edit with propose_node_edit, which the learner sees as a diff and approves or rejects. Propose edits when asked, or when notes would capture what they have just worked out; say in one line what you proposed, never that it is done." #\Newline
-               *rules* #\Newline
+  :system (str "You are a tutor helping a learner study one idea from a knowledge map. This conversation is not saved. You can see the idea's data above; you cannot change it, but you can propose an edit with propose_node_edit, which the learner sees as a diff and approves or rejects. Propose edits when asked, or when the body would be better for what they have just worked out; say in one line what you proposed, never that it is done. Every part of the idea you can see (title, compression with all its lines, body, era) is yours to propose changes to; never tell the learner that you cannot edit something they can see in the idea, and never refuse an edit they asked for because it bends a field's usual shape." #\Newline
+               *rules* #\Newline *body-rule* #\Newline
                "If the learner writes out their own understanding of the idea, mark it against the idea: what is right, what is missing (most important first), what is wrong, and a one-line verdict, as short lists. Judge only what is written; be honest, not kind. "
                "Otherwise answer their question directly: mechanism first, concrete, as short as the question allows. Ask them a question back only when it would teach them something. "
                "Reply in markdown, no preamble, no sign-off." #\Newline
@@ -499,29 +442,6 @@
                       (funcall emit "message" (obj "html" (message-view (list :role "error" :text (llm-error-message e)))
                                                    "text" "")))))))))))
 
-;;; ---- Chats: the list beside the dock --------------------------------------
-
-;; The chats at one place, as the dock's rail shows them.
-(defpage chat-list-page "/chats" (map-name scope current)
-  (unless (select-map map-name) (return-from chat-list-page (not-found "field")))
-  (chat-list (or scope "") current))
-
-;; One chat's messages, as the dock's log shows them; "new" is the empty state for
-;; a chat not yet started at `scope`.
-(defpage chat-log-page "/chat/:id" (id map-name scope)
-  (unless (select-map map-name) (return-from chat-log-page (not-found "field")))
-  (dock-log (and (not (equal id "new")) (getf (live-chat id) :id)) (or scope "")))
-
-(defaction rename-chat "/action/rename-chat" (map-name id title)
-  (unless (select-map map-name) (return-from rename-chat (not-found "field")))
-  (let ((c (rename-chat! id title)))
-    (raw-response "text/plain; charset=utf-8" (if c (getf c :title) ""))))
-
-(defaction delete-chat "/action/delete-chat" (map-name id)
-  (unless (select-map map-name) (return-from delete-chat (not-found "field")))
-  (delete-chat! id)
-  (raw-response "text/plain; charset=utf-8" "ok"))
-
 ;;; ---- Write: check an explanation ---------------------------------------
 
 (defprompt check-explanation
@@ -550,16 +470,14 @@
                                         (str "Field: " (map-title) #\Newline (node-context node-id) #\Newline
                                              "Learner wrote:" #\Newline text))))
           (add-attempt! node-id (trim text) (clean-feedback feedback)))
-      ;; The failure shows in the idea's chat, in the newest one or a fresh one.
-      (llm-error (e) (add-message! "error" (llm-error-message e) :node node-id
-                                   :chat (getf (or (newest-chat node-id) (new-chat! node-id "Checking an attempt")) :id)))))
+      (llm-error () nil)))
   (redirect (node-url node-id)))
 
 ;;; ---- Hand edits (plain) ---------------------------------------------------
 
-(defaction edit-node "/action/edit-node" (map-name node-id title compression why notes group prereqs era)
+(defaction edit-node "/action/edit-node" (map-name node-id title compression body group prereqs era)
   (unless (select-map map-name) (return-from edit-node (not-found "field")))
-  (update-node! (list :id node-id :title title :compression compression :why why :notes notes
+  (update-node! (list :id node-id :title title :compression compression :body body
                       :group group :prereqs prereqs :era era))
   (redirect (node-url node-id)))
 
@@ -593,7 +511,7 @@
                "Breadth first: cover the whole field at one level of depth rather than any part deeply. "
                "Use web search to check the ideas and dates against primary sources. "
                "groups: five to eight, each a lowercase-slug id and a one-sentence compression, ordered roughly by history."
-               "nodes: twenty-five to forty ideas, four to six per group, each with the schema fields; notes empty; each idea stands alone, with no links to other ideas; era is the year the idea was first had. "
+               "nodes: twenty-five to forty ideas, four to six per group, each with the schema fields; body one or two sentences on why the idea matters; each idea stands alone, with no links to other ideas; era is the year the idea was first had. "
                "title: the field's short title. compression: the field in one sentence.")
   :schema (:object (:title :string)
                    (:compression :string)
