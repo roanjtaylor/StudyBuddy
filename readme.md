@@ -32,10 +32,10 @@ Lisp data in files you can read and edit by hand. `data/maps/<field>.lisp` is th
 
 ## Claude via the subscription relay
 
-The app never holds an API key. Every model call is a POST to the ClaudeSubscription relay (`../hf-space`, deployed on Hugging Face Spaces), which runs the Claude Agent SDK on the Claude Code subscription. Checking an explanation and seeding a field use structured output, enforced by the engine (`outputFormat: json_schema`) and returned in a `structured` SSE event. The conversation uses the relay's streaming and caller-tool support instead: the app sends a tool manifest (`deftool`), the relay streams `delta` text and `tool_request` events, the app runs each tool and posts the answer to `/api/agent/tool-result`, and the run carries on. The relay needed no change for any of this. One Windows detail: dexador's WinHTTP backend reads a whole response before returning it, so `stream-post` in `llm.lisp` makes the WinHTTP calls itself, asking how much has arrived before each read, which is what makes the stream a stream. Set in the environment SBCL starts from:
+The app never holds an API key. Every model call is a POST to the ClaudeSubscription relay (`../z_hf-space`, deployed on Hugging Face Spaces), which runs the Claude Agent SDK on the Claude Code subscription. Checking an explanation and seeding a field use structured output, enforced by the engine (`outputFormat: json_schema`) and returned in a `structured` SSE event. The conversation uses the relay's streaming and caller-tool support instead: the app sends a tool manifest (`deftool`), the relay streams `delta` text and `tool_request` events, the app runs each tool and posts the answer to `/api/agent/tool-result`, and the run carries on. The relay needed no change for any of this. One Windows detail: dexador's WinHTTP backend reads a whole response before returning it, so `stream-post` in `llm.lisp` makes the WinHTTP calls itself, asking how much has arrived before each read, which is what makes the stream a stream. Set in the environment SBCL starts from:
 
 ```
-STUDYBUDDY_SERVER_URL=https://roanjtaylor-claudesubscription.hf.space   # default; or http://localhost:5174 when running hf-space locally
+STUDYBUDDY_SERVER_URL=https://roanjtaylor-claudesubscription.hf.space   # default; or http://localhost:5174 when running z_hf-space locally
 STUDYBUDDY_APP_SECRET=<the value of the Space secret studybuddySecretKey>
 ```
 

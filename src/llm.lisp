@@ -1,7 +1,7 @@
 ;;;; L4 — Model. One function talks to the relay; a macro defines prompts as data;
 ;;;; structured answers come back as plists so the UI never sees free prose.
 ;;;;
-;;;; Calls go through the ClaudeSubscription relay (projects/hf-space), which runs
+;;;; Calls go through the ClaudeSubscription relay (projects/z_hf-space), which runs
 ;;;; the Claude Agent SDK on the owner's subscription rather than metered API
 ;;;; credit. POST /api/agent, SSE back; with `outputFormat` the validated object
 ;;;; arrives in a `structured` event.
