@@ -35,6 +35,7 @@
         (list :id name
               :title (getf* head :title name)
               :compression (getf head :compression)
+              :axis (getf head :axis)
               :groups (tagged forms :group)
               :nodes (mapcar #'normalise-node (tagged forms :node)))))))
 
@@ -60,7 +61,8 @@
 (defun map-exists-p (name) (probe-file (map-file name)))
 
 (defun map-forms (map)
-  (append (list (list :map :id (getf map :id) :title (getf map :title) :compression (getf map :compression)))
+  (append (list (append (list :map :id (getf map :id) :title (getf map :title) :compression (getf map :compression))
+                        (when (getf map :axis) (list :axis (getf map :axis)))))
           (mapcar (lambda (g) (cons :group g)) (getf map :groups))
           (mapcar (lambda (n) (cons :node n)) (getf map :nodes))))
 
@@ -73,8 +75,9 @@
   id)
 
 ;; Mirror the current map to its file after any edit.
+(defvar *dry-run* nil "True while a proposal is applied to a throw-away copy of the map: nothing is written.")
 (defun save-map! ()
-  (write-file-forms (map-file (map-id)) (map-forms *map*))
+  (unless *dry-run* (write-file-forms (map-file (map-id)) (map-forms *map*)))
   *map*)
 
 ;; (check-map) → list of (node-id . missing-prereq-id); NIL when every id resolves.
@@ -139,6 +142,52 @@
       (setf (getf *map* :groups) (append (map-groups) (list (list :id id :compression (trim (getf* g :compression ""))))))
       (save-map!)
       id)))
+
+;; Change a group's compression and/or id (renaming moves its ideas along with it).
+(defun update-group! (id &key compression new-id)
+  (let ((g (find-group id)) (new (slugify (or new-id ""))))
+    (when g
+      (let ((g2 g))
+        (when (and (not (blankp new)) (not (equal new id)) (not (find-group new)))
+          (setf (getf *map* :nodes)
+                (mapcar (lambda (n) (if (equal (getf n :group) id) (plist-update n :group new) n))
+                        (map-nodes)))
+          (setf g2 (plist-update g2 :id new)))
+        (when compression (setf g2 (plist-update g2 :compression (trim compression))))
+        (setf (getf *map* :groups) (substitute g2 g (map-groups)))
+        (save-map!)
+        g2))))
+
+;; Drop a group, but only once no idea sits in it.
+(defun remove-group! (id)
+  (when (and (find-group id) (null (group-nodes id)))
+    (setf (getf *map* :groups) (remove id (map-groups) :key (lambda (g) (getf g :id)) :test #'equal))
+    (save-map!)
+    id))
+
+;; The timeline's squeezed year ranges: ((:from 1850 :to 1930 :scale 0.15) ...). Inside a range a year
+;; takes SCALE times the width it would at true scale, so a quiet stretch stops dominating the axis.
+(defun clean-axis (segments)
+  (sort (loop for s in segments
+              for from = (getf s :from) for to = (getf s :to) for scale = (getf s :scale)
+              when (and (realp from) (realp to) (realp scale) (< from to))
+                collect (list :from (round from) :to (round to)
+                              :scale (/ (round (* 100 (max .03 (min 1 scale)))) 100.0)))
+        #'< :key (lambda (s) (getf s :from))))
+
+(defun set-axis! (segments)
+  (setf (getf *map* :axis) (clean-axis segments))
+  (save-map!)
+  t)
+
+;; Put the named groups first, in that order; groups not named keep their order after them.
+(defun set-group-order! (ids)
+  (let* ((ids (remove-duplicates (mapcar #'slugify ids) :test #'equal :from-end t))
+         (named (loop for id in ids for g = (find-group id) when g collect g))
+         (rest (remove-if (lambda (g) (member (getf g :id) ids :test #'equal)) (map-groups))))
+    (setf (getf *map* :groups) (append named rest))
+    (save-map!)
+    t))
 
 (defun add-node! (node)
   (let ((n (normalise-node node)))

@@ -22,13 +22,13 @@ Built bottom-up, one small language per layer, each live-editable from the REPL:
 | L2 | `src/web.lisp` | `defpage`, `defaction`, `layout`, `redirect`; routes are a table so a re-evaluated form is live |
 | L3 | `src/store.lisp` | `defstore`: a list of plists in memory, mirrored to a file on every `put!` |
 | L4 | `src/llm.lisp` | `defprompt`, `ask`, `ask-structured`, `ask-with-search` — structured answers as plists, never prose; `deftool` and `converse` — a streamed conversation in which the model calls the app's tools |
-| L5 | `src/nodes.lisp`, `src/pages.lisp`, `src/actions.lisp` | Field, Node, Level, Attempt, Message, Artifact; the pages and the artifact viewers; the `converse` prompt, the tools (`add_nodes` … `create_quiz`) and the streaming `ask` action |
+| L5 | `src/nodes.lisp`, `src/pages.lisp`, `src/actions.lisp` | Field, Node, Level, Attempt, Message, Artifact; the pages and the artifact viewers; the `converse` prompt, the tools (`propose_map_changes` … `create_quiz`) and the streaming `ask` action |
 
 In the browser: `static/dock.js` runs the dock and the stage, `static/md.js` renders markdown while a reply streams (the same subset as `markdown->html`), `static/artifact.js` is the flashcard and quiz viewer.
 
 ## Data
 
-Lisp data in files you can read and edit by hand. `data/maps/<field>.lisp` is the map: one `(:map …)`, then `(:group …)` and `(:node …)` forms, one per line; each node carries one `:body`, its whole explanation in markdown (older files with `:why` and `:notes` are folded into it on load). The model's edits rewrite this file. Everything that is yours lives beside it, keyed by `"<field>/<node-id>"`: `attempts.lisp` (append-only), `settings.lisp`, and `artifacts.lisp` — what the model made (`:type` html, svg, mermaid, markdown, code, flashcards or quiz; `:content` the text, or the cards/questions as data), each optionally about one idea. `data/about.md` is the home page. Back it all up by copying the folder.
+Lisp data in files you can read and edit by hand. `data/maps/<field>.lisp` is the map: one `(:map …)`, then `(:group …)` and `(:node …)` forms, one per line; each node carries one `:body`, its whole explanation in markdown (older files with `:why` and `:notes` are folded into it on load). The model's edits rewrite this file. Everything that is yours lives beside it, keyed by `"<field>/<node-id>"`: `attempts.lisp` (append-only), `settings.lisp`, and `artifacts.lisp` — what the model made (`:type` html, svg, mermaid, markdown, code, flashcards or quiz; `:content` the text, or the cards/questions as data), each optionally about one idea. **Videos** pinned to an idea are in `videos.lisp` (`:map`, `:node`, `:video` id, `:title`, `:channel`); the "Find videos" button under an idea searches YouTube (or takes a pasted link) and plays results in an embed in the left column (`src/videos.lisp`, `static/videos.js`). `data/about.md` is the home page. Back it all up by copying the folder.
 
 ## Claude via the subscription relay
 

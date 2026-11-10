@@ -27,8 +27,42 @@
     bin.setAttribute('aria-expanded', String(!ask.hidden));
   });
 
+  // While a chat is answering, nothing may navigate the page away from it: a link click is
+  // held (in the capture phase, before anything else sees it) until the reply is finished, and
+  // leaving by other means asks first. The field chat streams from this very page.
+  document.addEventListener('click', function (e) {
+    if (!anyBusy()) return;
+    var a = e.target.closest && e.target.closest('a[href]');
+    if (!a || a.target || e.button !== 0) return;
+    var href = a.getAttribute('href') || '';
+    if (!href || href.charAt(0) === '#' || a.closest('.artifact-inline, .artifact-card')) return;
+    e.preventDefault(); e.stopPropagation();
+    toast('A chat is still answering — try again when it finishes.');
+  }, true);
+  window.addEventListener('beforeunload', function (e) {
+    if (anyBusy()) { e.preventDefault(); e.returnValue = ''; }
+  });
+
   var grid = document.querySelector('.stage.grid');
   if (!grid) return;
+
+  // The two chats are independent: the field chat (dock.js) lives outside everything this file
+  // swaps, so it keeps streaming while ideas are opened. The study chat belongs to the open
+  // idea, so while it is answering the idea cannot change under it.
+  function studyBusy() { return !!document.querySelector('.study-form.busy'); }
+  function anyBusy() { return studyBusy() || !!document.querySelector('#dock-form.busy'); }
+  var toastTimer = null;
+  function toast(text) {
+    var t = document.getElementById('busy-toast');
+    if (!t) { t = document.createElement('div'); t.id = 'busy-toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+    t.textContent = text; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
+  }
+  // A normal visit would drop a chat that is still answering, so say so instead.
+  function visit(url) {
+    if (anyBusy()) toast('A chat is still answering — try again when it finishes.');
+    else location.href = url;
+  }
 
   // keepStudy: refresh the idea in place (after an approved edit) without touching the study chat.
   function load(url, push, keepStudy) {
@@ -36,7 +70,7 @@
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (text) {
         var doc = new DOMParser().parseFromString(text, 'text/html');
-        if (!doc.getElementById('idea')) { location.href = url; return; }
+        if (!doc.getElementById('idea')) { visit(url); return; }
         // Swap the idea and the writing box; the chat on the right stays as it is.
         (keepStudy ? ['.idea-main'] : ['.idea-main', '.idea-study']).forEach(function (sel) {
           var mine = document.querySelector(sel), theirs = doc.querySelector(sel);
@@ -46,7 +80,7 @@
           wireForms(fresh);
         });
         // The study chat shows only with an idea open.
-        var side = document.querySelector('.idea-side'), newSide = doc.querySelector('.idea-side');
+        var side = document.querySelector('#idea .idea-side'), newSide = doc.querySelector('#idea .idea-side');
         if (side && newSide) side.classList.toggle('has-idea', newSide.classList.contains('has-idea'));
         var node = document.getElementById('idea');
 
@@ -70,23 +104,8 @@
         if (keepStudy) return;
         document.dispatchEvent(new Event('idea-swapped'));
         if (push) history.pushState(null, '', url);
-        // Bring the detail into view only if it is down below the fold.
-        var top = node.getBoundingClientRect().top;
-        if (top > window.innerHeight * 0.6) {
-          var scroller = document.querySelector('main');
-          var by = top - window.innerHeight * 0.4;
-          (scroller && scroller.scrollHeight > scroller.clientHeight ? scroller : window)
-            .scrollBy({ top: by, behavior: 'smooth' });
-        }
       })
-      .catch(function () { location.href = url; });
-  }
-
-  // A full page load of an idea (a direct visit, or a redirect after an action) used to rely
-  // on a #idea fragment to land on the detail; do it here so the URL stays clean.
-  if (document.querySelector('.idea-side.has-idea')) {
-    var detail = document.getElementById('idea');
-    if (detail) detail.scrollIntoView();
+      .catch(function () { visit(url); });
   }
 
   window.refreshIdea =function () { return load(location.pathname + location.search, false, true); };
@@ -97,10 +116,11 @@
   document.addEventListener('click', function (e) {
     var a = e.target.closest && e.target.closest('a[href]');
     if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || a.target) return;
-    var u = new URL(a.href, location.href);
+    var u = new URL(a.getAttribute('href'), location.href);   // not a.href: on an SVG link that is not a string
     var here = segments(location.pathname), there = segments(u.pathname);
     if (u.origin !== location.origin || there.length !== 2 || here[0] !== there[0]) return;
     e.preventDefault();
+    if (studyBusy()) { toast('The study chat is still answering — wait for it to finish before opening another idea.'); return; }
     u.hash = '';
     load(u.pathname + u.search, true);
   });

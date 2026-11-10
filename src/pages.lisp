@@ -264,6 +264,7 @@
 (defparameter *tl-left* 40 "Where the years start; room for the expand arrow.")
 (defparameter *tl-top* 52)
 (defparameter *label-px* 7.5 "Width of one character of a dot's label (14.4px text).")
+(defvar *tl-marks* nil "(idea-id . css-class) pairs: ideas to mark on the timeline, as in a proposal's preview.")
 (defparameter *row-h* 20 "Height of one row of ideas, as tight as the old outline list.")
 
 ;; A tick every 10 years, or wider when the span is long.
@@ -278,7 +279,7 @@
 
 ;; One shared year axis across the full width. Each group is a bar from its first to its
 ;; last idea, named inside; clicking it opens the group's ideas as dots on the same axis.
-(defcomponent timeline (nodes &optional (w *half-w*) open)
+(defcomponent timeline (nodes &optional (w *half-w*) open current)
   (let* ((dated (remove-if-not (lambda (n) (getf n :era)) nodes))
          (groups (remove-if-not (lambda (g) (some (lambda (n) (equal (getf n :group) (getf g :id))) dated))
                                 (visible-groups nodes)))
@@ -289,19 +290,38 @@
         (html (:p :class "quiet" "No ideas here have a date yet."))
         (let* ((step (tick-step (- (reduce #'max eras) (reduce #'min eras))))
                (lo (* step (floor (reduce #'min eras) step)))
-               (hi (let ((h (* step (ceiling (reduce #'max eras) step)))) (if (= h lo) (+ lo step) h))))
-          (labels ((x (year) (round (+ *tl-left* (* (- right *tl-left*) (/ (- year lo) (- hi lo))))))
+               (hi (let ((h (* step (ceiling (reduce #'max eras) step)))) (if (= h lo) (+ lo step) h)))
+               (segs (remove-if-not (lambda (s) (and (< (getf s :from) hi) (> (getf s :to) lo))) (getf (ensure-map) :axis))))
+          (labels ((shown (year)           ; years from LO to YEAR as drawn: squeezed ranges count for less
+                     (- (- year lo)
+                        (loop for s in segs
+                              sum (* (- 1 (getf s :scale))
+                                     (max 0 (- (min year (getf s :to)) (max lo (getf s :from))))))))
+                   (x (year) (round (+ *tl-left* (* (- right *tl-left*) (/ (shown year) (shown hi))))))
+                   (ticks ()               ; a year every STEP, skipping those squeezed too close to the last
+                     (let ((last nil))
+                       (loop for year from lo to hi by step
+                             when (or (null last) (>= (- (x year) last) 30))
+                               collect (progn (setf last (x year)) year))))
                    (label (n) (truncate-string (getf n :title)
                                                (max 6 (floor (- w (x (getf n :era)) 24) *label-px*))))
                    (grid (h)
-                     (loop for year from lo to hi by step
-                           do (html (:line :class "gridline" :x1 (x year) :y1 0 :x2 (x year) :y2 h)))))
+                     ;; A squeezed range is shaded, so it reads as not to scale.
+                     (dolist (s segs)
+                       (let ((a (x (max lo (getf s :from)))) (b (x (min hi (getf s :to)))))
+                         (html (:rect :x a :y 0 :width (max 1 (- b a)) :height h :class "axis-squeeze"
+                                      (:title (getf s :from) "-" (getf s :to) " shown at " (round (* 100 (getf s :scale))) "% of true scale")))))
+                     (dolist (year (ticks))
+                       (html (:line :class "gridline" :x1 (x year) :y1 0 :x2 (x year) :y2 h)))))
             (html
               (:div :class "tl"
                 (with-canvas (w 30)
-                  (loop for year from lo to hi by step
-                        do (html (:line :class "gridline" :x1 (x year) :y1 22 :x2 (x year) :y2 30)
-                                 (:text :x (x year) :y 16 :class "tick" :text-anchor "middle" year))))
+                  (dolist (s segs)
+                    (let ((a (x (max lo (getf s :from)))) (b (x (min hi (getf s :to)))))
+                      (html (:rect :x a :y 20 :width (max 1 (- b a)) :height 10 :class "axis-squeeze"))))
+                  (dolist (year (ticks))
+                    (html (:line :class "gridline" :x1 (x year) :y1 22 :x2 (x year) :y2 30)
+                          (:text :x (x year) :y 16 :class "tick" :text-anchor "middle" year))))
                 (dolist (g groups)
                   (let* ((id (getf g :id))
                          (gn (stable-sort (remove id dated :key (lambda (n) (getf n :group)) :test-not #'equal)
@@ -312,7 +332,7 @@
                          (flip (> (+ a 28 name-w) (- w 10))))
                     (multiple-value-bind (placed rows) (pack-rows gn (lambda (n) (x (getf n :era))))
                       (html
-                        (:details :class "tl-group" :open (equal id open)
+                        (:details :class (let ((mark (cdr (assoc (str "g:" id) *tl-marks* :test #'equal)))) (if mark (str "tl-group tl-g-" mark) "tl-group")) :open (or (eq open :all) (equal id open))
                           (:summary
                             (with-canvas (w 28)
                               (grid 28)
@@ -327,7 +347,15 @@
                             (grid (+ 6 (* *row-h* rows)))
                             (dolist (it placed)
                               (destructuring-bind (n nx row) it
-                                (html (:a :href (node-url (getf n :id)) :class "tl-idea"
+                                (html (:a :href (node-url (getf n :id))
+                                        :class (let ((base (if (equal (getf n :id) current) "tl-idea tl-current" "tl-idea"))
+                                                     (mark (cdr (assoc (getf n :id) *tl-marks* :test #'equal))))
+                                                 (if mark (str base " tl-m-" mark) base))
+                                        ;; The idea being read below gets a highlighter-yellow band behind its label.
+                                        (when (equal (getf n :id) current)
+                                          (html (:rect :x (+ nx 7) :y (+ 3 (* *row-h* row))
+                                                       :width (ceiling (+ 6 (* *label-px* (length (label n)))))
+                                                       :height 17 :rx 3 :class "cur-hl")))
                                         ;; An invisible target over the dot and its label, so the whole thing clicks.
                                         (:rect :x (- nx 10) :y (+ 2 (* *row-h* row)) :width (ceiling (+ 22 (* *label-px* (length (label n)))))
                                                :height 18 :class "hit")
@@ -374,7 +402,7 @@
               (html (:section :class "idea-below breadth"
                       (:div :class "stage grid"
                         (:section :class "cell timeline" :aria-label "Timeline"
-                          (timeline nodes *half-w* open)))
+                          (timeline nodes *half-w* open (and idea (getf idea :id)))))
                       ;; The field's chat, where the depth section has the study chat. Its context is
                       ;; always the whole field's timeline, whichever idea is open below.
                       (:aside :class "idea-side"
@@ -546,7 +574,7 @@
                                      (dolist (a as)
                                        (html (:div :class "artifact-tile"
                                                (artifact-block a t))))))))
-                         )))))
+                         (video-section n))))))
 
 (defpage node-page "/:name/:group/:id" (name group id)
   (unless (select-map name) (return-from node-page (not-found "field")))

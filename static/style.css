@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap");
+
 :root {
   --bg: #fafaf7;
   --fg: #1a1a1a;
@@ -90,9 +92,9 @@ a.round {
 a.round:hover { color: var(--fg); border-color: var(--fg); }
 
 /* Home: the articulation */
-.home { display: flex; gap: 4rem; align-items: flex-start; flex-wrap: wrap; }
-.home-about { flex: 1 1 24rem; }
-.home-fields { flex: 0 1 18rem; min-width: 12rem; }
+.home { display: block; }
+.home-about { margin-bottom: 2rem; }
+.home-fields { max-width: 44rem; }
 .home-fields h2 { margin: 0; font-size: 1.15rem; }
 .home-fields ul { list-style: disc; padding-left: 1.2rem; margin: .5rem 0; }
 .home-fields li { margin: .3rem 0; }
@@ -233,10 +235,18 @@ svg .bar-title { font-family: ui-monospace, Menlo, Consolas, monospace; font-siz
 .idea-side .three { grid-template-columns: 1fr; }
 @media (max-width: 800px) { .idea-below { grid-template-columns: minmax(0, 1fr); } }
 
-.idea-below.breadth { border-top: 0; }
+.idea-below.breadth { border-top: 0; align-items: stretch; }
+/* Breadth chat, once asked something: fill the timeline's height (zero basis, so it never makes the row taller). */
+.idea-below.breadth .idea-side { min-height: 0; }
+.dock.inline.pane:not(.study).grown { flex: 1 1 0; height: 0; min-height: 12rem; }
+.dock.inline.pane:not(.study).grown .dock-log { flex: 1 1 auto; max-height: none; }
+@media (max-width: 800px) { .dock.inline.pane:not(.study).grown { flex: none; height: min(34rem, 72dvh); } }
 
 /* Timeline ideas: the dot, its label and the space around them all click. */
 svg .hit { fill: transparent; }
+/* The idea open below: highlighter yellow behind its label. */
+svg .cur-hl { fill: #ffe94a; }
+svg a.tl-current .box-title { fill: #1a1a1a; font-weight: 600; }
 .tl-group svg .box-title { pointer-events: auto; cursor: pointer; }
 .tl-group svg a.tl-idea { cursor: pointer; }
 .tl-group svg a.tl-idea:hover .box-title { text-decoration: underline; }
@@ -247,11 +257,11 @@ svg .hit { fill: transparent; }
 /* Before the first message there is only the composer. */
 .pane .dock-log:empty { display: none; }
 /* The study chat, once asked something: as tall as the window (static/study.js adds .grown). */
-.dock.inline.pane.study { transition: height .4s ease; }
+.dock.inline.pane { transition: height .4s ease; }
 /* Less the 3rem bar at the top of the page, and a little air. */
 .dock.inline.pane.study.grown { height: calc(100dvh - 4rem); }
 .pane.study.grown .dock-log { flex: 1 1 auto; max-height: none; }
-@media (prefers-reduced-motion: reduce) { .dock.inline.pane.study { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .dock.inline.pane { transition: none; } }
 /* With an artifact on the stage beside it, the pane needs a height of its own. */
 .dock.inline.pane.staged { height: min(34rem, 72dvh); }
 .pane.staged .dock-log { flex: 1 1 auto; max-height: none; }
@@ -288,3 +298,103 @@ svg .hit { fill: transparent; }
 .pane .dock-form { padding: .3rem .5rem .5rem; }
 .pane .composer { padding: .45rem .45rem .35rem .75rem; border-radius: .9rem; }
 .pane .composer textarea { margin-bottom: .3rem; }
+
+/* A proposed change to the map: the groups it touches open on the timeline with the diff inside. */
+.tl-diff { margin: .2rem 0 .6rem; padding: 0 .5rem; display: grid; gap: .45rem; }
+.tl-change { border: 1px solid var(--line); border-left-width: 3px; border-radius: 4px; padding: .3rem .6rem; background: var(--panel); font-size: .88rem; }
+.tl-change.tl-add { border-left-color: #2ea043; background: rgba(46, 160, 67, .08); }
+.tl-change.tl-remove { border-left-color: #f85149; background: rgba(248, 81, 73, .08); }
+.tl-change.tl-update { border-left-color: #d29922; }
+.tl-change-head { font-weight: 600; }
+.tl-change-note { padding: 0 .3rem; }
+.tl-field { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: .1rem .6rem; margin-top: .2rem; }
+.tl-field-name { color: var(--muted); font-size: .8rem; }
+.tl-field-text { grid-column: 2; min-width: 0; overflow-wrap: anywhere; }
+.tl-field-text > :first-child { margin-top: 0; }
+.tl-field-text > :last-child { margin-bottom: 0; }
+.tl-field-text.chg { padding: .1rem .4rem; border-left: 3px solid; border-radius: 3px; }
+.tl-field-text.chg-add { background: rgba(46, 160, 67, .14); border-color: #2ea043; }
+.tl-field-text.chg-del { background: rgba(248, 81, 73, .14); border-color: #f85149; }
+.tl-arrow { color: var(--muted); }
+.tl-newgroup { border-top: 1px dashed var(--line); padding: .4rem .6rem 0; }
+.tl-newgroup-name { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85rem; color: #2ea043; font-weight: 600; }
+svg a.tl-marked-del .dot { fill: #f85149; }
+svg a.tl-marked-del .box-title { fill: #f85149; text-decoration: line-through; }
+svg a.tl-marked-upd .dot { fill: #d29922; }
+.map-review { margin: .6rem 0 0; }
+.map-review-sum { margin: 0 0 .3rem; font-size: .88rem; text-align: center; }
+.map-review .review-bar { position: static; margin-top: 0; }
+.idea-side.reviewing > .dock { display: none; }
+svg a.tl-m-new .dot { fill: #2ea043; }
+svg a.tl-m-new .box-title { fill: #2ea043; font-weight: 600; }
+svg a.tl-m-upd .dot { fill: #d29922; }
+/* Whole groups: the bar of a group that is new or has moved (green), is leaving (red) or was edited (amber). */
+.tl-group.tl-g-new svg .span { fill: #2ea043; }
+.tl-group.tl-g-del svg .span { fill: #f85149; }
+.tl-group.tl-g-upd svg .span { fill: #d29922; }
+.tl-group.tl-g-new svg .bar-title, .tl-group.tl-g-del svg .bar-title, .tl-group.tl-g-upd svg .bar-title { fill: #1a1a1a; }
+.map-preview { margin: .3rem 0; }
+.map-review a.tl-idea { pointer-events: none; }
+
+/* Videos pinned to an idea: pinned list, embedded player, and the YouTube browser. */
+.videos { margin-top: 1.5rem; font-family: Roboto, Arial, sans-serif; }
+.videos button, .videos input { font-family: inherit; }
+.vid-player { margin: .75rem 0; }
+.vid-player iframe { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: .5rem; background: #000; }
+.vid-player-bar { display: flex; justify-content: space-between; gap: .75rem; margin-top: .35rem; font-size: 14px; line-height: 20px; }
+.vid-player-title { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vid-close, .vid-open, .vid-pin, .vid-unpin { font: inherit; cursor: pointer; }
+.vid-close { background: none; border: 0; color: var(--muted); padding: 0; }
+.vid-list, .vid-results { list-style: none; margin: .5rem 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
+.vid { display: flex; align-items: stretch; gap: .5rem; }
+.vid-play { flex: 1 1 auto; min-width: 0; display: flex; gap: .65rem; align-items: center; text-align: left; font: inherit; color: inherit;
+  background: none; border: 1px solid var(--line); border-radius: .5rem; padding: .35rem; cursor: pointer; }
+.vid-play:hover { border-color: var(--muted); }
+.vid-play img { flex: none; width: 7.5rem; aspect-ratio: 16 / 9; object-fit: cover; border-radius: .3rem; background: var(--line); }
+.vid-meta { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.vid-title { font-family: Roboto, Arial, sans-serif; font-size: 14px; font-weight: 500; line-height: 20px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.vid-pin, .vid-unpin { flex: none; align-self: center; background: none; border: 1px solid var(--line); border-radius: .4rem; color: inherit; padding: .3rem .6rem; }
+.vid-unpin { border: 0; color: var(--muted); font-size: 1.1rem; padding: .2rem .5rem; }
+.vid-unpin:hover { color: #c33; }
+.vid-pin[disabled] { color: var(--muted); cursor: default; }
+.vid-open { margin-top: .5rem; background: none; border: 1px solid var(--line); border-radius: .5rem; color: inherit; padding: .45rem .9rem; }
+.vid-open:hover { border-color: var(--muted); }
+.vid-browse { margin-top: .75rem; }
+.vid-search { display: flex; gap: .5rem; }
+.vid-search input { flex: 1 1 auto; min-width: 0; font: inherit; padding: .45rem .6rem; }
+.vid-search button { font: inherit; padding: .45rem .9rem; cursor: pointer; }
+.vid-status:empty { display: none; }
+.videos [hidden] { display: none; }
+
+/* YouTube look: a red button, and results as large-thumbnail cards. */
+.vid-open { display: inline-flex; align-items: center; gap: .5rem; background: #f00; border: 0; color: #fff; font-weight: 600; border-radius: 999px; padding: .5rem 1.1rem; }
+.vid-open:hover { background: #cc0000; border: 0; }
+.vid-open .yt-ico { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.05rem; background: #fff; color: #f00; border-radius: .3rem; font-size: .6rem; padding-left: .05rem; }
+.vid-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem .85rem; margin-top: 1rem; }
+.vid-result { flex-direction: column; gap: .4rem; min-width: 0; }
+.vid-result .vid-play { border: 0; padding: 0; background: none; border-radius: 0; display: block; }
+.vr-thumb { position: relative; width: 100%; border-radius: .5rem; overflow: hidden; }
+.vid-result .vr-thumb img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 0; display: block; }
+.vr-thumb:hover img { filter: brightness(.92); }
+.vr-len { position: absolute; right: .4rem; bottom: .4rem; background: rgba(0,0,0,.8); color: #fff; font-size: 12px; line-height: 18px; font-weight: 500; padding: 0 4px; border-radius: .3rem; }
+.vr-info { display: flex; gap: .7rem; align-items: flex-start; }
+.vr-avatar { flex: none; width: 1.75rem; height: 1.75rem; border-radius: 50%; overflow: hidden; background: var(--line); display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--muted); }
+.vr-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.vr-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: .15rem; }
+.vid-result .vr-title { font-family: Roboto, Arial, sans-serif; font-size: 16px; font-weight: 500; line-height: 22px; text-align: left; cursor: pointer; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.vr-channel, .vr-facts { font-size: 14px; font-weight: 400; line-height: 20px; color: var(--muted); }
+.vid-result .vid-pin { display: inline-flex; align-items: center; gap: .35rem; align-self: flex-start; border-radius: 999px; padding: .25rem .65rem; font-weight: 500; font-size: 14px; }
+.vid-result .vid-pin:hover:not([disabled]) { background: var(--line); }
+.vid-result .vid-pin.pinned { color: #f00; border-color: #f00; }
+
+/* A short notice when a click has to wait for a chat to finish answering. */
+#busy-toast {
+  position: fixed; left: 50%; bottom: 1.2rem; z-index: 50; transform: translate(-50%, .6rem);
+  max-width: min(32rem, 90vw); padding: .5rem .8rem; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); box-shadow: 0 4px 18px rgba(0, 0, 0, .25); font-size: .88rem;
+  opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s;
+}
+#busy-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* A stretch of the year axis drawn squeezed (not to scale). */
+svg .axis-squeeze { fill: rgba(210, 153, 34, .16); }

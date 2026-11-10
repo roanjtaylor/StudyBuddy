@@ -8,6 +8,22 @@
 //   artifact {html}          a card for something it made; opens in the stage
 //   message {html, text, changed}  the finished reply, rendered by the server; replaces the live one
 //   done {}
+// Shared by both chats (breadth here, depth in study.js): the first question opens the pane
+// from its resting height to its .grown height with a smooth transition (see .pane in style.css).
+window.growPane = function (pane) {
+  if (pane.classList.contains('grown')) return;
+  var from = pane.offsetHeight;
+  pane.classList.add('grown');
+  var to = pane.offsetHeight;                 // where the stylesheet puts it
+  if (from === to || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  pane.style.flex = 'none'; pane.style.height = from + 'px';
+  pane.offsetHeight;                          // settle the starting height, so the change animates
+  pane.style.height = to + 'px';
+  var done = function () { pane.style.flex = ''; pane.style.height = ''; pane.removeEventListener('transitionend', done); };
+  pane.addEventListener('transitionend', done);
+  setTimeout(done, 600);
+};
+
 (function () {
   var dock = document.getElementById('dock');
   if (!dock) return;
@@ -257,6 +273,8 @@
     var text = input.value.trim();
     if (!text || form.classList.contains('busy')) return;
     input.value = text;
+    // Inline (breadth) chat: once asked something, stretch to the timeline's height.
+    if (inline) window.growPane(dock);
     var body = new URLSearchParams(new FormData(form));
     body.set('history', JSON.stringify(turns));
     var reply = null;
@@ -274,7 +292,7 @@
     form.classList.add('busy'); sendBtn.hidden = true; stopBtn.hidden = false;
     var ctl = new AbortController();
     controller = ctl;
-    var changed = false;
+    var changed = false, proposals = [];
     function release() {
       if (!form.classList.contains('busy')) return;
       form.classList.remove('busy'); sendBtn.hidden = false; stopBtn.hidden = true;
@@ -290,7 +308,12 @@
           else if (name === 'thinking') live.thinking(data.text || '');
           else if (name === 'status') live.status(data.text || '');
           else if (name === 'artifact') live.artifact(data.html || '');
-          else if (name === 'message') { changed = !!data.changed; reply = data.text; live.finish(data.html); if (!changed) release(); }
+          else if (name === 'proposal') proposals.push(data);
+          else if (name === 'message') {
+            changed = !!data.changed; reply = data.text; live.finish(data.html); if (!changed) release();
+            // A proposed change to the map is reviewed on the timeline, under the reply it came with.
+            if (proposals.length) review(proposals[proposals.length - 1], log.lastElementChild);
+          }
         });
       })
       .catch(function (err) {
@@ -303,12 +326,120 @@
         // Only a finished exchange is remembered; a stopped or failed one is dropped.
         if (reply) turns.push({ role: 'user', content: text }, { role: 'assistant', content: reply });
         // A changed map needs the page drawn again; the chat, where it hung and the stage come back as they were.
-        if (changed) {
-          keep('sessionStorage', chatKey, JSON.stringify({ html: log.innerHTML, turns: turns }));
-          location.reload();
-        }
+        if (changed) reloadKeepingChat();
       });
   });
+
+  // ---- Proposed changes to the map: reviewed on the timeline ----
+  // The model never edits the map. It proposes; the changes replace the chat on the
+  // right with removals in red and additions in green (the same marks as the depth chat's
+  // review), and nothing is applied until the learner approves. Either answer leaves the chat where it was.
+  function reloadKeepingChat() {
+    keep('sessionStorage', chatKey, JSON.stringify({ html: log.innerHTML, turns: turns }));
+    location.reload();
+  }
+  function h(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text) e.textContent = text;
+    return e;
+  }
+  var shownReview = null;
+  function dropReview() {
+    if (!shownReview) return;
+    shownReview.undo.forEach(function (f) { f(); });
+    shownReview = null;
+  }
+  function groupBlock(id) {
+    var found = null;
+    document.querySelectorAll('.tl-group').forEach(function (d) {
+      var t = d.querySelector('.bar-title');
+      if (t && t.textContent === id) found = d;
+    });
+    return found;
+  }
+  function ideaLink(id) {
+    return document.querySelector('.tl-group a.tl-idea[href$="/' + id + '"]');
+  }
+  function review(p, where) {
+    var changes = p.changes || [];
+    if (!changes.length || !where) return;
+    dropReview();
+    var undo = [], counts = { add: 0, update: 0, remove: 0, group: 0 };
+    function mark(id, cls) {
+      var dot = ideaLink(id);
+      if (!dot) return;
+      dot.classList.add(cls);
+      undo.push(function () { dot.classList.remove(cls); });
+    }
+
+    function markGroup(id, cls) {
+      var d = groupBlock(id);
+      if (!d) return;
+      d.classList.add(cls);
+      undo.push(function () { d.classList.remove(cls); });
+    }
+    changes.forEach(function (c) {
+      counts[c.kind] = (counts[c.kind] || 0) + 1;
+      if (c.kind === 'dropgroup') markGroup(c.id, 'tl-g-del');
+      else if (c.kind === 'editgroup') markGroup(c.id, 'tl-g-upd');
+      else if (c.kind === 'remove') mark(c.id, 'tl-marked-del');
+      else if (c.kind === 'update') mark(c.id, 'tl-marked-upd');
+    });
+
+    // The timeline as it is, every group open, so each idea the change touches can be seen.
+    document.querySelectorAll('.tl-group').forEach(function (d) {
+      var was = d.open; d.open = true;
+      undo.push(function () { d.open = was; });
+    });
+
+    // On the right, in place of the chat: the timeline as it would be, drawn by the server.
+    var panel = h('section', 'review map-review'), pic = h('div', 'map-preview');
+    panel.setAttribute('aria-label', 'Proposed changes to the map');
+    pic.appendChild(h('p', 'quiet small', 'Drawing the new timeline…'));
+
+    var note = h('p', 'review-note quiet small'),
+        bar = h('div', 'review-bar'), yes = h('button', 'approve', '✓ Approve'), no = h('button', 'reject', '✕ Reject');
+    yes.type = 'button'; no.type = 'button';
+    var side = dock.parentNode;
+    panel.appendChild(pic);
+    bar.appendChild(yes); bar.appendChild(no); panel.appendChild(note); panel.appendChild(bar);
+    var q = new URLSearchParams();
+    q.set('map-name', mapName); q.set('changes', JSON.stringify(changes));
+    fetch('/action/preview-map', { method: 'POST', body: q })
+      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        pic.innerHTML = r.html || '';
+        // Groups that move away from where they were: red on the timeline as it is.
+        (r.moved || []).forEach(function (id) { markGroup(id, 'tl-g-del'); });
+      })
+      .catch(function () { pic.innerHTML = ''; pic.appendChild(h('p', 'quiet small', 'The new timeline could not be drawn.')); });
+    side.appendChild(panel); side.classList.add('reviewing');
+    undo.push(function () { panel.remove(); side.classList.remove('reviewing'); });
+    shownReview = { undo: undo };
+
+    function settle(text) {
+      dropReview();
+      input.focus();
+      where.appendChild(h('p', 'quiet small proposal-note', text));
+      log.scrollTop = log.scrollHeight;
+    }
+    no.onclick = function () { settle('Changes rejected. Nothing changed.'); };
+    yes.onclick = function () {
+      yes.disabled = no.disabled = true; note.textContent = 'Applying…';
+      var body = new URLSearchParams();
+      body.set('map-name', mapName); body.set('changes', JSON.stringify(changes));
+      fetch('/action/apply-map', { method: 'POST', body: body })
+        .then(function (r) { return r.json(); })
+        .then(function (r) {
+          if (!r.ok) throw new Error(r.error || 'The changes were not applied.');
+          // The timeline is drawn on the server: redraw the page, the chat kept.
+          settle('Changes approved and applied.');
+          reloadKeepingChat();
+        })
+        .catch(function (err) { yes.disabled = no.disabled = false; note.textContent = String(err.message || err); });
+    };
+  }
 
   // ---- Start: as the page was left ----
   if (inline || keep('sessionStorage', 'dock-open') === '1') show(true);

@@ -155,6 +155,9 @@
     else previewText(node, c.before, c.after, c.field === 'era' ? ' · ' : '', side);
   }
 
+  // The breadth chat's review (dock.js) draws its diffs with the same marks.
+  window.studyDiff = { text: previewText, notes: previewNotes };
+
   // One review at a time: what is drawn on the idea, and the pane standing in for the chat.
   var shown = null;
   function holder(field) { return document.querySelector('.idea-main [data-field="' + field + '"]'); }
@@ -179,7 +182,7 @@
     restore();
     // The right column: the idea as it would read.
     var fresh = src.cloneNode(true), saved = [];
-    fresh.querySelectorAll('h2, .artifact-list').forEach(function (x) { x.remove(); });
+    fresh.querySelectorAll('h2, .artifact-list, .videos').forEach(function (x) { x.remove(); });
     changes.forEach(function (c) {
       var old = holder(c.field), neu = fresh.querySelector('[data-field="' + c.field + '"]');
       if (!old || !neu) return;
@@ -194,7 +197,6 @@
     card.appendChild(fresh); card.appendChild(note); card.appendChild(bar);
     side.appendChild(card); side.classList.add('reviewing');
     shown = { saved: saved, review: card, side: side };
-    document.getElementById('idea').scrollIntoView({ block: 'start', behavior: 'smooth' });
 
     // Back to the chat, where it was, with a line under the reply saying what happened.
     function resume(text) {
@@ -236,10 +238,7 @@
 
     // The first question opens the pane to the height of the window, to give the answer room.
     if (!pane.classList.contains('grown')) {
-      pane.style.height = pane.offsetHeight + 'px';
-      pane.classList.add('grown');
-      pane.offsetHeight;                      // settle the starting height, so the change animates
-      pane.style.height = '';
+      window.growPane(pane);
       pane.scrollIntoView({ block: 'start', behavior: 'smooth' });
     }
 

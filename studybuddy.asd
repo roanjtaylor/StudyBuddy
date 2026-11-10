@@ -12,6 +12,7 @@
                (:file "store")
                (:file "llm")
                (:file "nodes")
+               (:file "videos")
                (:file "pages")
                (:file "actions")
                (:file "main")))

@@ -114,54 +114,171 @@
               (:group (:maybe :string))
               (:era (:maybe :integer) "year; 0 if unknown"))))
 
-(deftool add-nodes
-  "Add new ideas to the map. Ids are lowercase slugs; group ids must exist or be added with add_groups first. Ideas are independent: no links between them."
-  (:object (:nodes (:array #.*node-schema*)))
-  (input)
-  (let ((added '()) (skipped '()))
-    (dolist (n (getf input :nodes))
-      (if (add-node! n) (push (getf n :title) added) (push (getf* n :id "?") skipped)))
-    (dolist (title (reverse added)) (note-change! (str "+ " title)))
-    (emit-event "status" "text" (str "Added " (length added) " idea" (if (= 1 (length added)) "" "s")))
-    (str "Added " (length added) " ideas: " (join ", " (reverse added)) "."
-         (when skipped (str " Skipped (id blank or already in the map): " (join ", " skipped) "."))
-         " The map now has " (length (map-nodes)) " ideas.")))
+;; The breadth chat never edits the map directly: it proposes, the learner sees the timeline
+;; with the changes marked red and green, and nothing is applied until they approve
+;; (/action/apply-map).
+(defparameter *map-fields*
+  '(("title" "Title") ("compression" "Compression") ("body" "Body") ("era" "Era") ("group" "Group")))
 
-(deftool update-nodes
-  "Change existing ideas. Give the id and only the fields you are changing; the rest keep their current values. The body holds the depth the learner has earned: the mechanism, the distinctions that matter, what to remember. To change a body, read the idea first (read_node) unless you already have its full body, then send the whole body rewritten with the new material worked in where it belongs; never the old text with a section added at the end."
-  (:object (:nodes (:array #.*node-patch-schema*)))
+(deftool propose-map-changes
+  "Propose changes to the map: new groups, new ideas, changes to existing ideas, ideas to remove. Nothing is changed until the learner approves; they see each affected group on the timeline with what changes marked red and green. Send everything you want in ONE call. Ids are lowercase slugs; a new idea's group must exist or be in groups. Ideas are independent: no links between them. For an update give the id and only the fields you are changing. To change a body, read the idea first (read_node) unless you already have its full body, then send the whole body rewritten with the new material worked in where it belongs; never the old text with a section added at the end."
+  (:object (:groups (:maybe (:array (:object (:id :string) (:compression :string)))) "groups to add")
+           (:editgroups (:maybe (:array (:object (:id :string "id of the existing group")
+                                                 (:compression (:maybe :string) "new one-sentence compression")
+                                                 (:newid (:maybe :string) "new id; renames the group and moves its ideas with it"))))
+            "existing groups to change")
+           (:dropgroups (:maybe (:array :string)) "ids of groups to delete; each must be empty once the rest of this proposal is applied (move or remove its ideas in the same call)")
+           (:order (:maybe (:array :string)) "group ids in the order the timeline should show them, top to bottom; use ids as they will be after this proposal; groups left out follow in their current order")
+           (:axis (:maybe (:array (:object (:from :integer "first year of the stretch to squeeze")
+                                           (:to :integer "last year of the stretch")
+                                           (:scale :number "display width of a year in it relative to true scale, 0.03 to 1; 0.15 shows the stretch at about a seventh of its true width"))))
+            "year ranges of the timeline's axis to show squeezed (not to scale) because little happens in them, so the ideas around them are not pushed far apart; this REPLACES the current ranges, so include the ones to keep")
+           (:resetaxis (:maybe :boolean) "true to put the timeline's axis back to true scale everywhere")
+           (:add (:maybe (:array #.*node-schema*)) "ideas to add")
+           (:update (:maybe (:array #.*node-patch-schema*)) "existing ideas to change")
+           (:remove (:maybe (:array :string)) "ids of ideas to remove"))
   (input)
-  (let ((done '()) (missing '()))
-    (dolist (p (getf input :nodes))
-      (let ((old (find-node (getf p :id))))
-        (if old
-            (let ((n (copy-list old)))
-              (loop for (k v) on p by #'cddr
-                    when (and v (not (eq k :id))) do (setf (getf n k) v))
-              (update-node! n)
-              (push (getf n :title) done))
-            (push (getf p :id) missing))))
-    (dolist (title (reverse done)) (note-change! (str "~ " title)))
-    (emit-event "status" "text" (str "Updated " (join ", " (reverse done))))
-    (str "Updated: " (join ", " (reverse done)) "."
-         (when missing (str " No idea with id: " (join ", " missing) ".")))))
+  (let ((changes '()) (taken '()))
+    (dolist (g (getf input :editgroups))
+      (let* ((old (find-group (getf g :id)))
+             (comp (and (getf g :compression) (trim (getf g :compression))))
+             (new (slugify (or (getf g :newid) ""))))
+        (when old
+          (let ((comp (and comp (not (equal comp (getf old :compression))) comp))
+                (new (and (not (blankp new)) (not (equal new (getf old :id))) (not (find-group new)) new)))
+            (when (or comp new)
+              (push (obj "kind" "editgroup" "id" (getf old :id)
+                         "compression" (or comp "") "before" (getf old :compression)
+                         "newid" (or new ""))
+                    changes))))))
+    (dolist (id (getf input :dropgroups))
+      (when (find-group id)
+        (push (obj "kind" "dropgroup" "id" id) changes)))
+    (when (getf input :order)
+      (let* ((now (mapcar (lambda (g) (getf g :id)) (map-groups)))
+             (want (remove-duplicates (mapcar #'slugify (getf input :order)) :test #'equal :from-end t))
+             (result (append (remove-if-not (lambda (id) (member id now :test #'equal)) want)
+                             (remove-if (lambda (id) (member id want :test #'equal)) now))))
+        (unless (equal now result)
+          (push (obj "kind" "order" "ids" (coerce (mapcar #'slugify (getf input :order)) 'vector)
+                     "before" (coerce now 'vector))
+                changes))))
+    (when (or (getf input :axis) (eq (getf input :resetaxis) t))
+      (let ((now (getf (ensure-map) :axis))
+            (want (if (eq (getf input :resetaxis) t) '() (clean-axis (getf input :axis)))))
+        (unless (equal now want)
+          (flet ((vec (l) (coerce (mapcar (lambda (s) (obj "from" (getf s :from) "to" (getf s :to) "scale" (getf s :scale))) l) 'vector)))
+            (push (obj "kind" "axis" "segments" (vec want) "before" (vec now)) changes)))))
+    (dolist (g (getf input :groups))
+      (let ((id (slugify (getf* g :id ""))))
+        (unless (or (blankp id) (find-group id))
+          (push (obj "kind" "group" "id" id "compression" (trim (getf* g :compression ""))) changes))))
+    (dolist (p (getf input :add))
+      (let* ((n (normalise-node p)) (id (getf n :id)))
+        (unless (or (blankp id) (find-node id) (member id taken :test #'equal))
+          (push id taken)
+          (push (obj "kind" "add"
+                     "node" (obj "id" id "title" (getf n :title) "compression" (getf n :compression)
+                                 "body" (getf n :body) "group" (getf n :group) "era" (field-text n :era)))
+                changes))))
+    (dolist (p (getf input :update))
+      (let ((old (find-node (getf p :id))) (fields '()))
+        (when old
+          (loop for (name label) in *map-fields*
+                for key = (kw name)
+                for new = (getf p key)
+                when new
+                  do (let ((before (field-text old key))
+                           (after (case key
+                                    (:era (if (eql new 0) "" (princ-to-string new)))
+                                    (:group (slugify new))
+                                    (t (trim new)))))
+                       (unless (equal before after)
+                         (push (obj "field" name "label" label "before" before "after" after) fields))))
+          (when fields
+            (push (obj "kind" "update" "id" (getf old :id) "title" (getf old :title) "group" (getf old :group)
+                       "fields" (coerce (nreverse fields) 'vector))
+                  changes)))))
+    (dolist (id (getf input :remove))
+      (let ((old (find-node id)))
+        (when old
+          (push (obj "kind" "remove" "id" id "title" (getf old :title) "group" (getf old :group)) changes))))
+    (cond ((null changes) "Nothing to propose: those changes match the map as it is.")
+          (t (emit-event "proposal" "scope" "map" "changes" (coerce (nreverse changes) 'vector))
+             "Shown to the learner on the timeline as a diff for approval. It is NOT applied yet; do not say it is. They will approve or reject it themselves."))))
 
-(deftool remove-nodes
-  "Remove ideas from the map by id. Other ideas' prerequisites on them are dropped too."
-  (:object (:ids (:array :string)))
-  (input)
-  (let ((done (remove nil (mapcar #'remove-node! (getf input :ids)))))
-    (dolist (id done) (note-change! (str "- " id)))
-    (emit-event "status" "text" (str "Removed " (join ", " done)))
-    (str "Removed: " (join ", " done) ".")))
+;; Apply a proposal's changes (parsed from the browser's JSON) to the current map, kinds in a safe order.
+(defun apply-changes! (list)
+  (dolist (kind '("group" "editgroup" "add" "update" "remove" "dropgroup" "order" "axis"))
+    (dolist (c list)
+      (when (equal (getf c :kind) kind)
+        (cond ((equal kind "group")
+               (add-group! (list :id (getf c :id) :compression (getf c :compression))))
+              ((equal kind "editgroup")
+               (update-group! (getf c :id) :compression (let ((x (getf c :compression))) (and (not (blankp x)) x)) :new-id (getf c :newid)))
+              ((equal kind "dropgroup") (remove-group! (getf c :id)))
+              ((equal kind "order") (set-group-order! (getf c :ids)))
+              ((equal kind "axis") (set-axis! (coerce (getf c :segments) 'list)))
+              ((equal kind "add") (add-node! (getf c :node)))
+              ((equal kind "remove") (remove-node! (getf c :id)))
+              (t
+               (let ((old (find-node (getf c :id))))
+                 (when old
+                   (let ((n (copy-list old)))
+                     (dolist (f (getf c :fields))
+                       (let ((k (kw (getf f :field))) (v (getf f :after)))
+                         (when (and (stringp v) (assoc (getf f :field) *map-fields* :test #'equal))
+                           (setf (getf n k) (if (eq k :era) (parse-integer v :junk-allowed t) v)))))
+                     (update-node! n))))))))))
 
-(deftool add-groups
-  "Add groups to the map, each a lowercase-slug id and a one-sentence compression."
-  (:object (:groups (:array (:object (:id :string) (:compression :string)))))
-  (input)
-  (let ((done (remove nil (mapcar #'add-group! (getf input :groups)))))
-    (dolist (id done) (note-change! (str "group " id)))
-    (str "Added groups: " (join ", " done) ".")))
+(defun parse-changes (changes)
+  (handler-case (json->lisp (jzon:parse changes)) (error () nil)))
+
+;; The learner approved a map proposal: apply what the browser sends back.
+(defaction apply-map "/action/apply-map" (map-name changes)
+  (unless (select-map map-name) (return-from apply-map (not-found "field")))
+  (let ((list (parse-changes changes)))
+    (flet ((reply (ok &optional error)
+             (raw-response "application/json" (jzon:stringify (obj "ok" ok "error" (or error ""))))))
+      (if (null list)
+          (reply nil "There is nothing to apply.")
+          (progn (apply-changes! list) (reply t))))))
+
+;; The ids in BEFORE that moved relative to the rest when it became AFTER: everything outside a
+;; longest run of ids that kept their relative order, so moving one group marks just that group.
+(defun moved-ids (before after)
+  (let* ((seq (loop for id in before for p = (position id after :test #'equal) when p collect (cons id p)))
+         (n (length seq)) (len (make-array n :initial-element 1)) (prev (make-array n :initial-element nil)) (best 0))
+    (dotimes (i n)
+      (dotimes (j i)
+        (when (and (< (cdr (nth j seq)) (cdr (nth i seq))) (>= (aref len j) (aref len i)))
+          (setf (aref len i) (1+ (aref len j)) (aref prev i) j)))
+      (when (> (aref len i) (aref len best)) (setf best i)))
+    (let ((keep '()))
+      (when (> n 0) (loop for i = best then (aref prev i) while i do (push (car (nth i seq)) keep)))
+      (remove-if (lambda (id) (member id keep :test #'equal)) (mapcar #'car seq)))))
+
+;; The proposal drawn as the timeline it would make: applied to a copy of the map, nothing written.
+;; Ideas it adds are marked new (green), ideas it changes are marked changed (amber).
+(defaction preview-map "/action/preview-map" (map-name changes)
+  (unless (select-map map-name) (return-from preview-map (not-found "field")))
+  (let ((list (parse-changes changes)))
+    (raw-response
+     "application/json"
+     (let* ((*map* (copy-tree *map*)) (*dry-run* t)
+            (before (mapcar (lambda (g) (getf g :id)) (map-groups))))
+       (apply-changes! list)
+       (let* ((moved (moved-ids before (mapcar (lambda (g) (getf g :id)) (map-groups))))
+              (*tl-marks* (append
+                           (loop for c in list
+                                 for kind = (getf c :kind)
+                                 when (equal kind "add") collect (cons (getf (getf c :node) :id) "new")
+                                 when (equal kind "update") collect (cons (getf c :id) "upd")
+                                 when (equal kind "group") collect (cons (str "g:" (getf c :id)) "new")
+                                 when (equal kind "editgroup") collect (cons (str "g:" (if (blankp (getf c :newid)) (getf c :id) (getf c :newid))) "upd"))
+                           (mapcar (lambda (id) (cons (str "g:" id) "new")) moved))))
+         (jzon:stringify (obj "html" (timeline (map-nodes) *half-w* :all)
+                              "moved" (coerce moved 'vector))))))))
 
 (deftool read-node
   "Read one idea in full, including its body and the learner's written attempts at it."
@@ -235,7 +352,7 @@
     (str "Created quiz " (getf a :id) " with " (length (getf input :questions)) " questions.")))
 
 (defparameter *buddy-tools*
-  '(add-nodes update-nodes remove-nodes add-groups read-node
+  '(propose-map-changes read-node
     create-artifact update-artifact read-artifact create-flashcards create-quiz))
 
 ;;; -- The prompt --
@@ -254,19 +371,19 @@
   :system (str "You are the learner's study buddy, living inside their knowledge map of one field. "
                "The map is the shared object: groups of ideas; each idea has a one-sentence compression, a body that explains it, and the verdict on the learner's latest written explanation."
                #\Newline *rules* #\Newline *body-rule* #\Newline
-               "The learner writes to you to learn, to reshape the map, and to have things made. You have tools for the last two; use them, do not describe what you could do." #\Newline
+               "The learner writes to you to learn, to reshape the map, and to have things made. You have tools for the last two; use them, do not describe what you could do. The map is changed only through propose_map_changes: the learner sees the proposal on the timeline as a diff and approves or rejects it, so say in one line what you proposed, never that it is done." #\Newline
                "Reply in markdown: concise, no preamble, no sign-off, mechanism over vocabulary. Headings, lists, tables and code fences all render. Refer to ideas by title. When you used a tool, say what you did in one line at the end." #\Newline
-               "Changing the map: when asked, fill gaps, go deeper on one idea (breadth first: three to six sub-ideas one level down, each independent, with no links between ideas), remove, merge, regroup, rename, or work what they have learned into an idea's body. "
-               "Ids are lowercase slugs. Group ids must exist in the map or be added with add_groups first. Era is a year, 0 if unknown. Keep compression one sentence. If asked where the learner is weak, say so with reasons." #\Newline
+               "Changing the map: when asked, fill gaps, go deeper on one idea (breadth first: three to six sub-ideas one level down, each independent, with no links between ideas), remove, merge, regroup, rename, reorder or rename or delete whole groups (the timeline shows groups in the order you set, and that order must always put the group whose earliest idea is oldest at the top: fix it whenever a change would break it, and when asked where a group belongs), or work what they have learned into an idea's body. "
+               "Ids are lowercase slugs. Group ids must exist in the map or be added in the same proposal. Era is a year, 0 if unknown. Keep compression one sentence. If asked where the learner is weak, say so with reasons." #\Newline
                *making-things* #\Newline
                "You can search the web and fetch pages: do so when you need current or primary information, and cite primary sources when you cite."))
 
 ;; The learner's turn: the map and where they are, then their words.
 (defun scope-note (scope)
   (cond ((equal scope "timeline")
-         "The learner is working on the TIMELINE of this field: one bar per group spanning the years of its ideas, and the dated ideas inside. This chat is about the field as a whole, not any one idea (the learner studies single ideas in a separate chat). Requests here are about the field's breadth: dates (era), which group an idea sits in, and what is missing in time. Make the changes with your tools.")
+         "The learner is working on the TIMELINE of this field: one bar per group spanning the years of its ideas, and the dated ideas inside. This chat is about the field as a whole, not any one idea (the learner studies single ideas in a separate chat). Requests here are about the field's breadth: dates (era), which group an idea sits in, the order and names of the groups, and what is missing in time. Keep the timeline in chronological order: groups run top to bottom by the year of their EARLIEST idea, oldest (most distant, e.g. negative years) first. The year axis is drawn to scale unless you squeeze stretches of it: when a long quiet stretch (few ideas over many years) pushes the ideas around it far apart, or the learner asks for a range to be compressed, "logarithmic" or "not to scale", propose axis ranges with a scale (0.1 to 0.3 suits a mostly empty stretch; keep every range that should stay squeezed, since the list replaces the old one; resetaxis undoes it all). Whenever a proposal adds a group, adds or re-dates ideas, or moves ideas between groups, check where every group now starts and send an order that puts the group with the earliest start at the top (ties: the one that ends earlier first), even if the learner did not ask for reordering. Propose the changes with your tools.")
         ((equal scope "topics")
-         "The learner is working on the TOPIC LIST of this field: the groups and the ideas inside each. Requests here are about adding, renaming, regrouping, removing and reordering topics. Make the changes with your tools.")))
+         "The learner is working on the TOPIC LIST of this field: the groups and the ideas inside each. Requests here are about adding, renaming, regrouping, removing and reordering topics. Propose the changes with your tools.")))
 
 (defun ask-turn (text node group &optional scope open-artifact)
   (str (map-context) #\Newline #\Newline

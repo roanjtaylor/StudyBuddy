@@ -1,14 +1,19 @@
 (:MAP :ID "computers" :TITLE "Computers" :COMPRESSION
- "A switch controls a switch; everything else is layers of programs loading programs.")
+ "A switch controls a switch; everything else is layers of programs loading programs." :AXIS
+ ((:FROM 1850 :TO 1880 :SCALE 0.04) (:FROM 1880 :TO 1900 :SCALE 0.08)
+  (:FROM 1900 :TO 1930 :SCALE 0.3)))
 (:GROUP :ID "switches" :COMPRESSION "A switch can control another switch.")
 (:GROUP :ID "stored-program" :COMPRESSION "Instructions are data in the same memory.")
-(:GROUP :ID "loaders" :COMPRESSION "Every layer is a program that loads the next.")
 (:GROUP :ID "sharing" :COMPRESSION "Many programs share one machine.")
 (:GROUP :ID "languages" :COMPRESSION "Languages are compressions over machine code.")
-(:GROUP :ID "network" :COMPRESSION "Machines talk.")
 (:GROUP :ID "learned" :COMPRESSION "Programs can be found, not written.")
+(:GROUP :ID "loaders" :COMPRESSION "Every layer is a program that loads the next.")
+(:GROUP :ID "surfaces" :COMPRESSION
+ "As switches shrink and get cheaper, the computer moves from a shared room to the desk, the pocket, the wall and the face.")
+(:GROUP :ID "network" :COMPRESSION "Machines talk.")
 (:NODE :ID "transistor" :TITLE "Transistor as a switch" :COMPRESSION
- "A small voltage at one terminal lets or blocks a current between two others, so one signal can control another."
+ "A small voltage at one terminal lets or blocks a current between two others, so one signal can control another.
+Un voltaje pequeño en un terminal permite o bloquea una corriente entre otros dos, de modo que una señal puede controlar a otra."
  :BODY
  "Every computer is billions of these and nothing else is physical; all the rest is arrangement."
  :GROUP "switches" :PREREQS NIL :ERA 1947)
@@ -264,7 +269,7 @@ Its weakness: the carry must ripple through every column, which limits speed. Ca
 (:NODE :ID "neuron-weighted-sum" :TITLE "The neuron as a weighted sum" :COMPRESSION
  "Multiply each input by a weight, add them up, squash the result: a tiny adjustable function."
  :BODY "The unit everything in machine learning is made of; there is no cleverness inside it."
- :GROUP "learned" :PREREQS ("adder") :ERA 1943)
+ :GROUP "learned" :PREREQS ("adder") :ERA 1958)
 (:NODE :ID "gradient-training" :TITLE "Training by gradient descent" :COMPRESSION
  "Measure the error, compute how each weight moved it, nudge every weight the other way, repeat millions of times."
  :BODY
@@ -294,3 +299,132 @@ Its weakness: the carry must ripple through every column, which limits speed. Ca
  :BODY
  "Where the model meets the rest of the stack: tools, files, the web. Most AI products are this loop."
  :GROUP "learned" :PREREQS ("model-as-loop-plus-weights" "web-as-app-platform" "shell") :ERA 2022)
+(:NODE :ID "mainframe-terminals" :TITLE "Mainframes and terminals" :COMPRESSION
+ "When a machine costs a building, many people share it through dumb terminals and the operating system rations it."
+ :BODY
+ "This is the starting surface, and it explains why sharing (scheduling, memory protection, privilege) was invented before personal computers existed. One expensive machine, many users at keyboards connected by wire; all the computing happens in the centre. Client and server later recreates this shape over the network."
+ :GROUP "surfaces" :PREREQS NIL :ERA 1964)
+(:NODE :ID "scaling-moore" :TITLE "Shrinking switches" :COMPRESSION
+ "Etching more transistors per chip makes each one cheaper and faster, and every new surface is that cost curve crossing a threshold."
+ :BODY
+ "The integrated circuit (1958) put many transistors on one slice; Moore's 1965 observation was that the count per chip kept doubling. Cheaper and lower-power switches are what made a minicomputer, then a desk machine, then a phone possible. The same programs-loading-programs stack moved onto each new size of machine."
+ :GROUP "surfaces" :PREREQS NIL :ERA 1965)
+(:NODE :ID "personal-computer" :TITLE "The personal computer" :COMPRESSION
+ "When a whole CPU fits on one chip, one person can own a machine, and the kernel's job shifts from rationing to serving one user."
+ :BODY
+ "The microprocessor (1971) made the CPU a single part. The home machine (Altair, Apple II, 1975-77) brought the loader chain, from ROM through disk to shell, to a desk, and made software a product."
+ :GROUP "surfaces" :PREREQS NIL :ERA 1977)
+(:NODE :ID "gui" :TITLE "Bitmap display and pointer" :COMPRESSION
+ "Treat the screen as a grid of memory the program paints and a pointer as an input device, and the machine can be operated by pointing instead of typing."
+ :BODY
+ "Xerox's Alto (1973) held the screen as pixels in RAM, so any program could draw anything. Windows, icons and mouse followed. This is the shell's successor for most people, and the browser later paints its tree the same way."
+ :GROUP "surfaces" :PREREQS NIL :ERA 1973)
+(:NODE :ID "mobile-embedded" :TITLE "Phones and embedded computers" :COMPRESSION
+ "With a battery, a radio and sensors added, the computer goes in the pocket or inside other things, and power budget becomes the main design constraint."
+ :BODY
+ "Microcontrollers (1970s) hide computers in cars, appliances and toys. The smartphone (2007) fuses a full OS, touch screen, GPS, camera and network into one device. Energy per operation, not speed, shapes its chips and its scheduler."
+ :GROUP "surfaces" :PREREQS NIL :ERA 2007)
+(:NODE :ID "wearables-spatial" :TITLE "Wearables and spatial computing" :COMPRESSION
+ "Glasses and headsets put the display on the face and sense the room, so the interface becomes the world around you."
+ :BODY
+ "The latest step in the same trend: smaller, closer, always on. Cameras and depth sensors track head and hands, and the program anchors drawings to places. It is the bitmap display and pointer idea with the screen replaced by your field of view."
+ :GROUP "surfaces" :PREREQS NIL :ERA 2014)
+(:NODE :ID "computability" :TITLE "What can be computed" :COMPRESSION
+ "A simple machine reading and writing symbols can compute anything computable, and some questions, like whether a program halts, no program can answer."
+ :BODY
+ "Turing's 1936 machine defines the limits of everything else in the map. Any computer, whatever its surface, computes the same set of functions; the differences are speed and cost. It also underlies code and data in one memory, since one universal machine can run any other machine's description."
+ :GROUP "stored-program" :PREREQS NIL :ERA 1936)
+(:NODE :ID "databases" :TITLE "Databases" :COMPRESSION
+ "Keep structured data in tables behind a query language, and let the system handle storage, concurrency and crash recovery."
+ :BODY
+ "Codd's relational model (1970) separated what you ask from how it is stored. Transactions let many programs change shared state without corrupting it. It is the next layer above files, and most servers are mainly a database with a front door."
+ :GROUP "sharing" :PREREQS NIL :ERA 1970)
+(:NODE :ID "cloud-virtualization" :TITLE "Virtualization and the cloud" :COMPRESSION
+ "A program that pretends to be a whole machine lets one physical computer be sliced and rented out as many."
+ :BODY
+ "A hypervisor does for whole operating systems what the kernel does for processes. Rented machines in data centres (2006 on) bring back the mainframe shape: thin clients such as phones talk to big shared computers."
+ :GROUP "network" :PREREQS NIL :ERA 2006)
+(:NODE :ID "cryptography" :TITLE "Cryptography and trust" :COMPRESSION
+ "Public-key mathematics lets strangers share secrets and verify identity over a network that anyone can read."
+ :BODY
+ "Diffie and Hellman (1976) showed that two parties could agree on a key in public. Encryption, signatures and certificates make HTTPS, software updates and secure boot trustworthy, and they are why a signed bootloader can check the kernel it loads."
+ :GROUP "network" :PREREQS NIL :ERA 1976)
+(:NODE :ID "bits-representation" :TITLE "Bits and representation" :COMPRESSION
+ "Anything, whether numbers, text, sound or pictures, can be stored as patterns of on/off switches, by agreeing on a code."
+ :BODY
+ "A switch only has two states, so every other kind of information has to be encoded in them. This is why one machine can handle everything.
+
+Integers use place value in base 2, with a fixed width (8, 32, 64 bits) and two's complement for negatives. Text maps each character to a number (ASCII, Unicode). Fractions use a sign, exponent and mantissa (floating point). Colours, sound samples and pixels are numbers too.
+
+The bits mean nothing by themselves. The same 32 bits can be an integer, a colour or an instruction, depending on what reads them. Shannon named the unit the *bit* in 1948."
+ :GROUP "switches" :PREREQS NIL :ERA 1948)
+(:NODE :ID "caches" :TITLE "Caches and the memory hierarchy" :COMPRESSION
+ "Small fast memory holds copies of recently used parts of big slow memory, and programs mostly reuse what they just touched."
+ :BODY
+ "CPUs run far faster than RAM can answer, so a CPU that fetched everything from RAM would mostly wait. The fix is a hierarchy: registers, then small caches, then RAM, then disk, each larger, slower and cheaper than the one before.
+
+On each access the hardware checks the cache first. A hit returns quickly. A miss fetches a whole block from the level below and keeps it. This works because programs show locality: they reuse the same addresses soon (temporal) and touch nearby addresses next (spatial). Wilkes proposed the idea in 1965 as \"slave memory\"."
+ :GROUP "stored-program" :PREREQS NIL :ERA 1965)
+(:NODE :ID "linking-loading" :TITLE "Linking and loading" :COMPRESSION
+ "An executable file is a program plus instructions for placing it in memory, and a loader copies it in, fixes up addresses and jumps to its start."
+ :BODY
+ "Every layer in this chain must turn a file on disk into a running program. Compiled pieces are separate object files with unresolved references to each other's functions. A linker joins them and resolves those names to addresses.
+
+The result is an executable with a header saying where the code and data go and where execution starts. The loader (in the kernel or the bootloader) maps those sections into memory, adjusts addresses if needed, and sets the PC to the entry point. Dynamic linking defers part of this to load time, so programs share libraries."
+ :GROUP "loaders" :PREREQS NIL :ERA 1960)
+(:NODE :ID "interrupts" :TITLE "Interrupts" :COMPRESSION
+ "Hardware can force the CPU to save its place and jump to a handler, so devices and timers get attention without the running program polling for them."
+ :BODY
+ "Without interrupts, a program would have to keep asking each device whether it needs anything. An interrupt is a signal from a timer, disk, network card or keyboard. The CPU finishes the current instruction, saves the PC and registers, and jumps to a handler address looked up in a table. When the handler finishes, execution resumes where it stopped.
+
+The scheduler's timer tick, device drivers and the system call mechanism all work this way. Exceptions such as page faults and division by zero use the same path."
+ :GROUP "sharing" :PREREQS NIL :ERA 1953)
+(:NODE :ID "concurrency-locks" :TITLE "Concurrency and locks" :COMPRESSION
+ "When threads share memory, the result can depend on timing, so a lock lets only one thread at a time touch the shared piece."
+ :BODY
+ "Threads can be switched at any instruction, so two threads that read, change and write the same variable can overwrite each other's work. This is a race condition, and it is hard to reproduce because it depends on timing.
+
+A lock (Dijkstra's semaphore, 1965) lets one thread enter a critical section while the others wait. Atomic hardware instructions make the lock itself safe. Locks bring their own hazards: deadlock, where threads each wait for the other, and lost speed from waiting. Alternatives are message passing and immutable data."
+ :GROUP "sharing" :PREREQS NIL :ERA 1965)
+(:NODE :ID "parsing-grammars" :TITLE "Parsing and grammars" :COMPRESSION
+ "A grammar defines which strings are valid programs, and a parser turns text into a tree that the rest of the language machinery works on."
+ :BODY
+ "Compilers, interpreters, shells and browsers all begin by turning flat text into structure. A lexer first splits characters into tokens. A parser then applies grammar rules (written in BNF, introduced for Algol 60) to build a syntax tree that shows nesting and precedence.
+
+Every later step works on the tree: type checking, code generation or direct evaluation. Languages that write code as their own data structures, like Lisp, make this step almost trivial."
+ :GROUP "languages" :PREREQS NIL :ERA 1960)
+(:NODE :ID "dns-naming" :TITLE "Naming and DNS" :COMPRESSION
+ "A distributed hierarchical directory maps human names to IP addresses, so no one machine has to know every name."
+ :BODY
+ "Packets travel by number, but people use names. DNS (Mockapetris, 1983) replaced a single shared hosts file with a tree of servers. Root servers point to servers for each top-level domain, which point to servers for each domain.
+
+A resolver asks down the chain and caches the answers for a time given by the owner. Whoever controls a name's records controls where it leads, which is why DNS matters for security as well."
+ :GROUP "network" :PREREQS NIL :ERA 1983)
+(:NODE :ID "embeddings" :TITLE "Embeddings" :COMPRESSION
+ "Each token becomes a learned vector of numbers, positioned so that things used in similar ways end up close together."
+ :BODY
+ "A network can only do arithmetic, so text has to become numbers. An embedding table gives each token a vector of hundreds or thousands of values, learned during training. Tokens that appear in similar contexts end up with similar vectors, and directions in the space come to carry meaning (word2vec, 2013).
+
+The transformer's first step is looking up these vectors, and each layer then refines them using context. Embeddings of whole passages let programs search by meaning rather than by exact words."
+ :GROUP "learned" :PREREQS NIL :ERA 2013)
+(:NODE :ID "post-training" :TITLE "Post-training" :COMPRESSION
+ "After next-token pretraining, further training on examples and human preference signals turns a text continuer into an assistant that follows instructions."
+ :BODY
+ "A pretrained model continues any text, including a question with another question. Post-training changes its behaviour with further training. Supervised fine-tuning on example conversations teaches the format. Reinforcement from human or model feedback (RLHF, 2022) rewards answers people prefer.
+
+The architecture is the same and only the weights shift. This step is what makes a model usable as the engine inside a wrapper."
+ :GROUP "learned" :PREREQS NIL :ERA 2022)
+(:NODE :ID "boolean-algebra" :TITLE "Boolean algebra" :COMPRESSION
+ "Logic reduces to arithmetic on 0 and 1 (AND, OR, NOT), so reasoning can be done by calculation, and later by circuits."
+ :BODY
+ "Boolean algebra is why a pile of switches can do reasoning: true and false become 1 and 0, and AND, OR and NOT become operations you can calculate with and simplify like ordinary algebra.
+
+Boole (*The Laws of Thought*, 1854) gave the rules. Any statement built from AND, OR and NOT can be rewritten, simplified and checked by symbol manipulation. Shannon's 1938 thesis showed that switching circuits obey the same algebra, so a logical expression can be turned directly into a circuit, and a circuit can be simplified with algebra."
+ :GROUP "switches" :PREREQS NIL :ERA 1854)
+(:NODE :ID "relay-vacuum-tube" :TITLE "Relays and vacuum tubes" :COMPRESSION
+ "Before transistors, a switch controlled by a signal was an electromagnet (relay) or a heated filament and grid (tube); the idea of one signal controlling another came first."
+ :BODY
+ "The transistor was not the first switch that another signal could control. It was the first one that was small, cheap and cool.
+
+A relay uses a small current in a coil to pull a metal contact open or closed. De Forest's triode (1906) uses a voltage on a grid to control a current flowing through a vacuum. Both give gain and switching, so both can build gates and memory. Early computers were made of them: Zuse's relay machines and ENIAC's 17,000+ tubes. Their size, heat, power draw and failure rate set the limits that the transistor removed."
+ :GROUP "switches" :PREREQS NIL :ERA 1906)
