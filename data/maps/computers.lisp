@@ -72,10 +72,7 @@ NAND alone is *functionally complete*: NOT(A) = NAND(A,A); AND = NOT(NAND); OR(A
 - Shannon, \"A Symbolic Analysis of Relay and Switching Circuits\" (1937)"
  :GROUP "switches" :PREREQS ("transistor") :ERA 1938)
 (:NODE :ID "adder" :TITLE "Adding with gates" :COMPRESSION
- "XOR gives the sum bit and AND the carry; chain one per bit and you add numbers of any width.
-XOR da el bit de suma y AND el acarreo; encadena uno por cada bit y podrás sumar números de cualquier ancho.
-XOR donne le bit de somme et AND la retenue ; enchaîne-en un par bit et tu pourras additionner des nombres de n'importe quelle largeur.
-XOR liefert das Summenbit und AND den Übertrag; verkette je Bit eines, und du kannst Zahlen beliebiger Breite addieren."
+ "XOR gives the sum bit and AND the carry; chain one per bit and you add numbers of any width."
  :BODY
  "Adding is just wiring: voltages pass through gates, and the pattern that comes out happens to be the right answer. It is school addition, column by column with a carry, using only 0 and 1.
 
@@ -117,8 +114,22 @@ Its weakness: the carry must ripple through every column, which limits speed. Ca
  :GROUP "switches" :PREREQS ("logic-gates") :ERA 1945)
 (:NODE :ID "flip-flop" :TITLE "Flip-flop as one bit of memory" :COMPRESSION
  "Two gates wired in a loop hold a value until pushed." :BODY
- "This is one bit of RAM. Memory is just a loop." :GROUP "switches" :PREREQS
- ("logic-gates" "clock") :ERA 1918)
+ "A computer needs somewhere to keep a value after the signal that set it has gone. The flip-flop does this with no moving parts and no special material: memory is just a loop.
+
+**Mechanism.** Wire two inverting stages (NOR gates, NAND gates or amplifying tubes/transistors) so that each one's output is the other's input. The loop has two stable states: Q=1 with Q̄=0, or Q=0 with Q̄=1. Each stage reinforces the other, so the state holds until an input pushes it over. Set drives it to one state and Reset to the other; with both inactive it holds. That is one bit.
+
+A single gate fed back on itself (an OR whose output returns to its input) also latches, but only one way: once at 1 it can never be cleared. Two inverting stages give a bit that can be written both ways. The stages must also have gain, restoring a clean 0 or 1 each trip around the loop, or the stored value decays.
+
+**History.**
+- 1830s: the electromagnetic relay (Joseph Henry, 1835). A relay whose own contact feeds its coil is a holding circuit, the first one-stage latch.
+- 1906: de Forest's triode gives an electronic switch and amplifier.
+- 1918: Eccles and Jordan patent two cross-coupled triodes, the first true bistable circuit (published in *Radio Review*, 1919). \"Flip-flop\" is a later name.
+- 1930s: Wynn-Williams chains bistables into scale-of-two counters.
+- 1940s: Colossus and ENIAC use tube flip-flops for registers, but they are too costly for bulk memory, so delay lines, Williams tubes and magnetic core follow.
+- 1960s onward: transistors and ICs. The 6-transistor SRAM cell, two cross-coupled inverters plus two access transistors, is still the CPU cache bit.
+
+This is one bit of RAM."
+ :GROUP "switches" :PREREQS ("logic-gates" "clock") :ERA 1918)
 (:NODE :ID "ram" :TITLE "RAM as an addressed grid" :COMPRESSION
  "A decoder turns an address number into one selected row of flip-flops you can read or overwrite."
  :BODY

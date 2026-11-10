@@ -283,7 +283,8 @@
           unless (find-artifact id) return id)))
 
 (defun add-artifact! (&key title type content node language)
-  (let ((a (list :id (new-artifact-id title) :map (map-id) :node node
+  ;; Pinned from the start, so it is kept with its idea (and listed there) without a manual pin.
+  (let ((a (list :pinned t :id (new-artifact-id title) :map (map-id) :node node
                  :type type :title (trim (or title "Untitled")) :language language
                  :content content :at (now-iso) :version 1)))
     (put-artifact! a)))

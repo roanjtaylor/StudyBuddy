@@ -193,65 +193,6 @@
   <text x=\"430\" y=\"168\" font-size=\"11\" fill=\"#b03030\">controls the path</text>
 </svg>"
  :AT "2026-11-01T00:05:40" :VERSION 1)
-(:ID "sr-latch-from-two-nor-gates" :MAP "computers" :NODE NIL :TYPE "svg" :TITLE
- "SR latch from two NOR gates" :LANGUAGE NIL :CONTENT
- "<svg viewBox=\"0 0 640 420\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"sans-serif\">
-  <style>
-    .lbl{font-size:16px;fill:#111}
-    .pin{font-size:14px;fill:#333}
-    .wire{stroke:#111;stroke-width:2;fill:none}
-    .fb{stroke:#c0392b;stroke-width:2;fill:none;stroke-dasharray:5 4}
-    .gate{fill:#eef3fb;stroke:#2c3e50;stroke-width:2}
-    .title{font-size:18px;fill:#111;font-weight:bold}
-    .note{font-size:13px;fill:#555}
-    .hdr{font-size:13px;fill:#111;font-weight:bold}
-    td,th{}
-  </style>
-
-  <text x=\"20\" y=\"28\" class=\"title\">SR latch: two NOR gates in a loop</text>
-
-  <!-- NOR gate 1 (top) -->
-  <g>
-    <path d=\"M200,70 q30,0 55,35 q-25,35 -55,35 q15,-35 0,-70 z\" class=\"gate\"/>
-    <circle cx=\"258\" cy=\"105\" r=\"5\" class=\"gate\"/>
-    <text x=\"215\" y=\"110\" class=\"pin\">NOR</text>
-  </g>
-  <!-- NOR gate 2 (bottom) -->
-  <g>
-    <path d=\"M200,230 q30,0 55,35 q-25,35 -55,35 q15,-35 0,-70 z\" class=\"gate\"/>
-    <circle cx=\"258\" cy=\"265\" r=\"5\" class=\"gate\"/>
-    <text x=\"215\" y=\"270\" class=\"pin\">NOR</text>
-  </g>
-
-  <!-- R input into top gate -->
-  <line x1=\"90\" y1=\"85\" x2=\"200\" y2=\"85\" class=\"wire\"/>
-  <text x=\"70\" y=\"90\" class=\"lbl\">R</text>
-  <!-- S input into bottom gate -->
-  <line x1=\"90\" y1=\"285\" x2=\"200\" y2=\"285\" class=\"wire\"/>
-  <text x=\"70\" y=\"290\" class=\"lbl\">S</text>
-
-  <!-- Q output from top -->
-  <line x1=\"263\" y1=\"105\" x2=\"430\" y2=\"105\" class=\"wire\"/>
-  <text x=\"440\" y=\"110\" class=\"lbl\">Q</text>
-  <!-- Q' output from bottom -->
-  <line x1=\"263\" y1=\"265\" x2=\"430\" y2=\"265\" class=\"wire\"/>
-  <text x=\"440\" y=\"270\" class=\"lbl\">Q&#772;</text>
-
-  <!-- Feedback Q -> bottom gate second input -->
-  <path d=\"M330,105 L330,160 L180,160 L180,250 L200,250\" class=\"fb\"/>
-  <!-- Feedback Q' -> top gate second input -->
-  <path d=\"M360,265 L360,200 L160,200 L160,120 L200,120\" class=\"fb\"/>
-
-  <text x=\"300\" y=\"150\" class=\"note\">red = feedback: each output steers the other gate</text>
-
-  <!-- State table -->
-  <text x=\"20\" y=\"345\" class=\"hdr\">S  R   →   Q</text>
-  <text x=\"20\" y=\"368\" class=\"note\">0  0   hold previous Q   ← this is the memory</text>
-  <text x=\"20\" y=\"388\" class=\"note\">1  0   Q = 1   (set)</text>
-  <text x=\"20\" y=\"408\" class=\"note\">0  1   Q = 0   (reset)</text>
-  <text x=\"330\" y=\"388\" class=\"note\">1  1   not allowed</text>
-</svg>"
- :AT "2026-11-02T13:07:07" :VERSION 1)
 (:ID "d-flip-flop-timing" :MAP "computers" :NODE NIL :TYPE "svg" :TITLE "D flip-flop timing"
  :LANGUAGE NIL :CONTENT
  "<svg viewBox=\"0 0 640 420\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"sans-serif\">
@@ -506,3 +447,885 @@ out.innerHTML=`Result: <span class=\"bit b${c}\">${c}</span> `+sums.map(s=>`<spa
 draw();
 </script></body></html>"
  :AT "2026-11-09T15:34:06" :VERSION 1)
+(:ID "relay-line-across-america" :MAP "computers" :NODE NIL :TYPE "html" :TITLE
+ "Relay line across America" :LANGUAGE NIL :CONTENT "<!DOCTYPE html>
+<html><head><meta charset=\"utf-8\">
+<style>
+ body{margin:0;font-family:system-ui,sans-serif;background:#f6f7f9;color:#222}
+ .wrap{max-width:1040px;margin:0 auto;padding:14px}
+ h1{font-size:18px;margin:0 0 4px}
+ p.sub{margin:0 0 10px;font-size:14px;color:#555}
+ .ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
+ input[type=text]{padding:8px 10px;font-size:15px;border:1px solid #bbb;border-radius:6px;width:160px;text-transform:uppercase}
+ button{padding:8px 16px;font-size:15px;border:0;border-radius:6px;background:#1d3557;color:#fff;cursor:pointer}
+ button.alt{background:#fff;color:#1d3557;border:1px solid #1d3557;user-select:none}
+ button:active{transform:translateY(1px)}
+ select{padding:7px;font-size:14px;border-radius:6px}
+ #morse{font-family:monospace;font-size:16px;letter-spacing:2px;min-height:22px;margin-bottom:6px}
+ svg{width:100%;height:auto;background:#fff;border:1px solid #ddd;border-radius:10px}
+ .legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;font-size:13px;margin-top:10px;color:#444}
+ .legend div{background:#fff;border:1px solid #e1e1e1;border-radius:8px;padding:8px}
+</style></head><body><div class=\"wrap\">
+<h1>A relay line across America</h1>
+<p class=\"sub\">Each section of wire is weak. At every station the arriving current only energises an electromagnet, which closes a switch that connects a fresh local battery to the next section. A switch controls a switch.</p>
+<div class=\"ctl\">
+ <input id=\"msg\" type=\"text\" value=\"SOS\" maxlength=\"12\">
+ <button id=\"send\">Send</button>
+ <button id=\"key\" class=\"alt\">Hold to tap the key</button>
+ <label>Speed <select id=\"spd\"><option value=\"1100\">Slow</option><option value=\"700\" selected>Normal</option><option value=\"350\">Fast</option></select></label>
+</div>
+<div id=\"morse\">&nbsp;</div>
+<svg id=\"svg\" viewBox=\"0 0 1000 560\" xmlns=\"http://www.w3.org/2000/svg\">
+ <defs><filter id=\"glow\" x=\"-50%\" y=\"-50%\" width=\"200%\" height=\"200%\"><feGaussianBlur stdDeviation=\"3.5\" result=\"b\"/><feMerge><feMergeNode in=\"b\"/><feMergeNode in=\"SourceGraphic\"/></feMerge></filter></defs>
+ <polygon points=\"60,70 250,85 400,80 560,85 700,80 760,95 800,110 850,90 900,100 930,70 960,90 950,140 920,170 900,200 880,230 860,290 840,340 850,380 870,420 880,470 850,500 820,440 790,400 740,400 660,420 600,440 560,460 520,490 500,520 470,500 440,450 380,430 330,420 290,380 220,380 150,350 100,300 70,240 50,170 45,110\" fill=\"#eef3ea\" stroke=\"#9fb28f\" stroke-width=\"2\" stroke-linejoin=\"round\"/>
+ <g id=\"tracks\"></g><g id=\"lit\" filter=\"url(#glow)\"></g><g id=\"stations\"></g>
+</svg>
+<div class=\"legend\">
+ <div><b>Colour = one section of wire.</b> Each has its own battery at its sending end, so the signal is renewed, not just carried.</div>
+ <div><b>Coil → arm.</b> Current arriving pulls the arm shut (it takes the colour of the line it now feeds). When the current stops, the arm springs open.</div>
+ <div><b>Same pattern copied.</b> Every dot and dash is repeated exactly, one hop later. The last station's arm lights the sounder.</div>
+</div>
+</div>
+<script>
+const NS=\"http://www.w3.org/2000/svg\";
+const st=[{n:\"San Francisco\",x:80,y:225},{n:\"Salt Lake City\",x:265,y:225},{n:\"Denver\",x:415,y:270},{n:\"Omaha\",x:555,y:215},{n:\"Chicago\",x:695,y:190},{n:\"New York\",x:870,y:185}];
+const col=[\"#e63946\",\"#f4a261\",\"#2a9d8f\",\"#4361ee\",\"#b5179e\"];
+const $=id=>document.getElementById(id);
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
+const tracks=$(\"tracks\"),lit=$(\"lit\"),sg=$(\"stations\");
+for(let i=0;i<5;i++){const a=st[i],b=st[i+1];
+ el(\"line\",{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:col[i],\"stroke-width\":4,opacity:.28,\"stroke-linecap\":\"round\"},tracks);
+ el(\"line\",{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:\"#fff\",\"stroke-width\":1.5,\"stroke-dasharray\":\"2 14\",opacity:.9},tracks);
+ // line label
+ el(\"text\",{x:(a.x+b.x)/2,y:(a.y+b.y)/2-14,\"text-anchor\":\"middle\",\"font-size\":13,fill:col[i],\"font-weight\":700},tracks).textContent=\"Line \"+(i+1);
+}
+const S=st.map((s,i)=>{
+ const g=el(\"g\",{transform:`translate(${s.x},${s.y})`},sg);
+ const node=el(\"circle\",{r:10,fill:\"#fff\",stroke:\"#333\",\"stroke-width\":2.5},g);
+ // card
+ el(\"rect\",{x:-46,y:20,width:92,height:58,rx:8,fill:\"#fff\",stroke:\"#bbb\"},g);
+ // battery
+ const bat1=el(\"line\",{x1:-36,x2:-36,y1:32,y2:50,stroke:\"#999\",\"stroke-width\":3},g);
+ const bat2=el(\"line\",{x1:-30,x2:-30,y1:37,y2:45,stroke:\"#999\",\"stroke-width\":3},g);
+ el(\"text\",{x:-33,y:68,\"text-anchor\":\"middle\",\"font-size\":12,fill:\"#666\"},g).textContent=\"battery\";
+ // wire battery to arm pivot
+ el(\"polyline\",{points:\"-36,41 -36,41\",fill:\"none\"},g);
+ // arm
+ const arm=el(\"line\",{x1:-12,y1:46,x2:10,y2:34,stroke:\"#999\",\"stroke-width\":3.5,\"stroke-linecap\":\"round\"},g);
+ el(\"circle\",{cx:-12,cy:46,r:2.5,fill:\"#555\"},g);
+ el(\"circle\",{cx:12,cy:46,r:2.5,fill:\"#555\"},g);
+ // coil
+ const coil=el(\"circle\",{cx:30,cy:40,r:9,fill:\"#fff\",stroke:\"#999\",\"stroke-width\":3},g);
+ el(\"text\",{x:30,y:68,\"text-anchor\":\"middle\",\"font-size\":12,fill:\"#666\"},g).textContent=i==0?\"key\":\"coil\";
+ el(\"text\",{x:0,y:-18,\"text-anchor\":\"middle\",\"font-size\":14,\"font-weight\":700,fill:\"#222\"},g).textContent=s.n;
+ return {node,bat1,bat2,arm,coil};
+});
+const toneLabel=el(\"text\",{x:870,y:122,\"text-anchor\":\"middle\",\"font-size\":14,\"font-weight\":700,fill:\"#b5179e\",opacity:0},sg);
+toneLabel.textContent=\"CLICK\";
+
+const M={A:\".-\",B:\"-...\",C:\"-.-.\",D:\"-..\",E:\".\",F:\"..-.\",G:\"--.\",H:\"....\",I:\"..\",J:\".---\",K:\"-.-\",L:\".-..\",M:\"--\",N:\"-.\",O:\"---\",P:\".--.\",Q:\"--.-\",R:\".-.\",S:\"...\",T:\"-\",U:\"..-\",V:\"...-\",W:\".--\",X:\"-..-\",Y:\"-.--\",Z:\"--..\",0:\"-----\",1:\".----\",2:\"..---\",3:\"...--\",4:\"....-\",5:\".....\",6:\"-....\",7:\"--...\",8:\"---..\",9:\"----.\"};
+let iv=[],D=700,U=140,manual=null;
+function send(){
+ D=+$(\"spd\").value;U=D/5;
+ const txt=$(\"msg\").value.toUpperCase();let cur=performance.now()+100,out=[];
+ for(const w of txt.split(\" \")){
+  for(const ch of w){const code=M[ch];if(!code)continue;out.push(code);
+   for(const sy of code){const len=sy==\".\"?1:3;iv.push({a:cur,b:cur+len*U});cur+=(len+1)*U}
+   cur+=2*U}
+  cur+=4*U;out.push(\"/\");}
+ $(\"morse\").textContent=out.join(\"  \");
+}
+$(\"send\").onclick=send;
+const key=$(\"key\");
+function kd(e){e.preventDefault();if(manual)return;D=+$(\"spd\").value;manual={a:performance.now(),b:Infinity};iv.push(manual)}
+function ku(){if(manual){manual.b=performance.now();manual=null}}
+key.addEventListener(\"mousedown\",kd);window.addEventListener(\"mouseup\",ku);
+key.addEventListener(\"touchstart\",kd,{passive:false});window.addEventListener(\"touchend\",ku);
+
+function cl(v){return Math.max(0,Math.min(1,v))}
+function frame(){
+ const t=performance.now();
+ while(iv.length&&iv[0].b!==Infinity&&t>iv[0].b+6*D+200)iv.shift();
+ lit.innerHTML=\"\";
+ const closed=[false,false,false,false,false,false];
+ for(const v of iv){
+  for(let s=0;s<6;s++){if(t>=v.a+s*D&&t<v.b+s*D)closed[s]=true}
+  for(let s=0;s<5;s++){
+   const f=cl((t-(v.a+s*D))/D),tl=cl((t-(v.b+s*D))/D);
+   if(t>=v.a+s*D&&f>tl){const a=st[s],b=st[s+1];
+    el(\"line\",{x1:a.x+(b.x-a.x)*tl,y1:a.y+(b.y-a.y)*tl,x2:a.x+(b.x-a.x)*f,y2:a.y+(b.y-a.y)*f,stroke:col[s],\"stroke-width\":8,\"stroke-linecap\":\"round\"},lit);}
+  }
+ }
+ for(let s=0;s<6;s++){
+  const o=S[s],on=closed[s],c=s<5?col[s]:\"#b5179e\";
+  o.arm.setAttribute(\"x2\",on?12:10);o.arm.setAttribute(\"y2\",on?46:34);
+  o.arm.setAttribute(\"stroke\",on?c:\"#999\");
+  o.bat1.setAttribute(\"stroke\",on?c:\"#999\");o.bat2.setAttribute(\"stroke\",on?c:\"#999\");
+  o.coil.setAttribute(\"stroke\",on?(s>0?col[s-1]:\"#333\"):\"#999\");
+  o.coil.setAttribute(\"fill\",on?(s>0?col[s-1]+\"55\":\"#ddd\"):\"#fff\");
+  o.node.setAttribute(\"fill\",on?c:\"#fff\");
+ }
+ toneLabel.setAttribute(\"opacity\",closed[5]?1:0);
+ requestAnimationFrame(frame);
+}
+frame();
+</script></body></html>"
+ :AT "2026-11-10T17:58:26" :VERSION 1)
+(:PINNED T :ID "relay-and-triode-tube" :MAP "computers" :NODE "relay-vacuum-tube" :TYPE "html"
+ :TITLE "Relay, triode tube and relay line" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:0;padding:12px;background:#fafaf7;color:#222}
+h2{font-size:16px;margin:4px 0 8px}
+.wrap{display:flex;flex-wrap:wrap;gap:12px}
+.card{flex:1 1 380px;background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px}
+.card.full{flex:1 1 100%}
+button{font-size:14px;padding:8px 14px;border-radius:8px;border:1px solid #888;background:#eee;cursor:pointer}
+button.on{background:#2e7d32;color:#fff;border-color:#2e7d32}
+button.bad{background:#c62828;color:#fff;border-color:#c62828}
+select{font-size:14px;padding:7px;border-radius:8px}
+p.n{font-size:13px;margin:6px 0 0;min-height:54px}
+svg{width:100%;height:auto}
+text{font-family:system-ui,sans-serif;font-size:12px;fill:#222}
+.flow{stroke-dasharray:6 6;animation:d .6s linear infinite}
+@keyframes d{to{stroke-dashoffset:-12}}
+.hide{display:none}
+input[type=range]{width:200px;vertical-align:middle}
+.ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:6px}
+code{font-size:15px;background:#f1f1ec;padding:2px 6px;border-radius:4px;letter-spacing:2px}
+.row{font-size:13px;margin:6px 0 0}
+</style></head><body>
+<div class=\"wrap\">
+<div class=\"card\"><h2>Relay (1830s–1940s): electromagnet moves a contact</h2>
+<svg viewBox=\"0 0 400 310\">
+<text x=\"200\" y=\"40\" text-anchor=\"middle\" style=\"font-weight:bold\">Load circuit (larger flow)</text>
+<path d=\"M60 150 V70 H350 V106 M350 134 V190 H285 V164\" fill=\"none\" stroke=\"#999\" stroke-width=\"2\"/>
+<path id=\"lc\" d=\"M60 150 V70 H350 V106 M350 134 V190 H285 V164\" fill=\"none\" stroke=\"#1565c0\" stroke-width=\"3\" class=\"flow hide\"/>
+<circle id=\"lamp\" cx=\"350\" cy=\"120\" r=\"14\" fill=\"#ddd\" stroke=\"#555\" stroke-width=\"2\"/>
+<text x=\"328\" y=\"124\" text-anchor=\"end\">lamp</text>
+<rect x=\"270\" y=\"154\" width=\"30\" height=\"10\" fill=\"#b0bec5\" stroke=\"#555\"/>
+<text x=\"262\" y=\"182\" text-anchor=\"end\">contact</text>
+<rect x=\"172\" y=\"165\" width=\"16\" height=\"90\" fill=\"#777\"/>
+<rect x=\"155\" y=\"185\" width=\"50\" height=\"50\" fill=\"none\" stroke=\"#555\"/>
+<g stroke=\"#b87333\" stroke-width=\"3\"><path d=\"M155 193H205M155 203H205M155 213H205M155 223H205\"/></g>
+<text x=\"214\" y=\"204\">coil</text>
+<text x=\"214\" y=\"250\">iron core</text>
+<path d=\"M155 210 H60 V275 H300 V210 H205\" fill=\"none\" stroke=\"#999\" stroke-width=\"2\"/>
+<path id=\"rc\" d=\"M155 210 H60 V275 H300 V210 H205\" fill=\"none\" stroke=\"#e65100\" stroke-width=\"3\" class=\"flow hide\"/>
+<circle cx=\"60\" cy=\"245\" r=\"5\" fill=\"#333\"/>
+<text x=\"70\" y=\"249\">input</text>
+<text x=\"180\" y=\"298\" text-anchor=\"middle\" style=\"font-weight:bold\">Control circuit (small signal)</text>
+<g id=\"arm\" style=\"transition:transform .25s;transform-origin:60px 150px\">
+<rect x=\"60\" y=\"146\" width=\"240\" height=\"8\" fill=\"#455a64\"/>
+</g>
+<circle cx=\"60\" cy=\"150\" r=\"5\" fill=\"#222\"/>
+<text x=\"70\" y=\"172\">pivot</text>
+<text x=\"130\" y=\"122\">armature</text>
+</svg>
+<button id=\"rb\">Press: current in coil OFF</button>
+<p class=\"n\" id=\"rn\"></p></div>
+
+<div class=\"card\"><h2>Triode tube (1906): grid voltage controls a current</h2>
+<svg viewBox=\"0 0 400 300\">
+<ellipse cx=\"200\" cy=\"130\" rx=\"95\" ry=\"115\" fill=\"#e3f2fd\" stroke=\"#555\" stroke-width=\"2\"/>
+<rect x=\"150\" y=\"45\" width=\"100\" height=\"8\" fill=\"#546e7a\"/><text x=\"262\" y=\"53\">plate (anode, +)</text>
+<path d=\"M150 112 h100\" stroke=\"#2e7d32\" stroke-width=\"2\" stroke-dasharray=\"6 4\"/><text x=\"262\" y=\"116\">grid</text>
+<path d=\"M165 190 L175 175 L185 190 L195 175 L205 190 L215 175 L225 190 L235 175\" fill=\"none\" stroke=\"#555\" stroke-width=\"3\" id=\"fil\"/>
+<text x=\"262\" y=\"186\">heated cathode</text>
+<text x=\"262\" y=\"200\">(filament)</text>
+<g id=\"els\"></g>
+<path d=\"M200 45 V10 H60 V270 H165 \" fill=\"none\" stroke=\"#999\" stroke-width=\"2\"/>
+<path d=\"M150 112 H30 V240\" fill=\"none\" stroke=\"#999\" stroke-width=\"2\"/>
+<path d=\"M165 190 V270 M235 175 V270\" stroke=\"#999\" stroke-width=\"2\" fill=\"none\"/>
+<text x=\"68\" y=\"30\" fill=\"#1565c0\">B+ supply, load</text>
+<text x=\"8\" y=\"262\">grid</text><text x=\"8\" y=\"276\">input</text>
+<circle id=\"heat\" cx=\"200\" cy=\"182\" r=\"30\" fill=\"#ff9800\" opacity=\"0\"/>
+<text x=\"168\" y=\"290\">heater power</text>
+</svg>
+<div><button id=\"hb\">Heater: OFF</button>
+Grid voltage: <input type=\"range\" id=\"gv\" min=\"-5\" max=\"5\" value=\"0\" step=\"1\"> <span id=\"gl\">0 V</span></div>
+<p class=\"n\" id=\"tn\"></p></div>
+
+<div class=\"card full\"><h2>Relay chain coast to coast (telegraph, 1861): the signal hops city to city</h2>
+<svg id=\"us\" viewBox=\"0 0 960 540\"></svg>
+<div class=\"ctl\">
+ <select id=\"msg\"><option>SOS</option><option>HI</option><option>OK</option><option>NY SF</option></select>
+ <button id=\"send\">Send message</button>
+ <button id=\"hold\">Hold to key</button>
+ <label>Dot length <input type=\"range\" id=\"spd\" min=\"200\" max=\"500\" value=\"320\"></label>
+ <button id=\"mode\" class=\"on\">Relays: ON (click to remove them)</button>
+</div>
+<p class=\"row\">Keyed: <code id=\"sent\">&nbsp;</code> Received at sounder: <code id=\"recv\">&nbsp;</code></p>
+<p class=\"n\" id=\"un\"></p></div>
+</div>
+<script>
+let coil=false,heat=false;
+const $=id=>document.getElementById(id);
+function relay(){
+ $('rb').textContent='Coil current: '+(coil?'ON':'OFF')+' (click)';$('rb').className=coil?'on':'';
+ $('arm').style.transform=coil?'rotate(0deg)':'rotate(-6deg)';
+ $('rc').classList.toggle('hide',!coil);
+ $('lc').classList.toggle('hide',!coil);
+ $('lamp').setAttribute('fill',coil?'#ffeb3b':'#ddd');
+ $('rn').textContent=coil?'Small current magnetises the iron core. It pulls the armature down until it touches the contact; the load circuit closes and the lamp lights.':'No coil current: a spring holds the armature up, so there is a gap at the contact, the load circuit is broken and the lamp is dark.';
+}
+$('rb').onclick=()=>{coil=!coil;relay()};
+relay();
+const els=[];const g=$('els');
+for(let i=0;i<14;i++){const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r',3.5);c.setAttribute('fill','#1565c0');g.appendChild(c);els.push({c,x:170+Math.random()*60,y:180-Math.random()*130,p:Math.random()})}
+function rate(){const v=+$('gv').value;return !heat?0:Math.max(0,Math.min(1,(v+3)/5))}
+function upd(){
+ const v=+$('gv').value;$('gl').textContent=(v>0?'+':'')+v+' V';
+ $('hb').textContent='Heater: '+(heat?'ON':'OFF');$('hb').className=heat?'on':'';
+ $('heat').setAttribute('opacity',heat?.35:0);$('fil').setAttribute('stroke',heat?'#ff5722':'#555');
+ const r=rate();
+ $('tn').textContent=!heat?'Cold cathode: no electrons boil off, so no current flows whatever the grid does.':
+  r==0?'Grid strongly negative: it repels electrons back to the cathode. Tube is OFF (switch open).':
+  r<1?'Grid partly negative: some electrons get through to the plate. A small grid change gives a large plate-current change (amplification).':
+  'Grid positive or near zero: electrons stream to the positive plate. Tube is ON (switch closed). Only the grid voltage changed, with almost no grid current.';
+}
+$('hb').onclick=()=>{heat=!heat;upd()};$('gv').oninput=upd;upd();
+function tick(){const r=rate();
+ els.forEach(e=>{
+  if(r==0){e.c.setAttribute('opacity',0);return}
+  e.p+=0.012+0.01*r;
+  if(e.p>1)e.p=0;
+  const x=e.x, y=185-e.p*(185-55);
+  e.c.setAttribute('cx',x);e.c.setAttribute('cy',y);
+  const pass=(e.idx===undefined?(e.idx=Math.random()):e.idx)<r;
+  e.c.setAttribute('opacity',(pass||e.p<0.38)?1:0);
+  if(!pass&&e.p>=0.38){e.p=0}
+ });requestAnimationFrame(tick)}
+tick();
+</script>
+<script>
+// ===== Relay chain over a map of the USA =====
+const N=5,TH=0.25,HOP=220;
+const cities=[
+ {n:'New York',lon:-74,lat:40.7,dx:14,dy:-14,a:'start'},
+ {n:'Chicago',lon:-87.6,lat:41.9,dx:0,dy:-18,a:'middle'},
+ {n:'Omaha',lon:-96,lat:41.3,dx:0,dy:-18,a:'middle'},
+ {n:'Salt Lake City',lon:-111.9,lat:40.8,dx:0,dy:-18,a:'middle'},
+ {n:'San Francisco',lon:-122.4,lat:37.8,dx:-4,dy:30,a:'start'}];
+const P=(lon,lat)=>[40+(lon+125)*14.6, 25+(49.6-lat)*19.2];
+cities.forEach(c=>{[c.x,c.y]=P(c.lon,c.lat)});
+const outline=[[-124.7,48.4],[-123,48.3],[-122.8,49],[-95.2,49],[-94.6,48.7],[-89.6,48],[-84.5,46.5],[-82.4,43.5],[-83.1,42],[-79,42.8],[-76.5,43.6],[-75,45],[-71.5,45],[-70,47.4],[-67.8,47.1],[-67,44.8],[-70.2,43.6],[-70.8,42.5],[-70,41.8],[-71.5,41.3],[-74,40.6],[-74,39.5],[-75.5,38.3],[-75.9,37],[-75.5,35.3],[-77.5,34.5],[-79.5,33],[-81,31.8],[-81.3,30],[-80,27],[-80.4,25.2],[-81.2,25.2],[-82.7,27.5],[-82.8,29.2],[-84,30],[-85.3,29.7],[-87.5,30.3],[-89.5,30.2],[-89.4,29],[-91,29.2],[-93.8,29.7],[-97.2,27.8],[-97.2,25.9],[-99.5,27.5],[-101.5,29.8],[-103,29],[-104.5,29.7],[-106.5,31.8],[-108.2,31.8],[-108.2,31.3],[-111,31.3],[-114.8,32.5],[-117.1,32.5],[-118.5,34],[-120.6,34.6],[-121.9,36.6],[-122.5,37.8],[-123.8,39.5],[-124.4,40.4],[-124.2,42],[-124.5,43],[-124,46.2],[-124.1,47]];
+const mapPath='M'+outline.map(p=>P(p[0],p[1]).map(v=>v.toFixed(1)).join(' ')).join(' L')+' Z';
+let s='<defs>';
+for(let i=0;i<N-1;i++){const a=cities[i],b=cities[i+1];
+ s+=`<linearGradient id=\"gr${i}\" gradientUnits=\"userSpaceOnUse\" x1=\"${a.x}\" y1=\"${a.y}\" x2=\"${b.x}\" y2=\"${b.y}\"><stop id=\"ga${i}\" offset=\"0\" stop-color=\"#e65100\" stop-opacity=\"1\"/><stop id=\"gb${i}\" offset=\"1\" stop-color=\"#e65100\" stop-opacity=\".5\"/></linearGradient>`}
+s+='</defs>';
+s+=`<rect width=\"960\" height=\"540\" fill=\"#e8f1f8\" rx=\"8\"/>
+<path d=\"${mapPath}\" fill=\"#f1efe4\" stroke=\"#8d9aa5\" stroke-width=\"2\" stroke-linejoin=\"round\"/>`;
+// wire underlay + lit segments
+for(let i=0;i<N-1;i++){const a=cities[i],b=cities[i+1];
+ s+=`<line x1=\"${a.x}\" y1=\"${a.y}\" x2=\"${b.x}\" y2=\"${b.y}\" stroke=\"#b0b0a8\" stroke-width=\"3\"/>
+ <line id=\"seg${i}\" x1=\"${a.x}\" y1=\"${a.y}\" x2=\"${b.x}\" y2=\"${b.y}\" stroke=\"url(#gr${i})\" stroke-width=\"6\" class=\"flow hide\"/>
+ <text x=\"${(a.x+b.x)/2}\" y=\"${(a.y+b.y)/2+(i==3?-14:20)}\" text-anchor=\"middle\" style=\"fill:#666;font-size:12px\">stretch ${i+1}</text>`;}
+for(let i=0;i<N;i++){const c=cities[i];
+ s+=`<circle id=\"ring${i}\" cx=\"${c.x}\" cy=\"${c.y}\" r=\"26\" fill=\"#66bb6a\" opacity=\"0\"/>
+ <circle id=\"cn${i}\" cx=\"${c.x}\" cy=\"${c.y}\" r=\"11\" fill=\"#fff\" stroke=\"#333\" stroke-width=\"3\"/>
+ <text x=\"${c.x+c.dx}\" y=\"${c.y+c.dy}\" text-anchor=\"${c.a}\" style=\"font-weight:bold;font-size:14px\">${cities[i].n}</text>
+ <text x=\"${c.x+c.dx}\" y=\"${c.y+c.dy+15}\" text-anchor=\"${c.a}\" style=\"fill:#666\">relay ${i+1}${i==0?' + key':i==N-1?' + sounder':''}</text>
+ <text id=\"str${i}\" x=\"${c.x}\" y=\"${c.y+(i==N-1?-22:38)}\" text-anchor=\"middle\" style=\"font-weight:bold\"></text>`;}
+s+=`<g transform=\"translate(560,420)\"><rect width=\"380\" height=\"105\" rx=\"8\" fill=\"#fff\" stroke=\"#ccc\"/>
+<circle cx=\"20\" cy=\"22\" r=\"8\" fill=\"#ffe0b2\" stroke=\"#333\" stroke-width=\"2\"/><text x=\"36\" y=\"26\">coil energised: relay closed</text>
+<circle cx=\"20\" cy=\"46\" r=\"10\" fill=\"#66bb6a\" opacity=\".5\"/><text x=\"36\" y=\"50\">local battery fires a fresh signal onward</text>
+<line x1=\"10\" y1=\"70\" x2=\"30\" y2=\"70\" stroke=\"#e65100\" stroke-width=\"5\"/><text x=\"36\" y=\"74\">line current (fades with distance)</text>
+<text x=\"12\" y=\"95\" style=\"fill:#666\">Distances and percentages are illustrative.</text></g>`;
+$('us').innerHTML=s;
+
+let relays=true,state=Array(N).fill(false),keyOn=false,busy=false,timers=[];
+const arrival=j=>j==0?1:(relays?0.6:Math.pow(0.6,j));
+const startS=i=>relays?1:Math.pow(0.6,i);
+function reachMax(){if(relays)return N-1;let r=0;for(let j=1;j<N;j++){if(arrival(j)>=TH)r=j;else break}return r}
+function paint(){
+ const rm=reachMax();
+ for(let i=0;i<N;i++){
+  const on=state[i];
+  $('cn'+i).setAttribute('fill',on?(i==N-1?'#ffeb3b':'#ffb74d'):'#fff');
+  $('ring'+i).setAttribute('opacity',on&&relays&&i>0?.45:(on&&i==0?.0:0));
+  if(i<N-1){
+   $('seg'+i).classList.toggle('hide',!on);
+   $('ga'+i).setAttribute('stop-opacity',startS(i));
+   $('gb'+i).setAttribute('stop-opacity',Math.max(arrival(i+1),.12));
+  }
+  const a=arrival(i),ok=i<=rm;
+  const t=$('str'+i);
+  t.textContent=i==0?'':Math.round(a*100)+'% arrives'+(ok?'':' – too weak');
+  t.style.fill=ok?'#2e7d32':'#c62828';
+  $('cn'+i).setAttribute('stroke',ok?'#333':'#c62828');
+ }
+ $('un').textContent=relays?
+  'Each coil receives only a weakened current (about 60% of what was sent) – still above the minimum, so the relay closes. It closes a different circuit powered by that city\\'s own battery, which launches a fresh full-strength signal on the next stretch. The relay is a switch controlled by a switch: the message is re-created, not amplified, at every hop.':
+  'No relays: a single battery has to push current through every stretch. It weakens with distance (here ×0.6 per stretch), so Salt Lake City gets about 22%, below the minimum, and the signal dies before California. Local batteries are unused.';
+}
+const morse={A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..'};
+const rev={};for(const k in morse)rev[morse[k]]=k;
+const unit=()=>+$('spd').value;
+function mkDec(el){return {t0:0,t1:0,s:'',el,
+ on(){const now=performance.now();if(this.t1&&this.s){const g=now-this.t1;if(g>5*unit())this.s+=' / ';else if(g>2*unit())this.s+=' ';}this.t0=now;},
+ off(){const d=performance.now()-this.t0;this.s+=d<2*unit()?'.':'-';this.t1=performance.now();this.show()},
+ show(){const txt=this.s.split(' ').map(w=>w==='/'?' ':(rev[w]||'')).join('');$(this.el).textContent=(this.s+'  →  '+txt)},
+ reset(){this.s='';this.t0=this.t1=0;$(this.el).innerHTML='&nbsp;'}};}
+const sentD=mkDec('sent'),recvD=mkDec('recv');
+function setKey(on){
+ if(on===keyOn)return;keyOn=on;on?sentD.on():sentD.off();
+ for(let i=0;i<N;i++){timers.push(setTimeout(()=>{
+  if(i>reachMax())return;
+  state[i]=on;
+  if(i==N-1){on?recvD.on():recvD.off()}
+  paint();
+ },i*HOP))}
+}
+function sendMsg(){
+ if(busy)return;busy=true;sentD.reset();recvD.reset();
+ const seq=[];const words=$('msg').value.split(' ');
+ words.forEach((w,wi)=>{[...w].forEach((ch,ci)=>{[...morse[ch]].forEach((e,ei,arr)=>{seq.push([true,e=='.'?1:3]);seq.push([false,ei<arr.length-1?1:(ci<w.length-1?3:(wi<words.length-1?7:1))])})})});
+ let t=0;
+ seq.forEach(([on,u])=>{const at=t;timers.push(setTimeout(()=>setKey(on),at));t+=u*unit()});
+ timers.push(setTimeout(()=>{setKey(false);busy=false},t+N*HOP+150));
+}
+$('send').onclick=sendMsg;
+const hold=$('hold');
+const down=e=>{if(!busy){e.preventDefault();setKey(true)}},up=()=>{if(!busy)setKey(false)};
+hold.addEventListener('pointerdown',down);hold.addEventListener('pointerup',up);hold.addEventListener('pointerleave',up);
+$('mode').onclick=()=>{
+ timers.forEach(clearTimeout);timers=[];busy=false;keyOn=false;state.fill(false);
+ relays=!relays;sentD.reset();recvD.reset();
+ $('mode').textContent=relays?'Relays: ON (click to remove them)':'Relays: OFF (click to restore them)';
+ $('mode').className=relays?'on':'bad';paint();
+};
+paint();
+</script></body></html>
+"
+ :AT "2026-11-10T18:06:38" :VERSION 4)
+(:ID "primitive-flip-flops-three-stages" :MAP "computers" :NODE "flip-flop" :TYPE "svg" :TITLE
+ "Primitive flip-flops, three stages" :LANGUAGE NIL :CONTENT
+ "<svg viewBox=\"0 0 900 400\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"sans-serif\" font-size=\"14\">
+<rect width=\"900\" height=\"400\" fill=\"#fff\"/>
+<g stroke=\"#222\" stroke-width=\"2\" fill=\"none\">
+<!-- Panel 1 -->
+<rect x=\"90\" y=\"130\" width=\"80\" height=\"60\" rx=\"10\" fill=\"#eef\"/>
+<path d=\"M20 145 H90\"/><path d=\"M60 175 H90\"/>
+<path d=\"M170 160 H270\"/>
+<path d=\"M220 160 V240 H60 V175\" stroke=\"#d33\"/>
+<!-- Panel 2 -->
+<path d=\"M335 70 H565\"/>
+<rect x=\"350\" y=\"90\" width=\"20\" height=\"35\"/><rect x=\"530\" y=\"90\" width=\"20\" height=\"35\"/>
+<path d=\"M360 70 V90\"/><path d=\"M540 70 V90\"/>
+<path d=\"M360 125 V170\"/><path d=\"M540 125 V170\"/>
+<circle cx=\"360\" cy=\"200\" r=\"30\" fill=\"#efe\"/><circle cx=\"540\" cy=\"200\" r=\"30\" fill=\"#efe\"/>
+<path d=\"M360 230 V280\"/><path d=\"M540 230 V280\"/>
+<path d=\"M340 280 H380\"/><path d=\"M520 280 H560\"/>
+<path d=\"M360 145 H435 V215 H510\" stroke=\"#d33\"/>
+<path d=\"M540 145 H465 V185 H390\" stroke=\"#36c\"/>
+<!-- Panel 3 -->
+<rect x=\"660\" y=\"110\" width=\"80\" height=\"50\" rx=\"10\" fill=\"#eef\"/>
+<rect x=\"660\" y=\"230\" width=\"80\" height=\"50\" rx=\"10\" fill=\"#eef\"/>
+<path d=\"M610 125 H660\"/><path d=\"M610 265 H660\"/>
+<path d=\"M740 135 H800\"/><path d=\"M740 255 H800\"/>
+<path d=\"M760 135 V180 H640 V245 H660\" stroke=\"#d33\"/>
+<path d=\"M770 255 V200 H630 V150 H660\" stroke=\"#36c\"/>
+</g>
+<g fill=\"#222\">
+<text x=\"20\" y=\"30\" font-size=\"16\" font-weight=\"bold\">1. One gate, fed back</text>
+<text x=\"20\" y=\"52\">Relay holding circuit / OR latch</text>
+<text x=\"112\" y=\"165\">OR</text>
+<text x=\"20\" y=\"138\">SET</text><text x=\"275\" y=\"165\">Q</text>
+<text x=\"20\" y=\"280\">Set it and it stays 1 forever.</text>
+<text x=\"20\" y=\"300\">No way to clear it: needs a reset.</text>
+
+<text x=\"320\" y=\"30\" font-size=\"16\" font-weight=\"bold\">2. Eccles–Jordan, 1918</text>
+<text x=\"320\" y=\"52\">Two cross-coupled triodes</text>
+<text x=\"545\" y=\"65\">+V</text>
+<text x=\"335\" y=\"148\">A</text><text x=\"552\" y=\"148\">B</text>
+<text x=\"348\" y=\"205\">T1</text><text x=\"528\" y=\"205\">T2</text>
+<text x=\"320\" y=\"320\">One tube conducts, pulling its plate low,</text>
+<text x=\"320\" y=\"340\">which cuts off the other. Two stable states.</text>
+
+<text x=\"600\" y=\"30\" font-size=\"16\" font-weight=\"bold\">3. SR latch, NOR gates</text>
+<text x=\"600\" y=\"52\">Same loop in logic form</text>
+<text x=\"683\" y=\"140\">NOR</text><text x=\"683\" y=\"260\">NOR</text>
+<text x=\"590\" y=\"130\">R</text><text x=\"590\" y=\"270\">S</text>
+<text x=\"805\" y=\"140\">Q</text><text x=\"805\" y=\"260\">Q̄</text>
+<text x=\"600\" y=\"320\">S=1 sets Q=1; R=1 clears it.</text>
+<text x=\"600\" y=\"340\">S=R=0: holds. Avoid S=R=1.</text>
+</g>
+<text x=\"20\" y=\"385\" fill=\"#555\">Red and blue wires are the two feedback paths; each stage's output forces the other's input.</text>
+</svg>"
+ :AT "2026-11-10T18:19:10" :VERSION 1)
+(:ID "sr-latch-three-hardwares" :MAP "computers" :NODE NIL :TYPE "html" :TITLE
+ "SR latch: three hardwares" :LANGUAGE NIL :CONTENT "<!DOCTYPE html>
+<html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:0;padding:14px;background:#fff;color:#222}
+h2{margin:0 0 4px;font-size:18px}
+.row{display:flex;flex-wrap:wrap;gap:18px;align-items:center;margin:10px 0}
+.grp{display:flex;gap:0;border:1px solid #adb5bd;border-radius:8px;overflow:hidden}
+.grp button{border:0;background:#f1f3f5;padding:8px 14px;font-size:14px;cursor:pointer}
+.grp button.on{background:#228be6;color:#fff}
+.inp{display:flex;align-items:center;gap:8px}
+.inp button{width:84px;padding:10px 0;font-size:15px;border-radius:8px;border:2px solid #868e96;background:#fff;cursor:pointer;font-weight:bold}
+.inp button.on{background:#2f9e44;border-color:#2f9e44;color:#fff}
+#status{font-size:16px;padding:8px 12px;background:#f8f9fa;border-left:4px solid #228be6;margin:8px 0}
+#note{font-size:14px;color:#444;line-height:1.45;margin:6px 0}
+svg{width:100%;max-width:820px;height:auto;border:1px solid #dee2e6;border-radius:8px}
+.small{font-size:13px;color:#666}
+</style></head><body>
+<h2>SR latch: same loop, different switches</h2>
+<div class=\"small\">Two NOR gates, each output feeding the other's input. Click S and R, then switch the hardware underneath: the behaviour does not change.</div>
+<div class=\"row\">
+ <div class=\"inp\"><span><b>Inputs</b></span><button id=\"bS\" onclick=\"tog('S')\">S = 0</button><button id=\"bR\" onclick=\"tog('R')\">R = 0</button></div>
+ <div class=\"grp\" id=\"hw\"></div>
+</div>
+<div id=\"status\"></div>
+<svg id=\"svg\" viewBox=\"0 0 780 490\"></svg>
+<div id=\"note\"></div>
+<div class=\"small\">Green = high (1), grey = low (0). Crossing wires without a dot are not connected. The tube version omits the voltage level-shifting divider a real tube circuit needs between stages.</div>
+<script>
+const HI='#2f9e44',LO='#868e96',INK='#222';
+let S=0,R=0,Q=0,Qb=1,hw='transistor';
+const HW={logic:'Logic symbols',transistor:'Transistors',relay:'Relays',tube:'Vacuum tubes'};
+const NOTES={
+logic:'Abstract view: a NOR gate outputs 1 only when both inputs are 0. Everything below is a way of building that one box.',
+transistor:'NOR from MOSFETs: a pull-up resistor tries to hold the output high; either transistor, when its gate goes high, conducts and pulls the output to ground. Parallel switches = OR, inverted by the resistor = NOR. Switching time: nanoseconds or less.',
+relay:'NOR from relays: power reaches the output through two normally-closed contacts in series. Either coil energised opens its contact and cuts the power; a resistor then pulls the output to ground. Series contacts, inverted = NOR. Switching time: milliseconds (you can hear it click).',
+tube:'NOR from triodes: both tubes share one plate resistor to +V. A positive grid lets current flow from plate to cathode, dragging the plate (the output) low; either tube can do it. Parallel switches, inverted = NOR. Switching time: microseconds, and the filaments glow.'};
+function nor(a,b){return (a||b)?0:1}
+function settle(){
+ for(let i=0;i<10;i++){
+  const nq=nor(R,Qb), nqb=nor(S,Q);
+  const ch=[];
+  if(nq!==Q)ch.push('q'); if(nqb!==Qb)ch.push('b');
+  if(!ch.length)return;
+  const pick=ch[Math.floor(Math.random()*ch.length)];
+  if(pick==='q')Q=nq; else Qb=nqb;
+ }
+}
+function tog(n){
+ if(n==='S')S^=1; else R^=1;
+ const wasBoth=(Q===0&&Qb===0);
+ settle(); render(wasBoth);
+}
+let raced=false;
+function render(wasBoth){
+ raced=!!wasBoth&&Q!==Qb&&!S&&!R;
+ bS.textContent='S = '+S;bS.className=S?'on':'';
+ bR.textContent='R = '+R;bR.className=R?'on':'';
+ document.querySelectorAll('#hw button').forEach(b=>b.className=b.dataset.k===hw?'on':'');
+ let t;
+ if(S&&R)t='<b>Forbidden:</b> S=R=1 forces both outputs to 0, so Q and Q̄ are no longer opposites.';
+ else if(S)t='S=1: Set. Q̄ is forced low, so Q is high. <b>Q = '+Q+'</b>';
+ else if(R)t='R=1: Reset. Q is forced low, so Q̄ is high. <b>Q = '+Q+'</b>';
+ else t='S=R=0: <b>Hold</b>. The loop keeps whatever it had. <b>Q = '+Q+'</b>'+(raced?' (released from S=R=1: a race, so the winner was random)':'');
+ status.innerHTML=t;
+ note.textContent=NOTES[hw];
+ svg.innerHTML=draw();
+}
+const w=(d,s,extra='')=>`<path d=\"${d}\" fill=\"none\" stroke=\"${s?HI:LO}\" stroke-width=\"3\" ${extra}/>`;
+const k=(d,extra='')=>`<path d=\"${d}\" fill=\"none\" stroke=\"${INK}\" stroke-width=\"2\" ${extra}/>`;
+const tx=(x,y,s,sz=13,fill=INK,anc='start')=>`<text x=\"${x}\" y=\"${y}\" font-size=\"${sz}\" fill=\"${fill}\" text-anchor=\"${anc}\">${s}</text>`;
+function res(x,y1,y2){const n=6,h=(y2-y1-16)/n;let d=`M${x} ${y1} v8`;for(let i=0;i<n;i++)d+=` l${i%2?-7:7} ${h/2*0+h}`;d+=` L${x} ${y2-8} V${y2}`;return k(d)}
+function gnd(x,y){return k(`M${x} ${y}v6M${x-9} ${y+6}h18M${x-6} ${y+10}h12M${x-3} ${y+14}h6`)}
+const dot=(x,y,s)=>`<circle cx=\"${x}\" cy=\"${y}\" r=\"4\" fill=\"${s?HI:LO}\"/>`;
+function gate(y,a,b,o,name){
+ let s=`<rect x=\"130\" y=\"${y}\" width=\"430\" height=\"200\" rx=\"10\" fill=\"#f8f9fa\" stroke=\"#ced4da\" stroke-dasharray=\"5 4\"/>`;
+ s+=tx(140,y+16,name,12,'#666');
+ const A=y+50,B=y+130,O=y+100;
+ // leads
+ s+=w(`M130 ${A}H${hw==='logic'?250:300}`,a)+w(`M130 ${B}H${hw==='logic'?250:300}`,b);
+ if(hw==='logic'){
+  s+=`<path d=\"M250 ${y+30} H320 Q400 ${y+30} 430 ${y+100} Q400 ${y+170} 320 ${y+170} H250 Q285 ${y+100} 250 ${y+30}Z\" fill=\"#e7f5ff\" stroke=\"${INK}\" stroke-width=\"2\"/>`;
+  s+=`<circle cx=\"438\" cy=\"${O}\" r=\"8\" fill=\"#fff\" stroke=\"${INK}\" stroke-width=\"2\"/>`;
+  s+=tx(335,O+5,'NOR',15,INK,'middle');
+  s+=w(`M250 ${A}H265`,a)+w(`M250 ${B}H265`,b)+w(`M446 ${O}H560`,o);
+ } else if(hw==='transistor'){
+  s+=tx(445,y+14,'+V',12);s+=k(`M470 ${y+20}V${y+26}`)+res(470,y+26,O)+w(`M470 ${O-8}V${O}`,o);
+  s+=w(`M320 ${O}H470`,o)+w(`M470 ${O}H560`,o)+dot(320,O,o)+dot(400,O,o)+dot(470,O,o);
+  // T1 gets B, T2 gets A
+  const T=(x,gy,on,sig)=>`<rect x=\"${x}\" y=\"${y+110}\" width=\"40\" height=\"40\" rx=\"4\" fill=\"${on?'#ffec99':'#fff'}\" stroke=\"${INK}\" stroke-width=\"2\"/>`+
+    k(`M${x} ${gy}h8`)+k(`M${x+8} ${y+116}v28`)+k(`M${x+14} ${y+116}v28`)+tx(x+20,y+134,'',1)+
+    k(`M${x+20} ${y+110}V${O}`)+k(`M${x+20} ${y+150}V${y+170}`)+tx(x+27,y+142,on?'ON':'off',10,on?'#e67700':'#666');
+  s+=w(`M300 ${B}h0`,b)+T(300,B,b)+w(`M360 ${A}`,a);
+  s+=w(`M130 ${A}H360V${y+120}H380`,a)+T(380,y+120,a);
+  s+=k(`M320 ${y+170}H400`)+k(`M360 ${y+170}V${y+174}`)+gnd(360,y+174);
+  s+=tx(300,y+106,'',1)+tx(300,y+192,'MOSFETs in parallel',11,'#666');
+ } else if(hw==='relay'){
+  s+=tx(455,y+14,'+V',12);s+=k(`M450 ${y+18}V${y+24}`);
+  const C=(cy1,cy2,on)=>{ // contact between cy1..cy2
+   let r=k(`M450 ${cy1}V${cy1+4}`)+k(`M450 ${cy2-4}V${cy2}`)+`<circle cx=\"450\" cy=\"${cy1+4}\" r=\"3\" fill=\"${INK}\"/><circle cx=\"450\" cy=\"${cy2-4}\" r=\"3\" fill=\"${INK}\"/>`;
+   r+= on? k(`M450 ${cy1+4}L463 ${cy2-10}`) : k(`M450 ${cy1+4}V${cy2-4}`);
+   return r};
+  s+=C(y+24,y+56,a)+C(y+62,y+94,b);
+  s+=w(`M450 ${y+56}V${y+62}`,!a)+w(`M450 ${y+94}V${O}`,o);
+  s+=w(`M450 ${y+24}V${y+24}`,1);
+  s+=w(`M320 0`,0);
+  // pull-down
+  s+=w(`M450 ${O}H560`,o)+w(`M450 ${O}V${O+4}`,o)+res(450,O+4,y+168)+gnd(450,y+168);
+  // coils
+  const coil=(cy,sig)=>`<rect x=\"300\" y=\"${cy-14}\" width=\"50\" height=\"28\" rx=\"4\" fill=\"${sig?'#ffec99':'#fff'}\" stroke=\"${INK}\" stroke-width=\"2\"/>`+
+    k(`M308 ${cy-6}q4 -4 8 0t8 0t8 0t8 0`)+k(`M308 ${cy+6}q4 -4 8 0t8 0t8 0t8 0`)+k(`M325 ${cy+14}v8`)+gnd(325,cy+22)+tx(358,cy-18,'coil',11,'#666');
+  s+=coil(A,a)+coil(B,b);
+  s+=k(`M350 ${A}L440 ${y+40}`,'stroke-dasharray=\"4 3\" stroke=\"#e8590c\"')+k(`M350 ${B}L440 ${y+77}`,'stroke-dasharray=\"4 3\" stroke=\"#e8590c\"');
+  s+=tx(360,y+192,'normally-closed contacts in series',11,'#666');
+ } else { // tube
+  s+=tx(445,y+14,'+V',12);s+=k(`M470 ${y+20}V${y+26}`)+res(470,y+26,O);
+  s+=w(`M320 ${O}H560`,o)+dot(410,O,o)+dot(470,O,o)+dot(320,O,o);
+  const V=(cx,gy,on)=>{const cy=y+130;
+   let r=`<circle cx=\"${cx}\" cy=\"${cy}\" r=\"26\" fill=\"${on?'#ffd8a8':'#fff'}\" stroke=\"${INK}\" stroke-width=\"2\"/>`;
+   r+=k(`M${cx} ${O}V${cy-16}`)+k(`M${cx-10} ${cy-16}h20`)+k(`M${cx-10} ${cy}h20`,'stroke-dasharray=\"4 3\"')+k(`M${cx-26} ${gy}H${cx-10}`)+k(`M${cx-8} ${cy+14}q4 4 8 0t8 0`)+k(`M${cx} ${cy+16}V${y+172}`);
+   r+=on? `<path d=\"M${cx} ${cy-14}V${cy+14}\" stroke=\"#e8590c\" stroke-width=\"3\" stroke-dasharray=\"3 3\"/>`:'';
+   return r+tx(cx+30,cy-12,on?'flows':'cut off',10,on?'#e67700':'#666')};
+  s+=w(`M130 ${B}H294`,b)+V(320,B,b);
+  s+=w(`M130 ${A}H365V${y+130}H384`,a)+V(410,y+130,a);
+  s+=k(`M320 ${y+172}H410`)+gnd(365,y+172);
+  s+=tx(300,y+196,'triodes sharing one plate resistor',11,'#666');
+ }
+ return s;
+}
+function draw(){
+ const yt=20,yb=270;
+ let s='';
+ s+=gate(yt,R,Qb,Q,'Gate 1: inputs R, Q̄ → output Q');
+ s+=gate(yb,S,Q,Qb,'Gate 2: inputs S, Q → output Q̄');
+ // input leads and labels
+ s+=w('M44 70H130',R)+w('M44 320H130',S);
+ s+=`<circle cx=\"26\" cy=\"70\" r=\"16\" fill=\"${R?HI:'#fff'}\" stroke=\"${INK}\" stroke-width=\"2\"/>`+tx(26,75,'R',14,R?'#fff':INK,'middle');
+ s+=`<circle cx=\"26\" cy=\"320\" r=\"16\" fill=\"${S?HI:'#fff'}\" stroke=\"${INK}\" stroke-width=\"2\"/>`+tx(26,325,'S',14,S?'#fff':INK,'middle');
+ // feedback
+ s+=w('M560 120H700',Q)+w('M600 120V235H90V400H130',Q)+dot(600,120,Q);
+ s+=w('M560 370H700',Qb)+w('M640 370V255H60V150H130',Qb)+dot(640,370,Qb);
+ s+=`<circle cx=\"722\" cy=\"120\" r=\"18\" fill=\"${Q?HI:'#fff'}\" stroke=\"${INK}\" stroke-width=\"2\"/>`+tx(722,125,'Q',15,Q?'#fff':INK,'middle');
+ s+=`<circle cx=\"722\" cy=\"370\" r=\"18\" fill=\"${Qb?HI:'#fff'}\" stroke=\"${INK}\" stroke-width=\"2\"/>`+tx(722,375,'Q̄',15,Qb?'#fff':INK,'middle');
+ s+=tx(722,152,'Q='+Q,12,INK,'middle')+tx(722,402,'Q̄='+Qb,12,INK,'middle');
+ s+=tx(420,247,'feedback: Q → gate 2',11,'#666','middle');
+ return s;
+}
+const g=document.getElementById('hw');
+Object.keys(HW).forEach(kk=>{const b=document.createElement('button');b.textContent=HW[kk];b.dataset.k=kk;b.onclick=()=>{hw=kk;render()};g.appendChild(b)});
+const bS=document.getElementById('bS'),bR=document.getElementById('bR'),status=document.getElementById('status'),note=document.getElementById('note'),svg=document.getElementById('svg');
+render();
+</script></body></html>
+"
+ :AT "2026-11-10T18:28:33" :VERSION 1)
+(:PINNED T :ID "flip-flops-with-live-sr-latch" :MAP "computers" :NODE "flip-flop" :TYPE "html"
+ :TITLE "Flip-flops with live SR latch" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:sans-serif;margin:0;padding:12px;background:#fff;color:#222}
+h2{font-size:17px;margin:18px 0 6px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
+button{font-size:14px;padding:8px 14px;border:2px solid #222;background:#f4f4f4;border-radius:8px;cursor:pointer}
+button.on{background:#d33;color:#fff;border-color:#d33}
+button.pw{background:#2a2;color:#fff;border-color:#2a2}
+button.pwoff{background:#444;color:#fff;border-color:#444}
+button.hw.sel{background:#36c;color:#fff;border-color:#36c}
+.out{font-size:16px;padding:8px 12px;background:#eef;border-radius:8px}
+.note{color:#555;font-size:13px;margin-top:6px}
+.pnote{color:#7a4a00;font-size:13px;margin-top:6px;background:#fff6e5;padding:8px;border-radius:8px}
+#view{max-width:760px}
+svg{width:100%;height:auto}
+</style></head><body>
+<svg viewBox=\"0 0 900 400\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"sans-serif\" font-size=\"14\">
+<rect width=\"900\" height=\"400\" fill=\"#fff\"/>
+<g stroke=\"#222\" stroke-width=\"2\" fill=\"none\">
+<rect x=\"90\" y=\"130\" width=\"80\" height=\"60\" rx=\"10\" fill=\"#eef\"/>
+<path d=\"M20 145 H90\"/><path d=\"M60 175 H90\"/>
+<path d=\"M170 160 H270\"/>
+<path d=\"M220 160 V240 H60 V175\" stroke=\"#d33\"/>
+<path d=\"M335 70 H565\"/>
+<rect x=\"350\" y=\"90\" width=\"20\" height=\"35\"/><rect x=\"530\" y=\"90\" width=\"20\" height=\"35\"/>
+<path d=\"M360 70 V90\"/><path d=\"M540 70 V90\"/>
+<path d=\"M360 125 V170\"/><path d=\"M540 125 V170\"/>
+<circle cx=\"360\" cy=\"200\" r=\"30\" fill=\"#efe\"/><circle cx=\"540\" cy=\"200\" r=\"30\" fill=\"#efe\"/>
+<path d=\"M360 230 V280\"/><path d=\"M540 230 V280\"/>
+<path d=\"M340 280 H380\"/><path d=\"M520 280 H560\"/>
+<path d=\"M360 145 H435 V215 H510\" stroke=\"#d33\"/>
+<path d=\"M540 145 H465 V185 H390\" stroke=\"#36c\"/>
+<rect x=\"660\" y=\"110\" width=\"80\" height=\"50\" rx=\"10\" fill=\"#eef\"/>
+<rect x=\"660\" y=\"230\" width=\"80\" height=\"50\" rx=\"10\" fill=\"#eef\"/>
+<path d=\"M610 125 H660\"/><path d=\"M610 265 H660\"/>
+<path d=\"M740 135 H800\"/><path d=\"M740 255 H800\"/>
+<path d=\"M760 135 V180 H640 V245 H660\" stroke=\"#d33\"/>
+<path d=\"M770 255 V200 H630 V150 H660\" stroke=\"#36c\"/>
+</g>
+<!-- power legs -->
+<g fill=\"none\" stroke-width=\"3\">
+<path d=\"M130 112 V130\" stroke=\"#e08a00\"/><path d=\"M130 190 V204\" stroke=\"#666\"/>
+<path d=\"M700 94 V110\" stroke=\"#e08a00\"/><path d=\"M700 160 V172\" stroke=\"#666\"/>
+<path d=\"M700 214 V230\" stroke=\"#e08a00\"/><path d=\"M700 280 V294\" stroke=\"#666\"/>
+</g>
+<g font-size=\"12\">
+<text x=\"136\" y=\"122\" fill=\"#e08a00\">Vcc</text><text x=\"136\" y=\"204\" fill=\"#666\">GND</text>
+<text x=\"706\" y=\"104\" fill=\"#e08a00\">Vcc</text><text x=\"706\" y=\"170\" fill=\"#666\">GND</text>
+<text x=\"706\" y=\"224\" fill=\"#e08a00\">Vcc</text><text x=\"706\" y=\"292\" fill=\"#666\">GND</text>
+</g>
+<g fill=\"#222\">
+<text x=\"20\" y=\"30\" font-size=\"16\" font-weight=\"bold\">1. One gate, fed back</text>
+<text x=\"20\" y=\"52\">Relay holding circuit / OR latch</text>
+<text x=\"112\" y=\"165\">OR</text>
+<text x=\"20\" y=\"138\">SET</text><text x=\"275\" y=\"165\">Q</text>
+<text x=\"20\" y=\"280\">Set it and it stays 1 forever.</text>
+<text x=\"20\" y=\"300\">No way to clear it: needs a reset.</text>
+<text x=\"320\" y=\"30\" font-size=\"16\" font-weight=\"bold\">2. Eccles–Jordan, 1918</text>
+<text x=\"320\" y=\"52\">Two cross-coupled triodes</text>
+<text x=\"545\" y=\"65\">+V</text><text x=\"570\" y=\"300\" font-size=\"12\">(0 V / ground rail below)</text>
+<text x=\"335\" y=\"148\">A</text><text x=\"552\" y=\"148\">B</text>
+<text x=\"348\" y=\"205\">T1</text><text x=\"528\" y=\"205\">T2</text>
+<text x=\"320\" y=\"320\">One tube conducts, pulling its plate low,</text>
+<text x=\"320\" y=\"340\">which cuts off the other. Two stable states.</text>
+<text x=\"600\" y=\"30\" font-size=\"16\" font-weight=\"bold\">3. SR latch, NOR gates</text>
+<text x=\"600\" y=\"52\">Same loop in logic form</text>
+<text x=\"683\" y=\"140\">NOR</text><text x=\"683\" y=\"260\">NOR</text>
+<text x=\"590\" y=\"130\">R</text><text x=\"590\" y=\"270\">S</text>
+<text x=\"805\" y=\"140\">Q</text><text x=\"805\" y=\"260\">Q̄</text>
+<text x=\"600\" y=\"320\">S=1 sets Q=1; R=1 clears it.</text>
+<text x=\"600\" y=\"340\">S=R=0: holds. Avoid S=R=1.</text>
+</g>
+<text x=\"20\" y=\"375\" fill=\"#555\">Red and blue wires are the two feedback paths; each stage's output forces the other's input.</text>
+<text x=\"20\" y=\"392\" fill=\"#e08a00\">Orange = power (Vcc / +V), grey = ground. Every gate needs these as well as its input legs: the gate's output is power being steered.</text>
+</svg>
+
+<h2>Try it: an SR latch built from two NOR gates</h2>
+<div class=\"row\">
+  <button id=\"bP\" class=\"pw\">Power: ON</button>
+  <button id=\"bS\">S = 0</button><button id=\"bR\">R = 0</button>
+  <span class=\"out\" id=\"state\"></span>
+</div>
+<div class=\"row\">
+  <b>Gate hardware:</b>
+  <button class=\"hw\" data-m=\"logic\">Logic symbol</button>
+  <button class=\"hw\" data-m=\"relay\">Relay</button>
+  <button class=\"hw\" data-m=\"tube\">Vacuum tube</button>
+  <button class=\"hw\" data-m=\"cmos\">Transistor (CMOS)</button>
+</div>
+<div id=\"view\"></div>
+<div class=\"note\" id=\"note\"></div>
+<div class=\"pnote\" id=\"pnote\"></div>
+
+<script>
+let S=0,R=0,Q=0,Qb=1,mode='logic';
+let P=1,lv=1,lost=false,raf=null;
+const D=3000; // animation length (ms), slowed down from real time
+const nor=(a,b)=>(a||b)?0:1;
+function col(v){
+  if(lost) return '#ccc';
+  if(!v) return lv<1?'#bbb':'#888';
+  const f=Math.max(0,Math.min(1,lv));
+  const mix=(a,b)=>Math.round(b+(a-b)*f);
+  return `rgb(${mix(221,190)},${mix(51,190)},${mix(51,190)})`;
+}
+function pc(){return lost?'#ccc':(lv<1?`rgb(${Math.round(190+(224-190)*lv)},${Math.round(190-(190-138)*lv)},${Math.round(190-190*lv)})`:'#e08a00')}
+function settle(){
+  for(let i=0;i<8;i++){
+    const nq=nor(R,Qb); const nqb=nor(S,nq);
+    if(nq===Q&&nqb===Qb)break; Q=nq;Qb=nqb;
+  }
+}
+function T(x,y,s,o={}){return `<text x=\"${x}\" y=\"${y}\" font-size=\"${o.sz||14}\" fill=\"${o.fill||'#222'}\" text-anchor=\"${o.a||'start'}\">${s}</text>`}
+function L(d,c='#222',w=2,extra=''){return `<path d=\"${d}\" stroke=\"${c}\" stroke-width=\"${w}\" fill=\"none\" ${extra}/>`}
+function dot(x,y,c='#222'){return `<circle cx=\"${x}\" cy=\"${y}\" r=\"4\" fill=\"${c}\"/>`}
+function gnd(x,y){return L(`M${x} ${y} V${y+6}`)+L(`M${x-12} ${y+6} H${x+12}`)+L(`M${x-8} ${y+12} H${x+8}`)+L(`M${x-4} ${y+18} H${x+4}`)}
+
+function logicView(){
+  let s=`<svg viewBox=\"0 0 520 250\">`;
+  s+=L(`M20 45 H240`,col(R))+T(20,38,'R');
+  s+=L(`M20 175 H240`,col(S))+T(20,168,'S');
+  s+=L(`M320 55 H480`,col(Q))+T(485,60,'Q='+Q);
+  s+=L(`M320 165 H480`,col(Qb))+T(485,170,'Q̄='+Qb);
+  s+=L(`M360 55 V125 H200 V150 H240`,col(Q));
+  s+=L(`M400 165 V105 H215 V65 H240`,col(Qb));
+  for(const y of [30,140]){
+    s+=L(`M280 ${y-18} V${y}`,pc(),3)+T(286,y-6,'Vcc',{sz:12,fill:pc()});
+    s+=L(`M280 ${y+50} V${y+62}`,lost?'#ccc':'#666',3)+T(286,y+70,'GND',{sz:12,fill:'#666'});
+    s+=`<rect x=\"240\" y=\"${y}\" width=\"80\" height=\"50\" rx=\"10\" fill=\"#eef\" stroke=\"#222\" stroke-width=\"2\"/>`+T(280,y+30,'NOR',{a:'middle'});
+  }
+  return s+`</svg>`;
+}
+
+function relayG(a,b,out){
+  let s=T(420,10,'+V',{a:'middle',sz:12,fill:pc()})+L('M420 14 V20',pc(),3);
+  const ct=(y,open)=> open
+    ? L(`M420 ${y} V${y+14}`)+L(`M420 ${y+14} L434 ${y+32}`,'#222',3)+L(`M414 ${y+38} H426`)+L(`M420 ${y+38} V${y+50}`)
+    : L(`M420 ${y} V${y+50}`);
+  s+=ct(20,a)+L('M420 70 V110')+ct(110,b)+L('M420 160 V175');
+  for(const [y,v] of [[50,a],[150,b]]){
+    s+=L(`M180 ${y} H400`,'#888',1.5,'stroke-dasharray=\"4 4\"');
+    s+=L(`M60 ${y} H100`,col(v));
+    s+=`<rect x=\"100\" y=\"${y-20}\" width=\"80\" height=\"40\" rx=\"6\" fill=\"${v?'#fdd':'#f4f4f4'}\" stroke=\"#222\" stroke-width=\"2\"/>`+T(140,y+4,'coil',{a:'middle',sz:12});
+  }
+  s+=`<rect x=\"408\" y=\"175\" width=\"24\" height=\"30\" fill=\"#fff\" stroke=\"#222\" stroke-width=\"2\"/>`+L('M420 205 V220')+gnd(420,220);
+  s+=T(440,194,'R',{sz:12})+T(442,70,'contacts (NC)',{sz:11,fill:'#555'});
+  s+=L('M420 175 H540 V100 H560',col(out))+dot(420,175,col(out));
+  return s;
+}
+function tubeG(a,b,out){
+  let s=T(335,10,'+V',{a:'middle',sz:12,fill:pc()})+L('M335 14 V22',pc(),3);
+  s+=`<rect x=\"323\" y=\"22\" width=\"24\" height=\"32\" fill=\"#fff\" stroke=\"#222\" stroke-width=\"2\"/>`+T(355,42,'R',{sz:12});
+  s+=L('M335 54 V70')+L('M250 70 H420',col(out))+dot(335,70,col(out));
+  s+=L('M420 70 H540 V100 H560',col(out));
+  s+=L('M250 215 H420')+gnd(335,215)+dot(335,215);
+  s+=L('M60 50 H180 V110 H236',col(a));
+  s+=L('M60 150 H244 a6 6 0 0 1 12 0 H406',col(b));
+  [[250,110,a],[420,150,b]].forEach(([x,cy,v])=>{
+    s+=L(`M${x} 70 V${cy-28}`,col(out))+L(`M${x} ${cy+28} V215`);
+    s+=`<circle cx=\"${x}\" cy=\"${cy}\" r=\"28\" fill=\"${(v&&!lost&&lv>0.3)?'#ffd9a0':'#f4f4f4'}\" stroke=\"#222\" stroke-width=\"2\"/>`;
+    s+=L(`M${x-12} ${cy-16} H${x+12}`)+L(`M${x-14} ${cy} H${x+14}`,'#222',1.5,'stroke-dasharray=\"4 3\"')+L(`M${x-12} ${cy+16} H${x+12}`);
+  });
+  s+=T(262,98,'plate',{sz:11,fill:'#555'})+T(432,138,'plate',{sz:11,fill:'#555'});
+  return s;
+}
+function cmosG(a,b,out){
+  let s=T(335,8,'+V',{a:'middle',sz:12,fill:pc()})+L('M335 12 V15',pc(),3);
+  const tr=(x,y,kind,on)=>{const o=on&&!lost&&lv>0.5;return `<rect x=\"${x}\" y=\"${y}\" width=\"70\" height=\"34\" rx=\"6\" fill=\"${o?'#cfc':'#f4f4f4'}\" stroke=\"#222\" stroke-width=\"2\"/>`+T(x+35,y+15,kind,{a:'middle',sz:12})+T(x+35,y+29,o?'ON':'off',{a:'middle',sz:11,fill:o?'#070':'#888'})};
+  s+=tr(300,15,'PMOS',!a)+L('M335 49 V70')+tr(300,70,'PMOS',!b)+L('M335 104 V125');
+  s+=L('M265 125 H475',col(out))+dot(335,125,col(out));
+  s+=L('M265 125 V165')+tr(230,165,'NMOS',a)+L('M265 199 V208')+gnd(265,208);
+  s+=L('M475 125 V165')+tr(440,165,'NMOS',b)+L('M475 199 V208')+gnd(475,208);
+  s+=L('M475 125 H540 V100 H560',col(out));
+  s+=L('M60 50 H120 V32 H300',col(a))+L('M120 32 V182 H230',col(a))+dot(120,50,col(a));
+  s+=L('M60 150 H114 a6 6 0 0 1 12 0 H200 V87 H300',col(b));
+  s+=L('M200 150 H259 a6 6 0 0 1 12 0 H400 V182 H440',col(b))+dot(200,150,col(b));
+  return s;
+}
+function gateG(oy,title,fn,a,b,out,l1,l2){
+  return `<g transform=\"translate(0 ${oy})\">`+T(70,-4,title,{sz:13})+fn(a,b,out)+
+    T(64,44,l1,{sz:12,fill:col(a)})+T(64,144,l2,{sz:12,fill:col(b)})+`</g>`;
+}
+function hwView(){
+  const fn=mode==='relay'?relayG:mode==='tube'?tubeG:cmosG;
+  let s=`<svg viewBox=\"0 0 760 600\">`;
+  s+=L('M10 80 H60',col(R))+T(10,72,'R',{fill:col(R)});
+  s+=L('M10 480 H60',col(S))+T(10,472,'S',{fill:col(S)});
+  s+=gateG(30,'Gate 1: Q = NOR(R, Q̄)',fn,R,Qb,Q,'R','Q̄');
+  s+=gateG(330,'Gate 2: Q̄ = NOR(S, Q)',fn,Q,S,Qb,'Q','S');
+  s+=L('M560 130 H690 V295 H40 V380 H60',col(Q));
+  s+=L('M560 430 H720 V315 H46 a6 6 0 0 0 -12 0 H20 V180 H60',col(Qb));
+  s+=dot(600,130,col(Q))+dot(600,430,col(Qb));
+  s+=T(610,122,'Q = '+Q,{fill:col(Q),sz:15})+T(610,422,'Q̄ = '+Qb,{fill:col(Qb),sz:15});
+  s+=T(750,20,'supply: '+(P?'ON':'OFF'),{a:'end',sz:13,fill:P?'#e08a00':'#888'});
+  return s+`</svg>`;
+}
+const notes={
+ logic:'Logic view: Q = NOR(R, Q̄) and Q̄ = NOR(S, Q). Click S and R to change inputs. The Vcc and GND legs are drawn on each gate; the logic symbol normally hides them.',
+ relay:'Relay NOR: each input energises a coil that opens a normally-closed contact. The contacts are in series from +V, so any energised coil breaks the path and OUT drops to 0. The outputs cross over to feed the other gate\\'s coil.',
+ tube:'Tube NOR: two triodes share one plate resistor. A high grid on either tube lets current flow and pulls the plate low (inverting), so OUT is 1 only when both grids are low. The outputs cross over to drive the other gate\\'s grid.',
+ cmos:'CMOS NOR: two PMOS in series pull OUT up only if both inputs are low; two NMOS in parallel pull OUT down if either input is high. The outputs cross over to drive the other gate\\'s inputs.'
+};
+const pnotes={
+ logic:'Power off: a stored 1 is not a current circling the loop. It is a voltage that a gate is actively holding up from the supply. With no supply nothing holds it up, so it drains away. Animation is slowed down; in a real chip it is gone in about a nanosecond to a microsecond.',
+ relay:'Power off: the coil current stops, the magnetic field collapses and the spring opens or closes the contacts within about 5–20 ms. The loop is gone in one relay-release time, not slowly.',
+ tube:'Power off: with +V gone, no plate current can flow, so no tube can hold its plate low or high. The stored voltages (on the plate resistors and coupling capacitors) discharge in milliseconds, though the supply\\'s own capacitors can stretch that. The glowing filament cooling is irrelevant: it is slower than the loop dying.',
+ cmos:'Power off: as Vcc falls the PMOS and NMOS stop conducting, so the output nodes float. Their tiny capacitance leaks away in about a nanosecond to a microsecond. This is why SRAM forgets the moment power drops.'
+};
+function frame(t0){
+  return function f(now){
+    lv=Math.max(0,1-(now-t0)/D);
+    if(!lost&&lv<0.5){lost=true;Q=0;Qb=0;}
+    render();
+    if(lv>0&&P===0) raf=requestAnimationFrame(f);
+  };
+}
+function setPower(p){
+  if(raf)cancelAnimationFrame(raf);
+  P=p;
+  if(!p){raf=requestAnimationFrame(t=>frame(t)(t));}
+  else{
+    lv=1;
+    if(lost){
+      lost=false;
+      Q=0;Qb=0;
+      if(!S&&!R){Q=Math.random()<.5?1:0;Qb=1-Q;} // symmetric: a tiny imbalance picks a winner
+    }
+  }
+  render();
+}
+function render(){
+  if(P) settle();
+  const bP=document.getElementById('bP');
+  bP.textContent='Power: '+(P?'ON':'OFF');bP.className=P?'pw':'pwoff';
+  document.getElementById('bS').textContent='S = '+S;document.getElementById('bS').className=S?'on':'';
+  document.getElementById('bR').textContent='R = '+R;document.getElementById('bR').className=R?'on':'';
+  let msg;
+  if(!P){
+    msg=lost?'Power off: the stored bit is gone. All wires at 0 V.':'Power off: voltages sagging ('+Math.round(lv*100)+'%). Bit still readable above 50%.';
+  } else {
+    msg = S&&R ? 'S=R=1: forbidden, both outputs forced to 0. Release one at a time.' :
+            (Q===1&&Qb===0)?'Q = 1 (set)' : (Q===0&&Qb===1)?'Q = 0 (reset)' : 'Q = Q̄ = '+Q+' (invalid)';
+    if(!S&&!R&&Q!==Qb) msg+=' – holding';
+  }
+  document.getElementById('state').textContent=msg;
+  document.querySelectorAll('.hw').forEach(b=>b.classList.toggle('sel',b.dataset.m===mode));
+  document.getElementById('note').textContent=notes[mode];
+  document.getElementById('pnote').textContent=pnotes[mode];
+  document.getElementById('view').innerHTML = mode==='logic'? logicView() : hwView();
+}
+document.getElementById('bP').onclick=()=>setPower(P?0:1);
+document.getElementById('bS').onclick=()=>{S^=1;render()};
+document.getElementById('bR').onclick=()=>{R^=1;render()};
+document.querySelectorAll('.hw').forEach(b=>b.onclick=()=>{mode=b.dataset.m;render()});
+render();
+</script></body></html>
+"
+ :AT "2026-11-10T19:08:04" :VERSION 3)
+(:PINNED T :ID "sr-latch-from-two-nor-gates" :MAP "computers" :NODE "flip-flop" :TYPE "svg" :TITLE
+ "SR latch from two NOR gates" :LANGUAGE NIL :CONTENT
+ "<svg viewBox=\"0 0 640 420\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"sans-serif\">
+  <style>
+    .lbl{font-size:16px;fill:#111}
+    .pin{font-size:14px;fill:#333}
+    .wire{stroke:#111;stroke-width:2;fill:none}
+    .fb{stroke:#c0392b;stroke-width:2;fill:none;stroke-dasharray:5 4}
+    .pwr{stroke:#e08a00;stroke-width:3;fill:none}
+    .gnd{stroke:#666;stroke-width:3;fill:none}
+    .gate{fill:#eef3fb;stroke:#2c3e50;stroke-width:2}
+    .title{font-size:18px;fill:#111;font-weight:bold}
+    .note{font-size:13px;fill:#555}
+    .hdr{font-size:13px;fill:#111;font-weight:bold}
+  </style>
+
+  <text x=\"20\" y=\"28\" class=\"title\">SR latch: two NOR gates in a loop</text>
+
+  <!-- power legs (drawn first so gates sit on top) -->
+  <path d=\"M225,48 V78\" class=\"pwr\"/><text x=\"233\" y=\"58\" font-size=\"12\" fill=\"#e08a00\">Vcc</text>
+  <path d=\"M225,135 V152\" class=\"gnd\"/><text x=\"233\" y=\"152\" font-size=\"12\" fill=\"#666\">GND</text>
+  <path d=\"M250,208 V238\" class=\"pwr\"/><text x=\"258\" y=\"222\" font-size=\"12\" fill=\"#e08a00\">Vcc</text>
+  <path d=\"M225,295 V322\" class=\"gnd\"/><text x=\"233\" y=\"334\" font-size=\"12\" fill=\"#666\">GND</text>
+
+  <!-- NOR gate 1 (top) -->
+  <g>
+    <path d=\"M200,70 q30,0 55,35 q-25,35 -55,35 q15,-35 0,-70 z\" class=\"gate\"/>
+    <circle cx=\"258\" cy=\"105\" r=\"5\" class=\"gate\"/>
+    <text x=\"215\" y=\"110\" class=\"pin\">NOR</text>
+  </g>
+  <!-- NOR gate 2 (bottom) -->
+  <g>
+    <path d=\"M200,230 q30,0 55,35 q-25,35 -55,35 q15,-35 0,-70 z\" class=\"gate\"/>
+    <circle cx=\"258\" cy=\"265\" r=\"5\" class=\"gate\"/>
+    <text x=\"215\" y=\"270\" class=\"pin\">NOR</text>
+  </g>
+
+  <line x1=\"90\" y1=\"85\" x2=\"200\" y2=\"85\" class=\"wire\"/>
+  <text x=\"70\" y=\"90\" class=\"lbl\">R</text>
+  <line x1=\"90\" y1=\"285\" x2=\"200\" y2=\"285\" class=\"wire\"/>
+  <text x=\"70\" y=\"290\" class=\"lbl\">S</text>
+
+  <line x1=\"263\" y1=\"105\" x2=\"430\" y2=\"105\" class=\"wire\"/>
+  <text x=\"440\" y=\"110\" class=\"lbl\">Q</text>
+  <line x1=\"263\" y1=\"265\" x2=\"430\" y2=\"265\" class=\"wire\"/>
+  <text x=\"440\" y=\"270\" class=\"lbl\">Q&#772;</text>
+
+  <path d=\"M330,105 L330,160 L180,160 L180,250 L200,250\" class=\"fb\"/>
+  <path d=\"M360,265 L360,200 L160,200 L160,120 L200,120\" class=\"fb\"/>
+
+  <text x=\"300\" y=\"150\" class=\"note\">red = feedback: each output steers the other gate</text>
+
+  <text x=\"330\" y=\"345\" class=\"note\">Orange = Vcc, grey = GND.</text>
+  <text x=\"330\" y=\"362\" class=\"note\">Both gates need power; the outputs</text>
+  <text x=\"330\" y=\"378\" class=\"note\">are supply voltage steered by inputs.</text>
+
+  <text x=\"20\" y=\"345\" class=\"hdr\">S  R   →   Q</text>
+  <text x=\"20\" y=\"368\" class=\"note\">0  0   hold previous Q   ← this is the memory</text>
+  <text x=\"20\" y=\"388\" class=\"note\">1  0   Q = 1   (set)</text>
+  <text x=\"20\" y=\"408\" class=\"note\">0  1   Q = 0   (reset)</text>
+  <text x=\"330\" y=\"408\" class=\"note\">1  1   not allowed</text>
+</svg>"
+ :AT "2026-11-10T19:08:10" :VERSION 2)

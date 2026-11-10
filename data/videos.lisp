@@ -9,3 +9,8 @@
 (:ID "computers/relay-vacuum-tube/k4oGI_dNaPc" :MAP "computers" :NODE "relay-vacuum-tube" :VIDEO
  "k4oGI_dNaPc" :TITLE "ENIAC: The First Computer" :CHANNEL "University of Pennsylvania" :AT
  "2026-11-10T11:37:16")
+(:ID "computers/relay-vacuum-tube/FU_YFpfDqqA" :MAP "computers" :NODE "relay-vacuum-tube" :VIDEO
+ "FU_YFpfDqqA" :TITLE "Why The First Computers Were Made Out Of Light Bulbs" :CHANNEL "Veritasium"
+ :AT "2026-11-10T13:00:54")
+(:ID "computers/flip-flop/I0-izyq6q5s" :MAP "computers" :NODE "flip-flop" :VIDEO "I0-izyq6q5s"
+ :TITLE "How Do Computers Remember?" :CHANNEL "Sebastian Lague" :AT "2026-11-10T18:22:06")

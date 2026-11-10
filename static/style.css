@@ -258,12 +258,13 @@ svg a.tl-current .box-title { fill: #1a1a1a; font-weight: 600; }
 .pane .dock-log:empty { display: none; }
 /* The study chat, once asked something: as tall as the window (static/study.js adds .grown). */
 .dock.inline.pane { transition: height .4s ease; }
-/* Less the 3rem bar at the top of the page, and a little air. */
-.dock.inline.pane.study.grown { height: calc(100dvh - 4rem); }
+/* Exactly what is left under the 3rem bar at the top of the page. */
+.dock.inline.pane.study.grown { height: calc(100dvh - 3rem); }
 /* Pinned to the right column: the left column scrolls past while the chat (its prompt too) stays put.
    The side column stretches to the row's height so there is room for it to travel. */
 #idea.idea-below { align-items: stretch; }
-#idea .idea-side > .idea-study { position: sticky; top: 3.5rem; }
+/* The page scrolls inside <main>, which already starts under the navbar, so the offset is 0 (not the bar's height again). */
+#idea .idea-side > .idea-study { position: sticky; top: 0; }
 @media (max-width: 800px) { #idea .idea-side > .idea-study { position: static; } }
 .pane.study.grown .dock-log { flex: 1 1 auto; max-height: none; }
 @media (prefers-reduced-motion: reduce) { .dock.inline.pane { transition: none; } }

@@ -81,7 +81,7 @@
 (defun artifacts-context ()
   (let ((as (map-artifacts)))
     (if as
-        (str "Artifacts already made in this field (id | type | title | about):" #\Newline
+        (str "Artifacts already made in this field. When the learner asks to extend, fix or change one of these (or to make it interactive), call update_artifact with its id; do not create a new artifact for it (id | type | title | about):" #\Newline
              (join #\Newline (mapcar (lambda (a) (str "  " (getf a :id) " | " (getf a :type) " | " (getf a :title)
                                                      " | " (or (getf a :node) "the field")))
                                      as)))
@@ -305,7 +305,7 @@
 ;;; -- Artifact tools: what the model makes that is not prose --
 
 (deftool create-artifact
-  "Make something the learner opens beside the chat: a self-contained web page (html: a complete document; scripts from CDNs are fine; interactive explorations, simulations, visualisers, drills), a diagram (svg: a complete <svg> element with viewBox; or mermaid: a diagram definition), a document (markdown), or a program (code, with language). Returns the artifact's id. Mention the artifact in your reply by title; do not repeat its content there."
+  "Make something the learner opens beside the chat: a self-contained web page (html: a complete document; scripts from CDNs are fine; interactive explorations, simulations, visualisers, drills), a diagram (svg: a complete <svg> element with viewBox; or mermaid: a diagram definition), a document (markdown), or a program (code, with language). Returns the artifact's id. Mention the artifact in your reply by title; do not repeat its content there. Only for something genuinely new: to extend, fix, restyle or make interactive an artifact that already exists, use update_artifact on its id instead, never a second copy."
   (:object (:type (:enum "html" "svg" "mermaid" "markdown" "code"))
            (:title :string "short, specific; five words or fewer")
            (:content :string "the whole thing")
@@ -319,7 +319,7 @@
     (str "Created artifact " (getf a :id) " (" (getf a :type) "): " (getf a :title))))
 
 (deftool update-artifact
-  "Replace an artifact's content (and optionally its title). Read it first with read_artifact if you do not have its current content."
+  "Replace an artifact's content (and optionally its title). This is how every change to an existing artifact is made (extending it, fixing it, adding interactivity, restyling): prefer it to create_artifact. Read it first with read_artifact if you do not have its current content."
   (:object (:id :string) (:content :string "the whole new content") (:title (:maybe :string)))
   (input)
   (let ((a (update-artifact! (getf input :id) :content (getf input :content) :title (getf input :title))))

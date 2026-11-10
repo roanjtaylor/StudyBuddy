@@ -200,12 +200,21 @@ body.dock-focus { overflow: hidden; }
   transform: none; margin: 0; box-shadow: var(--cl-shadow);
 }
 .dock.focus .dock-body { flex-direction: row; }
+/* Full screen wins over the pane's resting, grown and staged heights (static/style.css), however much is said. */
+.dock.inline.pane.focus, .dock.inline.pane.grown.focus, .dock.inline.pane.study.grown.focus, .dock.inline.pane.staged.focus,
+.dock.inline.pane:not(.study).grown.focus {
+  position: fixed; inset: 1rem; width: auto; height: auto; min-height: 0; flex: none; top: 1rem; z-index: 71;
+}
+.dock.focus .dock-log, .pane.focus .dock-log, .pane.grown.focus .dock-log { flex: 1 1 auto; max-height: none; }
+.dock.focus .dock-stage[hidden] { display: none; }
 .dock.focus .dock-stage, .dock.inline.staged.focus .dock-stage {
   order: -1; flex: 1 1 auto; border-left: 0; border-top: 0; border-right: 1px solid var(--cl-line);
 }
 .dock.focus .dock-chat, .dock.inline.staged.focus .dock-chat { flex: 0 0 min(28rem, 36vw); min-width: 20rem; }
-.dock.focus .composer-tools { display: none; }
-.dock.focus .composer-row { justify-content: flex-end; }
+/* Full screen keeps the context (the open artifact) and the model and effort in view. */
+.dock.focus .composer-tools { flex: 1; }
+.dock.focus .composer-row { flex-wrap: wrap; }
+.dock.focus .pill { max-width: 100%; }
 .stage-x { display: none; }
 .dock.focus .stage-x { display: grid; }
 .dock.focus #stage-close, .dock.focus #stage-focus { display: none; }
@@ -239,6 +248,7 @@ body.dock-focus { overflow: hidden; }
 .artifact-tile:has(.artifact-inline) { width: 100%; }
 .artifact-tile .artifact-inline { max-width: none; }
 .artifact-tile .artifact-preview { height: auto; aspect-ratio: 16 / 10; }
+/* A document is shown in full: its height is set to the document's own (static/dock.js). */
 /* Deleting: a red bin that shows on hover; clicked, it grows "Delete? Delete / Cancel" beside it. */
 .artifact-del-form { display: flex; align-items: center; gap: .3rem; margin: 0; flex-shrink: 0; }
 .artifact-del-form.pending::after { content: none; }
@@ -272,3 +282,20 @@ body:has(.pin-tray) .artifact-pin { display: grid; }
 @media (hover: none) { .artifact-pin { opacity: .85; } }
 .pin-art { width: 12rem; }
 .pin-art .artifact-card { display: flex; }
+/* A pinned diagram or page shows itself, full width, with its unpin button at the top left. */
+.pin-art .artifact-inline { max-width: none; }
+.pin-art .artifact-inline .artifact-card { display: none; }
+.pin-art:has(.artifact-inline) .pin-tools { right: auto; left: .4rem; top: .4rem; }
+
+/* A page, in the depth section and the pinned tray, is a small thumbnail like the images and
+   videos: the page laid out at desktop size, then scaled down to the tile. Go full screen to use it. */
+.pin-list .pin-art:has(.artifact-inline-html), .artifact-tile:has(.artifact-inline-html) { width: 12rem; }
+.pin-art .artifact-inline-html, .artifact-tile .artifact-inline-html {
+  container-type: inline-size; position: relative; overflow: hidden; aspect-ratio: 16 / 10;
+  border: 1px solid var(--cl-line); border-radius: .5rem; background: #fff; cursor: zoom-in;
+}
+.pin-art .artifact-inline-html .artifact-preview, .artifact-tile .artifact-inline-html .artifact-preview {
+  position: absolute; top: 0; left: 0; width: 1000px; height: 625px; max-width: none; border: 0; border-radius: 0;
+  transform-origin: 0 0; scale: .2; scale: tan(atan2(100cqw, 1000px));
+  pointer-events: none;
+}

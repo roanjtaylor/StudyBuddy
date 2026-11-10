@@ -46,7 +46,9 @@
 
 ;;; ---- Artifacts: cards in the chat, pages of their own ----------------------
 
-(defun artifact-view-url (id) (str "/artifact/" id "/view"))
+;; VERSION, when given, makes the address differ per version so a cached older copy is never reused.
+(defun artifact-view-url (id &optional version)
+  (str "/artifact/" id "/view" (when version (str "?v=" version))))
 
 (defparameter *artifact-kinds*
   '(("html" "⌘" "Interactive") ("svg" "◇" "Diagram") ("mermaid" "⇄" "Diagram")
@@ -108,7 +110,7 @@
 (defcomponent artifact-block (a &optional removable)
   (if (member (getf a :type) *inline-artifact-types* :test #'equal)
       (html (:figure :class (str "artifact-inline artifact-inline-" (getf a :type)) :data-artifact (getf a :id)
-              (:iframe :class "artifact-preview" :src (artifact-view-url (getf a :id)) :title (getf a :title)
+              (:iframe :class "artifact-preview" :src (artifact-view-url (getf a :id) (getf* a :version 1)) :title (getf a :title)
                        :loading "lazy" :sandbox (if (equal (getf a :type) "svg") "" "allow-scripts"))
               ;; Over the top right corner: the bin, the name, and the way to full screen
               ;; (the frame swallows clicks, so that has to be a button over it).
@@ -538,8 +540,16 @@
 (defpage artifact-view "/artifact/:id/view" (id)
   (let ((a (find-artifact id)))
     (unless a (return-from artifact-view (not-found "artifact")))
+    ;; Always the current version: an edit must show the next time it is opened.
+    (setf (ht:header-out "Cache-Control") "no-store")
     (let ((type (getf a :type)) (c (getf a :content)))
-      (cond ((equal type "html") (raw-response "text/html; charset=utf-8" c))
+      (cond ((equal type "html")
+             ;; Tells the page holding this in a preview how tall it is, so the preview shows it all.
+             (raw-response "text/html; charset=utf-8"
+                           (str c "<script>(function(){var l=0;function s(){var d=document,h=Math.ceil(Math.max(d.documentElement.scrollHeight,d.body?d.body.scrollHeight:0));"
+                                "if(h&&h!==l){l=h;parent.postMessage({artifactHeight:h},'*')}}"
+                                "addEventListener('load',s);addEventListener('resize',s);"
+                                "if(window.ResizeObserver)new ResizeObserver(s).observe(document.documentElement);setInterval(s,500);s()})()</script>")))
             ((equal type "svg")
              (artifact-frame a (html (:div :class "svg-wrap" (:raw c)))))
             ((equal type "mermaid")

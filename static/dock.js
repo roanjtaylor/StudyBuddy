@@ -24,6 +24,18 @@ window.growPane = function (pane) {
   setTimeout(done, 600);
 };
 
+// A document artifact's preview grows to the document's own height, so all of it shows and
+// can be used where it stands (the frame reports it; see the artifact view).
+window.addEventListener('message', function (e) {
+  var h = e.data && e.data.artifactHeight;
+  if (!h) return;
+  var frames = document.querySelectorAll('.artifact-inline-html .artifact-preview');
+  for (var i = 0; i < frames.length; i++) {
+    if (frames[i].closest('.artifact-tile, .pin-art')) continue;   // thumbnails keep their fixed size
+    if (frames[i].contentWindow === e.source) frames[i].style.height = Math.min(h, 4000) + 'px';
+  }
+});
+
 (function () {
   var dock = document.getElementById('dock');
   if (!dock) return;
@@ -87,10 +99,11 @@ window.growPane = function (pane) {
     stage.hidden = false;
     dock.classList.add('staged');
     if (full) setFocus(true);   // before the frame loads: moving the dock reloads it
-    // The same artifact again (a new version) must load afresh.
-    frame.src = '/artifact/' + id + '/view' + (id === openId ? '?t=' + Date.now() : '');
+    // Always load afresh: the artifact may have been edited since it was last opened.
+    frame.src = '/artifact/' + id + '/view?t=' + Date.now();
     openId = id; openType = type;
     if (artifactField) artifactField.value = id;
+    setContext(name || id);
     keep('sessionStorage', 'dock-stage', JSON.stringify({ id: id, type: type, title: name }));
   }
   function closeStage() {
@@ -101,7 +114,15 @@ window.growPane = function (pane) {
     setFocus(false);
     scrim.hidden = true; document.body.classList.remove('dock-focus');
     openId = ''; if (artifactField) artifactField.value = '';
+    setContext(null);
     keep('sessionStorage', 'dock-stage', '');
+  }
+  // The "looking at" pill names the open artifact while there is one, so it is plain what Claude is given.
+  var pill = dock.querySelector('.pill-text'), pillBase = pill ? pill.textContent : '';
+  function setContext(name) {
+    if (!pill) return;
+    if (name) { pill.textContent = 'Artifact: ' + name; pill.parentNode.title = 'Claude is given this artifact'; }
+    else { pill.textContent = pillBase; pill.parentNode.title = 'What Claude is looking at'; }
   }
   document.getElementById('stage-close').addEventListener('click', closeStage);
 
@@ -138,6 +159,11 @@ window.growPane = function (pane) {
   // the page, wherever the card is. It never leaves the page for the artifact's own address.
   document.addEventListener('click', function (e) {
     var t = e.target.closest && (e.target.closest('.artifact-expand') || e.target.closest('.artifact-card'));
+    // A thumbnail of a page opens full screen on a click anywhere on it (not on its buttons).
+    if (!t && e.target.closest && !e.target.closest('button, a')) {
+      var th = e.target.closest('.artifact-tile .artifact-inline-html, .pin-art .artifact-inline-html');
+      if (th) t = th.querySelector('.artifact-expand');
+    }
     if (!t) return;
     var card = t.classList.contains('artifact-card') ? t : t.closest('.artifact-inline').querySelector('.artifact-card');
     if (!card || !card.dataset.artifact) return;
@@ -220,6 +246,15 @@ window.growPane = function (pane) {
         // A new version of an open artifact replaces its block; anything new is opened.
         var old = cards.querySelector(':scope > [data-artifact="' + card.dataset.artifact + '"]');
         if (old) old.replaceWith(block); else cards.appendChild(block);
+        // Every other copy of this artifact on the page (earlier messages, the idea's tiles and
+        // pins) shows the old version until pointed at the new one.
+        var fresh = block.querySelector('iframe.artifact-preview');
+        if (fresh) {
+          var sel = '[data-artifact="' + card.dataset.artifact + '"] iframe.artifact-preview';
+          Array.prototype.forEach.call(document.querySelectorAll(sel), function (f) {
+            if (!block.contains(f)) f.src = fresh.getAttribute('src');
+          });
+        }
         log.scrollTop = log.scrollHeight;
         // A visual shows itself in the chat; anything else opens on the stage. A click on a card opens either.
         // In full screen, whatever it makes or changes appears on the stage at once.

@@ -14,3 +14,7 @@
  "5XDY3FPCTRFO" :TITLE "ENIAC Penn1" :THUMB
  "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6c/ENIAC_Penn1.jpg/500px-ENIAC_Penn1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
  :PAGE "https://commons.wikimedia.org/wiki/File:ENIAC_Penn1.jpg" :AT "2026-11-10T11:34:00")
+(:ID "computers/flip-flop/O9DRGBUOWJBR" :MAP "computers" :NODE "flip-flop" :KEY "O9DRGBUOWJBR"
+ :TITLE "Flip flop circuit" :THUMB
+ "https://upload.wikimedia.org/wikipedia/commons/e/ed/Flip_flop_circuit.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled"
+ :PAGE "https://commons.wikimedia.org/wiki/File:Flip_flop_circuit.png" :AT "2026-11-10T18:23:14")

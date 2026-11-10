@@ -182,7 +182,16 @@
 ;; A pinned artifact: its card (opens on the stage) and a way to unpin.
 (defcomponent artifact-item (a)
   (html (:li :class "vid pin-art" :data-artifact (getf a :id)
-          (artifact-card a)
+          ;; A diagram or page shows itself (as in the chat); anything else is its card.
+          (if (member (getf a :type) *inline-artifact-types* :test #'equal)
+              (html (:figure :class (str "artifact-inline artifact-inline-" (getf a :type)) :data-artifact (getf a :id)
+                      (:iframe :class "artifact-preview" :src (artifact-view-url (getf a :id) (getf* a :version 1)) :title (getf a :title)
+                               :loading "lazy" :sandbox (if (equal (getf a :type) "svg") "" "allow-scripts"))
+                      (:div :class "artifact-tools"
+                        (:span :class "artifact-name" (getf a :title))
+                        (:button :type "button" :class "artifact-expand" :title "Full screen" :aria-label "Full screen" (icon "expand")))
+                      (artifact-card a)))
+              (artifact-card a))
           (:div :class "pin-tools"
             (:button :type "button" :class "pin-tool pin-remove" :data-kind "artifact" :data-key (getf a :id)
                      :title "Unpin this artifact" :aria-label "Unpin this artifact" (icon "trash"))))))
