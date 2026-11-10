@@ -260,6 +260,11 @@ svg a.tl-current .box-title { fill: #1a1a1a; font-weight: 600; }
 .dock.inline.pane { transition: height .4s ease; }
 /* Less the 3rem bar at the top of the page, and a little air. */
 .dock.inline.pane.study.grown { height: calc(100dvh - 4rem); }
+/* Pinned to the right column: the left column scrolls past while the chat (its prompt too) stays put.
+   The side column stretches to the row's height so there is room for it to travel. */
+#idea.idea-below { align-items: stretch; }
+#idea .idea-side > .idea-study { position: sticky; top: 3.5rem; }
+@media (max-width: 800px) { #idea .idea-side > .idea-study { position: static; } }
 .pane.study.grown .dock-log { flex: 1 1 auto; max-height: none; }
 @media (prefers-reduced-motion: reduce) { .dock.inline.pane { transition: none; } }
 /* With an artifact on the stage beside it, the pane needs a height of its own. */
@@ -334,58 +339,96 @@ svg a.tl-m-upd .dot { fill: #d29922; }
 .tl-group.tl-g-upd svg .span { fill: #d29922; }
 .tl-group.tl-g-new svg .bar-title, .tl-group.tl-g-del svg .bar-title, .tl-group.tl-g-upd svg .bar-title { fill: #1a1a1a; }
 .map-preview { margin: .3rem 0; }
+.map-diff-fold { margin-top: .8rem; }
+.map-diff-fold > summary { cursor: pointer; font-size: .85rem; color: var(--muted); margin-bottom: .4rem; }
 .map-review a.tl-idea { pointer-events: none; }
 
-/* Videos pinned to an idea: pinned list, embedded player, and the YouTube browser. */
-.videos { margin-top: 1.5rem; font-family: Roboto, Arial, sans-serif; }
-.videos button, .videos input { font-family: inherit; }
-.vid-player { margin: .75rem 0; }
-.vid-player iframe { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: .5rem; background: #000; }
-.vid-player-bar { display: flex; justify-content: space-between; gap: .75rem; margin-top: .35rem; font-size: 14px; line-height: 20px; }
-.vid-player-title { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vid-close, .vid-open, .vid-pin, .vid-unpin { font: inherit; cursor: pointer; }
-.vid-close { background: none; border: 0; color: var(--muted); padding: 0; }
-.vid-list, .vid-results { list-style: none; margin: .5rem 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
-.vid { display: flex; align-items: stretch; gap: .5rem; }
-.vid-play { flex: 1 1 auto; min-width: 0; display: flex; gap: .65rem; align-items: center; text-align: left; font: inherit; color: inherit;
-  background: none; border: 1px solid var(--line); border-radius: .5rem; padding: .35rem; cursor: pointer; }
-.vid-play:hover { border-color: var(--muted); }
-.vid-play img { flex: none; width: 7.5rem; aspect-ratio: 16 / 9; object-fit: cover; border-radius: .3rem; background: var(--line); }
-.vid-meta { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
-.vid-title { font-family: Roboto, Arial, sans-serif; font-size: 14px; font-weight: 500; line-height: 20px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.vid-pin, .vid-unpin { flex: none; align-self: center; background: none; border: 1px solid var(--line); border-radius: .4rem; color: inherit; padding: .3rem .6rem; }
-.vid-unpin { border: 0; color: var(--muted); font-size: 1.1rem; padding: .2rem .5rem; }
-.vid-unpin:hover { color: #c33; }
-.vid-pin[disabled] { color: var(--muted); cursor: default; }
-.vid-open { margin-top: .5rem; background: none; border: 1px solid var(--line); border-radius: .5rem; color: inherit; padding: .45rem .9rem; }
-.vid-open:hover { border-color: var(--muted); }
-.vid-browse { margin-top: .75rem; }
-.vid-search { display: flex; gap: .5rem; }
-.vid-search input { flex: 1 1 auto; min-width: 0; font: inherit; padding: .45rem .6rem; }
-.vid-search button { font: inherit; padding: .45rem .9rem; cursor: pointer; }
-.vid-status:empty { display: none; }
-.videos [hidden] { display: none; }
+/* Browse: a centred button at the foot of the idea; its panel is images (left) and videos (right). */
+.videos { margin-top: 2rem; font-family: Roboto, Arial, sans-serif; }
+.videos button, .videos input, .pin-tray button { font-family: inherit; }
+.videos [hidden], .pin-tray[hidden] { display: none; }
+.browse-bar { display: flex; justify-content: center; }
+.browse-open { font: inherit; font-weight: 600; cursor: pointer; background: none; color: inherit;
+  border: 1px solid var(--line); border-radius: 999px; padding: .5rem 1.6rem; }
+.browse-open:hover, .browse-open[aria-expanded="true"] { border-color: var(--fg); }
+.browse { margin-top: 1rem; }
+.browse-search { display: flex; gap: .5rem; }
+.browse-search input { flex: 1 1 auto; min-width: 0; font: inherit; padding: .45rem .6rem; }
+.browse-search button { font: inherit; padding: .45rem .9rem; cursor: pointer; }
+.browse-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.25rem; margin-top: 1rem; align-items: start; }
+@media (max-width: 560px) { .browse-cols { grid-template-columns: minmax(0, 1fr); } }
+.browse-col h3, .pin-tray h3 { margin: 0 0 .5rem; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+.col-status:empty { display: none; }
+.vid-results, .pin-list { list-style: none; margin: 0; padding: 0; }
 
-/* YouTube look: a red button, and results as large-thumbnail cards. */
-.vid-open { display: inline-flex; align-items: center; gap: .5rem; background: #f00; border: 0; color: #fff; font-weight: 600; border-radius: 999px; padding: .5rem 1.1rem; }
-.vid-open:hover { background: #cc0000; border: 0; }
-.vid-open .yt-ico { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.05rem; background: #fff; color: #f00; border-radius: .3rem; font-size: .6rem; padding-left: .05rem; }
-.vid-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem .85rem; margin-top: 1rem; }
-.vid-result { flex-direction: column; gap: .4rem; min-width: 0; }
-.vid-result .vid-play { border: 0; padding: 0; background: none; border-radius: 0; display: block; }
+/* Image results: two to a row, a pin over the corner of each. */
+.img-results { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem .6rem; }
+.img-result { position: relative; min-width: 0; display: flex; flex-direction: column; gap: .25rem; }
+.img-link { display: block; border-radius: .5rem; overflow: hidden; background: var(--line); }
+.img-link img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.img-link:hover img { filter: brightness(.92); }
+.img-name { font-size: 12px; line-height: 16px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.img-pin { position: absolute; top: .35rem; right: .35rem; }
+
+/* The pin buttons, on images and videos alike. */
+.vid-pin, .img-pin { display: inline-flex; align-items: center; gap: .35rem; font-size: 14px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px; padding: .25rem .65rem; background: var(--bg); color: inherit; }
+.vid-pin { align-self: flex-start; background: none; }
+.vid-pin:hover:not([disabled]), .img-pin:hover:not([disabled]) { background: var(--line); }
+.vid-pin[disabled], .img-pin[disabled] { cursor: default; }
+.vid-pin.pinned, .img-pin.pinned { color: #f00; border-color: #f00; }
+
+/* Videos: a player, and results as large-thumbnail cards, one to a row in the narrow column. */
+.vid-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem .6rem; }
+.vid-result .vr-avatar { display: none; }
+.browse-col .browse-search { margin-bottom: .75rem; }
+.vid-result { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+.vid-result .vid-play { display: block; width: 100%; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .vr-thumb { position: relative; width: 100%; border-radius: .5rem; overflow: hidden; }
-.vid-result .vr-thumb img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 0; display: block; }
+.vid-result .vr-thumb img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
 .vr-thumb:hover img { filter: brightness(.92); }
 .vr-len { position: absolute; right: .4rem; bottom: .4rem; background: rgba(0,0,0,.8); color: #fff; font-size: 12px; line-height: 18px; font-weight: 500; padding: 0 4px; border-radius: .3rem; }
 .vr-info { display: flex; gap: .7rem; align-items: flex-start; }
 .vr-avatar { flex: none; width: 1.75rem; height: 1.75rem; border-radius: 50%; overflow: hidden; background: var(--line); display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--muted); }
 .vr-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .vr-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: .15rem; }
-.vid-result .vr-title { font-family: Roboto, Arial, sans-serif; font-size: 16px; font-weight: 500; line-height: 22px; text-align: left; cursor: pointer; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.vr-channel, .vr-facts { font-size: 14px; font-weight: 400; line-height: 20px; color: var(--muted); }
-.vid-result .vid-pin { display: inline-flex; align-items: center; gap: .35rem; align-self: flex-start; border-radius: 999px; padding: .25rem .65rem; font-weight: 500; font-size: 14px; }
-.vid-result .vid-pin:hover:not([disabled]) { background: var(--line); }
-.vid-result .vid-pin.pinned { color: #f00; border-color: #f00; }
+.vid-result .vr-title { font-size: 15px; font-weight: 500; line-height: 21px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.vr-channel, .vr-facts { font-size: 13px; line-height: 18px; color: var(--muted); }
+
+/* Pinned at the foot of the idea, above Browse: Images: then Videos:, as small tiles. */
+.pin-tray { margin-bottom: 1.25rem; }
+.pin-group { margin-bottom: .9rem; }
+.pin-tray h3 { text-transform: none; letter-spacing: 0; font-size: .95rem; color: var(--fg); }
+.pin-list { display: flex; flex-wrap: wrap; gap: .5rem; }
+.pin-list .vid { position: relative; display: block; width: 9rem; }
+.pin-list .vid-play { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.pin-list .vid-play img, .pin-img-link img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: .4rem; background: var(--line); }
+.pin-list .vid-meta { display: block; margin-top: .2rem; }
+.pin-list .vid-title { font-size: 12px; line-height: 16px; font-weight: 500; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pin-list .vid-meta .quiet { display: none; }
+/* On hover: the bin (red) and full screen, over the top right of the tile. */
+.pin-tools { position: absolute; top: .3rem; right: .3rem; display: flex; gap: .25rem; opacity: 0; transition: opacity .12s; }
+.pin-list .vid:hover .pin-tools, .pin-tools:focus-within { opacity: 1; }
+@media (hover: none) { .pin-tools { opacity: .9; } }
+.pin-tool { display: grid; place-items: center; width: 1.7rem; height: 1.7rem; padding: 0; cursor: pointer; color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: .5rem; }
+.pin-tool .ico { width: 1rem; height: 1rem; }
+.pin-tool:hover { border-color: var(--fg); }
+.pin-remove { color: #d73a31; border-color: #d73a31; }
+.pin-remove:hover { background: #d73a31; color: #fff; border-color: #d73a31; }
+
+/* Full screen: the image or video over the page, which is greyed behind it. */
+.pin-lightbox { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 2rem; background: rgba(24,24,22,.82); }
+.pin-lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: .5rem; background: var(--bg); }
+.pin-lightbox iframe { width: min(100%, calc((100dvh - 4rem) * 16 / 9)); aspect-ratio: 16 / 9; border: 0; border-radius: .5rem; background: #000; }
+.pin-lightbox-bar { position: absolute; top: 1rem; right: 1rem; display: flex; align-items: center; gap: .6rem; }
+.pin-lightbox-src { color: #fff; font-size: 14px; padding: .35rem .8rem; border-radius: 999px; background: rgba(255,255,255,.15); text-decoration: none; }
+.pin-lightbox-src:hover { background: rgba(255,255,255,.3); }
+.pin-lightbox-x { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; padding: 0; cursor: pointer; color: #fff; background: rgba(255,255,255,.15); border: 0; border-radius: 50%; }
+.pin-lightbox-x:hover { background: rgba(255,255,255,.3); }
+.img-link, .pin-img-link, .vid-play { cursor: zoom-in; }
+body.pin-lightboxed { overflow: hidden; }
+
 
 /* A short notice when a click has to wait for a chat to finish answering. */
 #busy-toast {
@@ -398,3 +441,32 @@ svg a.tl-m-upd .dot { fill: #d29922; }
 
 /* A stretch of the year axis drawn squeezed (not to scale). */
 svg .axis-squeeze { fill: rgba(210, 153, 34, .16); }
+
+/* Search bars: the button sits inside the field; Google blue for images, YouTube red for videos. */
+.browse-search { position: relative; display: block; }
+.browse-search input { width: 100%; box-sizing: border-box; padding: .5rem 5.6rem .5rem .8rem; border-radius: 999px; }
+.browse-search button { position: absolute; top: 50%; right: .3rem; transform: translateY(-50%); padding: .25rem .85rem;
+  border: 0; border-radius: 999px; color: #fff; font-weight: 600; font-size: 14px; cursor: pointer; }
+.browse-search[data-kind="images"] button { background: #4285f4; }
+.browse-search[data-kind="images"] button:hover { background: #3367d6; }
+.browse-search[data-kind="videos"] button { background: #f00; }
+.browse-search[data-kind="videos"] button:hover { background: #cc0000; }
+.img-link img { object-fit: contain; }
+/* Video pins sit over the top right of the thumbnail, as on images. */
+.vid-result { position: relative; }
+.vid-result .vid-pin { position: absolute; top: .35rem; right: .35rem; align-self: auto; background: var(--bg); }
+/* Pin buttons appear on hover or keyboard focus (always shown where there is no hover); a pinned item keeps its mark. */
+@media (hover: hover) {
+  .vid-result .vid-pin:not(.pinned), .img-result .img-pin:not(.pinned) { opacity: 0; transition: opacity .12s; }
+  .vid-result:hover .vid-pin, .img-result:hover .img-pin,
+  .vid-result .vid-pin:focus-visible, .img-result .img-pin:focus-visible { opacity: 1; }
+}
+/* Browse: a solid grey button so it reads clearly as the way in. */
+.browse-open { background: #6b6b6b; border-color: #6b6b6b; color: #fff; }
+.browse-open:hover, .browse-open[aria-expanded="true"] { background: #555; border-color: #555; }
+/* Full screen images: sized against the window itself (a % height has nothing to resolve against here). */
+.pin-lightbox img { max-width: calc(100vw - 4rem); max-height: calc(100dvh - 4rem); width: auto; height: auto; }
+/* Previews show the whole picture: pinned images are fitted inside their tile, not cropped to fill it. */
+.pin-list .pin-img-link { display: block; border-radius: .4rem; background: var(--line); }
+.pin-img-link img { aspect-ratio: 4 / 3; object-fit: contain; }
+.img-link img { object-fit: contain; }

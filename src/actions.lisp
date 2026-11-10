@@ -87,6 +87,19 @@
                                      as)))
         "No artifacts made in this field yet.")))
 
+;; What the learner pinned to this idea, in full, so a new chat can use and edit it.
+(defun pinned-context (node)
+  (let ((as (and node (node-pinned-artifacts node))))
+    (when as
+      (str "Artifacts the learner pinned to this idea (kept from earlier chats; use them as context, and change one with update_artifact, whole content):" #\Newline
+           (join #\Newline
+                 (mapcar (lambda (a)
+                           (let ((text (let ((s (princ-to-string (artifact-text a))))
+                                         (if (> (length s) 8000) (str (subseq s 0 8000) "…") s))))
+                             (str "--- " (getf a :id) " | " (getf a :type) " | " (getf a :title) #\Newline text)))
+                         as))
+           #\Newline #\Newline))))
+
 ;;; ---- Ask: the one channel --------------------------------------------------
 ;;; The learner's words go to the model with the map and the focus; the reply streams
 ;;; back; and the model acts on the map and makes artifacts through the tools below,
@@ -362,7 +375,7 @@
 (defparameter *making-things*
   (str "Making things: when a diagram, a picture, a flashcard deck, a quiz, a document, a program, or anything interactive would teach better than prose, MAKE it with create_artifact, create_flashcards or create_quiz — the learner sees it rendered beside the chat, as on claude.ai. "
        "NEVER paste svg, html, mermaid or ASCII-art diagrams into the reply, and never tell the learner to save code to a file or open it elsewhere: you have the tool, use it. After making one, refer to it by title in a short reply and do not repeat its content. "
-       "Diagrams: svg for anything spatial (a device, an architecture, a data path, a timeline, a mechanism, states side by side) — a complete <svg> with a viewBox, no fixed width/height, generous spacing, text no smaller than 12 units, labelled parts, colour used to mean something; mermaid for flows, sequences and state machines. A diagram of several states or steps is one svg laid out as panels, each titled. "
+       "In mermaid never use ~ (write 'about' or ≈) and break label lines with <br/>, not newlines. Diagrams: svg for anything spatial (a device, an architecture, a data path, a timeline, a mechanism, states side by side) — a complete <svg> with a viewBox, no fixed width/height, generous spacing, text no smaller than 12 units, labelled parts, colour used to mean something; mermaid for flows, sequences and state machines. A diagram of several states or steps is one svg laid out as panels, each titled. "
        "Interactive: html, a complete document, self-contained, with its own styles; it may load libraries from a CDN. Good for simulators, step-through visualisers, calculators, drills. "
        "Quizzes from a chip or a quick 'quiz me' can stay in the reply as questions with answers under a heading at the end; a quiz to be scored is create_quiz. "
        "To change an artifact, read it if you do not have its content, then update_artifact with the whole new content."))
@@ -393,6 +406,7 @@
        (when scope (str (scope-note scope) #\Newline #\Newline))
        (when group (str "The learner is looking at group: " group #\Newline #\Newline))
        (when node (str (node-context node) #\Newline (attempts-context node) #\Newline #\Newline))
+       (pinned-context node)
        "Learner says:" #\Newline (trim text)))
 
 ;; What the relay streams, turned into what the browser shows.
@@ -544,6 +558,7 @@
                                                                         :content (str "Field: " (map-title) #\Newline
                                                                                       (node-context node) #\Newline #\Newline
                                                                                       (artifacts-context) #\Newline #\Newline
+                                                                                      (pinned-context node)
                                                                                       "Learner says:" #\Newline (trim text)))))
                                                     :system (getf (prompt 'study) :system)
                                                     :tools *study-tools*

@@ -298,6 +298,25 @@
               (getf new :version) (1+ (getf* old :version 1)))
         (put-artifact! new)))))
 
+;; Pinned: the learner kept it with an idea. It sits in the idea's tray, and later chats
+;; about the idea are given its content, so it can be read and edited again.
+(defun node-pinned-artifacts (node)
+  (remove-if-not (lambda (a) (getf a :pinned)) (map-artifacts node)))
+
+(defun pin-artifact! (id node)
+  (let ((old (find-artifact id)))
+    (when old
+      (let ((new (copy-list old)))
+        (setf (getf new :node) node (getf new :pinned) t)
+        (put-artifact! new)))))
+
+(defun unpin-artifact! (id)
+  (let ((old (find-artifact id)))
+    (when (and old (getf old :pinned))
+      (let ((new (copy-list old)))
+        (setf (getf new :pinned) nil)
+        (put-artifact! new)))))
+
 (defun remove-artifact! (id)
   (when (find-artifact id)
     (setf *artifacts* (remove id *artifacts* :key (lambda (a) (getf a :id)) :test #'equal))

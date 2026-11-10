@@ -6,7 +6,7 @@
 // fetched and swapped in below the timeline, which stays where they are.
 (function () {
   function wireForms(root) {
-    root.querySelectorAll('form:not(.dock-form)').forEach(function (form) {
+    root.querySelectorAll('form:not(.dock-form):not(.browse-search)').forEach(function (form) {
       form.addEventListener('submit', function () { form.classList.add('pending'); });
       form.querySelectorAll('textarea').forEach(function (ta) {
         ta.addEventListener('keydown', function (e) {

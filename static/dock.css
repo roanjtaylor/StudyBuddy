@@ -259,3 +259,16 @@ body.dock-focus { overflow: hidden; }
 .artifact-del-confirm button { padding: .05rem .45rem; font-size: .75rem; border-radius: .35rem; }
 .artifact-del-yes, .artifact-del-yes:hover { background: #d73a31; color: #fff; border-color: #d73a31; }
 
+
+/* Pin to the open idea: only on a page that has a tray; shows with the other corner tools. */
+.artifact-pin {
+  display: none; place-items: center; width: 1.8rem; height: 1.8rem; padding: 0; cursor: pointer; color: var(--cl-muted);
+  background: var(--cl-panel); border: 1px solid var(--cl-line); border-radius: .5rem; opacity: 0; transition: opacity .12s;
+}
+body:has(.pin-tray) .artifact-pin { display: grid; }
+.artifact-pin .ico { width: 1rem; height: 1rem; }
+.artifact-pin.pinned { opacity: 1; color: #f00; border-color: #f00; }
+.artifact-inline:hover .artifact-pin, .artifact-tile:hover .artifact-pin, .artifact-pin:focus-visible { opacity: 1; }
+@media (hover: none) { .artifact-pin { opacity: .85; } }
+.pin-art { width: 12rem; }
+.pin-art .artifact-card { display: flex; }

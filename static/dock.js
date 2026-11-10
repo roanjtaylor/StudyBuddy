@@ -33,7 +33,8 @@ window.growPane = function (pane) {
   var form = document.getElementById('dock-form');
   var input = form.elements.text, here = form.elements.here;
   var mapName = form.elements['map-name'].value;
-  var sendBtn = form.querySelector('.dock-send:not(.dock-stop)'), stopBtn = form.querySelector('.dock-stop');
+  var sendBtn = form.querySelector('.dock-send:not(.dock-stop):not(.dock-clear)'), stopBtn = form.querySelector('.dock-stop');
+  var clearBtn = form.querySelector('.dock-clear');
   var stage = document.getElementById('dock-stage'), frame = document.getElementById('stage-frame');
   var stageTitle = document.getElementById('stage-title');
 
@@ -290,12 +291,14 @@ window.growPane = function (pane) {
     log.scrollTop = log.scrollHeight;
     input.value = ''; grow();
     form.classList.add('busy'); sendBtn.hidden = true; stopBtn.hidden = false;
+    if (clearBtn) clearBtn.hidden = true;
     var ctl = new AbortController();
     controller = ctl;
     var changed = false, proposals = [];
     function release() {
       if (!form.classList.contains('busy')) return;
       form.classList.remove('busy'); sendBtn.hidden = false; stopBtn.hidden = true;
+      if (clearBtn) clearBtn.hidden = false;
       log.scrollTop = log.scrollHeight;
       input.focus();
     }
@@ -328,6 +331,17 @@ window.growPane = function (pane) {
         // A changed map needs the page drawn again; the chat, where it hung and the stage come back as they were.
         if (changed) reloadKeepingChat();
       });
+  });
+
+  // Clear: forget the conversation and start afresh (as in the study pane).
+  if (clearBtn) clearBtn.addEventListener('click', function () {
+    if (form.classList.contains('busy')) return;
+    dropReview();
+    log.innerHTML = ''; turns = [];
+    keep('sessionStorage', chatKey, '');
+    dock.classList.remove('grown');
+    clearBtn.hidden = true;
+    input.focus();
   });
 
   // ---- Proposed changes to the map: reviewed on the timeline ----
@@ -398,12 +412,58 @@ window.growPane = function (pane) {
     panel.setAttribute('aria-label', 'Proposed changes to the map');
     pic.appendChild(h('p', 'quiet small', 'Drawing the new timeline…'));
 
+    // What changes, written out: removals in red, additions in green (the marks of the depth chat's review).
+    var diffs = h('div', 'tl-diff');
+    function fieldDiff(box, f) {
+      var before = String(f.before || ''), after = String(f.after || '');
+      var row = h('div', 'tl-field'), name = h('div', 'tl-field-name', f.label || f.field);
+      row.appendChild(name);
+      [['-', before, 'del'], ['+', after, 'add']].forEach(function (s) {
+        if (!s[1]) return;
+        var t = h('div', 'tl-field-text chg chg-' + s[2] + ' previewing');
+        if (window.studyDiff) {
+          if (f.field === 'body') window.studyDiff.notes(t, before, after, s[0]);
+          else window.studyDiff.text(t, before, after, '', s[0]);
+        } else t.textContent = s[1];
+        row.appendChild(t);
+      });
+      box.appendChild(row);
+    }
+    changes.forEach(function (c) {
+      var kind = c.kind, box;
+      if (kind === 'update') {
+        box = h('div', 'tl-change tl-update');
+        box.appendChild(h('div', 'tl-change-head', 'Change: ' + (c.title || c.id)));
+        (c.fields || []).forEach(function (f) { fieldDiff(box, f); });
+      } else if (kind === 'add' && c.node) {
+        box = h('div', 'tl-change tl-add');
+        box.appendChild(h('div', 'tl-change-head', 'Add: ' + (c.node.title || c.node.id)));
+        ['compression', 'body'].forEach(function (k) {
+          if (c.node[k]) fieldDiff(box, { field: k, label: k === 'body' ? 'Body' : 'Compression', before: '', after: c.node[k] });
+        });
+      } else if (kind === 'remove') {
+        box = h('div', 'tl-change tl-remove', 'Remove: ' + (c.title || c.id));
+      } else if (kind === 'group') {
+        box = h('div', 'tl-change tl-add', 'Add group: ' + c.id + (c.compression ? ' — ' + c.compression : ''));
+      } else if (kind === 'dropgroup') {
+        box = h('div', 'tl-change tl-remove', 'Remove group: ' + c.id);
+      } else if (kind === 'editgroup') {
+        box = h('div', 'tl-change tl-update', 'Edit group: ' + c.id + (c.newid ? ' → ' + c.newid : '') + (c.compression ? ' — ' + c.compression : ''));
+      }
+      if (box) diffs.appendChild(box);
+    });
+
     var note = h('p', 'review-note quiet small'),
         bar = h('div', 'review-bar'), yes = h('button', 'approve', '✓ Approve'), no = h('button', 'reject', '✕ Reject');
     yes.type = 'button'; no.type = 'button';
     var side = dock.parentNode;
     panel.appendChild(pic);
     bar.appendChild(yes); bar.appendChild(no); panel.appendChild(note); panel.appendChild(bar);
+    // The timeline and the buttons come first; the written changes follow, tucked in a fold.
+    if (diffs.childNodes.length) {
+      var fold = h('details', 'map-diff-fold'), sum = h('summary', '', 'Text changes (red removed, green added)');
+      fold.open = true; fold.appendChild(sum); fold.appendChild(diffs); panel.appendChild(fold);
+    }
     var q = new URLSearchParams();
     q.set('map-name', mapName); q.set('changes', JSON.stringify(changes));
     fetch('/action/preview-map', { method: 'POST', body: q })
@@ -449,6 +509,7 @@ window.growPane = function (pane) {
     if (saved) {
       log.innerHTML = saved.html || ''; turns = saved.turns || [];
       log.scrollTop = log.scrollHeight;
+      if (clearBtn && turns.length) clearBtn.hidden = false;
     }
   } catch (e) {}
   var staged = keep('sessionStorage', 'dock-stage');

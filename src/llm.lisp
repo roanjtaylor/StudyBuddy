@@ -327,12 +327,21 @@
                    "toolTimeoutMs" 60000
                    "previewChars" 200
                    "thinkingDisplay" "summarized"))
-        (run-id nil) (reply '()) (error-text nil))
+        (run-id nil) (reply '()) (error-text nil) (after-tool nil))
     (when system (setf (gethash "systemPrompt" body) system))
     (when effort (setf (gethash "effort" body) effort))
     (when tools (setf (gethash "tools" body) (tool-manifest tools)))
     (flet ((handle (name data-text)
              (let ((data (handler-case (jzon:parse data-text) (error () (obj)))))
+               ;; Words before a tool call and words after it are separate paragraphs, not one run-on.
+               (when (and (equal name "delta") after-tool)
+                 (setf after-tool nil)
+                 (let ((s (gethash "text" data)))
+                   (when (and reply (stringp s) (plusp (length s))
+                              (not (member (char s 0) '(#\Newline #\Return))))
+                     (setf (gethash "text" data) (str (format nil "~%~%") s)))))
+               (when (member name '("tool_request" "tool_call") :test #'equal)
+                 (setf after-tool t))
                (cond ((equal name "run") (setf run-id (gethash "runId" data)))
                      ((equal name "delta") (push (gethash "text" data) reply))
                      ((equal name "error") (setf error-text (gethash "error" data)))

@@ -1,13 +1,15 @@
-;;;; L5b — Videos pinned to an idea.
+;;;; L5b — Images and videos for an idea: browsed under the idea, pinned beside the chat.
 ;;;;
-;;;; A pin is (:id "computers/ram/VIDEOID" :map :node :video :title :channel :at), kept in
+;;;; A video pin is (:id "computers/ram/VIDEOID" :map :node :video :title :channel :at), kept in
 ;;;; data/videos.lisp beside the map (not inside it, so the model rewriting an idea never
-;;;; drops them). Search scrapes YouTube's public results page: no API key needed.
+;;;; drops them). An image pin is the same in data/images.lisp. Video search scrapes YouTube's
+;;;; public results page; image search uses Wikimedia Commons' open API: no key for either.
 ;;;; The browser side is static/videos.js.
 
 (in-package :studybuddy)
 
 (defstore video (:file "videos.lisp" :key :id))
+(defstore image (:file "images.lisp" :key :id))
 
 (defun node-videos (node)
   (remove-if-not (lambda (v) (and (equal (getf v :map) (map-id)) (equal (getf v :node) node)))
@@ -104,7 +106,55 @@
         (list :title (jget j "title") :channel (jget j "author_name")))
     (error () nil)))
 
-;;; ---- The section under an idea ---------------------------------------------
+;;; ---- Images: Wikimedia Commons ----------------------------------------------
+
+(defun node-images (node)
+  (remove-if-not (lambda (v) (and (equal (getf v :map) (map-id)) (equal (getf v :node) node)))
+                 (images)))
+
+(defun image-key (title) (format nil "~36r" (sxhash title)))
+
+(defun image-pin-id (node key) (str (map-id) "/" node "/" key))
+
+(defun pin-image! (node key title thumb page)
+  (put-image! (list :id (image-pin-id node key) :map (map-id) :node node :key key
+                    :title (trim (or title "Image")) :thumb thumb :page page :at (now-iso))))
+
+(defun unpin-image! (node key)
+  (let ((id (image-pin-id node key)))
+    (when (find-image id)
+      (setf *images* (remove id *images* :key (lambda (v) (getf v :id)) :test #'equal))
+      (save-images)
+      id)))
+
+;; "File:Some_name.jpg" → "Some name"
+(defun clean-file-title (s)
+  (let* ((s (if (prefix-p "File:" s) (subseq s 5) s))
+         (dot (position #\. s :from-end t)))
+    (substitute #\Space #\_ (if dot (subseq s 0 dot) s))))
+
+;; (search-images "transistor") → list of plists, up to 12 pictures with thumbnails.
+(defun search-images (query)
+  (let* ((url (str "https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search"
+                   "&gsrnamespace=6&gsrlimit=12&prop=imageinfo&iiprop=url%7Cmime&iiurlwidth=480&gsrsearch="
+                   (quri:url-encode (str query " filetype:bitmap"))))
+         (data (jzon:parse (dex:get url :headers *browser-headers* :force-string t)))
+         (pages (jget data "query" "pages"))
+         (found '()))
+    (when (hash-table-p pages)
+      (maphash (lambda (k p) (declare (ignore k))
+                 (let ((info (jget p "imageinfo" 0)))
+                   (when (and info (stringp (jget info "thumburl")))
+                     (push (list (or (jget p "index") 0)
+                                 (list :key (image-key (jget p "title"))
+                                       :title (clean-file-title (jget p "title"))
+                                       :thumb (jget info "thumburl")
+                                       :page (or (jget info "descriptionurl") "")))
+                           found))))
+               pages))
+    (mapcar #'second (sort found #'< :key #'first))))
+
+;;; ---- The browser under an idea, and the pins beside the chat ----------------
 
 (defun video-thumb (id) (str "https://i.ytimg.com/vi/" id "/mqdefault.jpg"))
 
@@ -116,31 +166,74 @@
             (:span :class "vid-meta"
               (:span :class "vid-title" (getf v :title))
               (:span :class "quiet small" (getf v :channel))))
-          (:button :type "button" :class "vid-unpin" :title "Unpin this video"
-                   :aria-label "Unpin this video" :data-video (getf v :video) "×"))))
+          (:div :class "pin-tools"
+            (:button :type "button" :class "pin-tool pin-remove" :data-kind "video" :data-key (getf v :video)
+                     :title "Unpin this video" :aria-label "Unpin this video" (icon "trash"))))))
 
-;; Pinned videos, then the button that opens the browser. static/videos.js does the rest.
+(defcomponent image-item (v)
+  (html (:li :class "vid pin-img" :data-image (getf v :key)
+          (:a :class "pin-img-link" :href (getf v :page) :target "_blank" :rel "noopener"
+              :title (getf v :title)
+            (:img :src (getf v :thumb) :alt (getf v :title) :loading "lazy"))
+          (:div :class "pin-tools"
+            (:button :type "button" :class "pin-tool pin-remove" :data-kind "image" :data-key (getf v :key)
+                     :title "Unpin this image" :aria-label "Unpin this image" (icon "trash"))))))
+
+;; A pinned artifact: its card (opens on the stage) and a way to unpin.
+(defcomponent artifact-item (a)
+  (html (:li :class "vid pin-art" :data-artifact (getf a :id)
+          (artifact-card a)
+          (:div :class "pin-tools"
+            (:button :type "button" :class "pin-tool pin-remove" :data-kind "artifact" :data-key (getf a :id)
+                     :title "Unpin this artifact" :aria-label "Unpin this artifact" (icon "trash"))))))
+
+;; Pinned images and videos, at the foot of the idea above Browse: "Images:" then "Videos:".
+;; Each group is hidden until something is pinned. static/videos.js fills and empties them.
+(defcomponent pin-tray (n)
+  (let ((id (getf n :id)))
+    (html (:div :class "pin-tray" :data-map (map-id) :data-node id
+                :hidden (not (or (node-images id) (node-videos id) (node-pinned-artifacts id)))
+            (:div :class "pin-group pin-artifacts" :hidden (null (node-pinned-artifacts id))
+              (:h3 "Made:")
+              (:ul :class "pin-list" (dolist (v (node-pinned-artifacts id)) (artifact-item v))))
+            (:div :class "pin-group pin-images" :hidden (null (node-images id))
+              (:h3 "Images:")
+              (:ul :class "pin-list" (dolist (v (node-images id)) (image-item v))))
+            (:div :class "pin-group pin-videos" :hidden (null (node-videos id))
+              (:h3 "Videos:")
+              (:ul :class "pin-list" (dolist (v (node-videos id)) (video-item v))))))))
+
+;; The Browse button at the foot of the idea, and the panel it opens: one search bar,
+;; images on the left and videos on the right.
 (defcomponent video-section (n)
-  (let ((vs (node-videos (getf n :id))))
-    (html (:section :class "videos" :data-map (map-id) :data-node (getf n :id) :data-title (getf n :title)
-            (:h2 :class "videos-h" :hidden (null vs) "Videos")
-            (:div :class "vid-player" :hidden t)
-            (:ul :class "vid-list" :hidden (null vs)
-              (dolist (v vs) (video-item v)))
-            (:button :type "button" :class "vid-open" :aria-expanded "false"
-              (:span :class "yt-ico" :aria-hidden "true" "▶") "Find videos")
-            (:div :class "vid-browse" :hidden t
-              (:form :class "vid-search" :action "/action/video-search" :method "post"
-                (:input :type "text" :name "q" :autocomplete "off"
-                        :placeholder "Search YouTube, or paste a link…" :aria-label "Search YouTube")
-                (:button :type "submit" "Search"))
-              (:p :class "quiet small vid-status" :role "status")
-              (:ul :class "vid-results"))))))
+  (html (:section :class "videos" :data-map (map-id) :data-node (getf n :id) :data-title (getf n :title)
+          (pin-tray n)
+          (:div :class "browse-bar"
+            (:button :type "button" :class "browse-open" :aria-expanded "false" "Browse"))
+          (:div :class "browse" :hidden t
+            (:div :class "browse-cols"
+              (:section :class "browse-col browse-images" :aria-label "Images"
+                (:form :class "browse-search" :data-kind "images" :action "/action/image-search" :method "post"
+                  (:input :type "text" :name "q" :autocomplete "off"
+                          :placeholder "Search images…" :aria-label "Search images")
+                  (:button :type "submit" "Search"))
+                (:p :class "quiet small col-status" :role "status")
+                (:ul :class "img-results"))
+              (:section :class "browse-col browse-videos" :aria-label "Videos"
+                (:form :class "browse-search" :data-kind "videos" :action "/action/video-search" :method "post"
+                  (:input :type "text" :name "q" :autocomplete "off"
+                          :placeholder "Search YouTube, or paste a link…" :aria-label "Search YouTube")
+                  (:button :type "submit" "Search"))
+                (:p :class "quiet small col-status" :role "status")
+                (:ul :class "vid-results")))))))
 
 ;;; ---- Actions ---------------------------------------------------------------
 
 (defun json-reply (&rest kvs)
   (raw-response "application/json" (jzon:stringify (apply #'obj kvs))))
+
+(defun plist->obj (r)
+  (apply #'obj (loop for (k v) on r by #'cddr append (list (lower k) v))))
 
 (defaction video-search "/action/video-search" (q)
   (cond ((blankp q) (json-reply "ok" nil "error" "Type something to search for."))
@@ -151,13 +244,15 @@
                        "results" (vector (obj "video" id "title" (or (getf d :title) "YouTube video")
                                               "channel" (or (getf d :channel) "") "avatar" "" "length" "" "views" "" "published" "")))))
         (t (handler-case
-               (json-reply "ok" t
-                           "results" (coerce (mapcar (lambda (r)
-                                                       (apply #'obj (loop for (k v) on r by #'cddr
-                                                                          append (list (lower k) v))))
-                                                     (search-youtube (trim q)))
-                                             'vector))
+               (json-reply "ok" t "results" (coerce (mapcar #'plist->obj (search-youtube (trim q))) 'vector))
              (error () (json-reply "ok" nil "error" "YouTube could not be reached. Try again, or paste a link."))))))
+
+(defaction image-search "/action/image-search" (q)
+  (cond ((blankp q) (json-reply "ok" nil "error" "Type something to search for."))
+        ((parse-video-id q) (json-reply "ok" t "results" (vector)))   ; a video link has no images
+        (t (handler-case
+               (json-reply "ok" t "results" (coerce (mapcar #'plist->obj (search-images (trim q))) 'vector))
+             (error () (json-reply "ok" nil "error" "Images could not be loaded. Try again."))))))
 
 (defaction pin-video "/action/pin-video" (map-name node-id video title channel)
   (cond ((not (select-map map-name)) (json-reply "ok" nil "error" "No such field."))
@@ -170,3 +265,31 @@
   (if (and (select-map map-name) (unpin-video! node-id video))
       (json-reply "ok" t)
       (json-reply "ok" nil "error" "That video was not pinned.")))
+
+;; Only addresses on Wikimedia are kept, as the search itself returns them.
+(defaction pin-image "/action/pin-image" (map-name node-id key title thumb page)
+  (cond ((not (select-map map-name)) (json-reply "ok" nil "error" "No such field."))
+        ((not (find-node node-id)) (json-reply "ok" nil "error" "No such idea."))
+        ((or (blankp key)
+             (not (or (prefix-p "https://upload.wikimedia.org/" (or thumb ""))
+                      (prefix-p "https://thumb.wikimedia.org/" (or thumb ""))))
+             (not (prefix-p "https://commons.wikimedia.org/" (or page ""))))
+         (json-reply "ok" nil "error" "That is not an image."))
+        (t (json-reply "ok" t "html" (image-item (pin-image! node-id key title thumb page))))))
+
+(defaction unpin-image "/action/unpin-image" (map-name node-id key)
+  (if (and (select-map map-name) (unpin-image! node-id key))
+      (json-reply "ok" t)
+      (json-reply "ok" nil "error" "That image was not pinned.")))
+
+;; Pin an artifact to an idea, or unpin it. Pinned, it stays with the idea for later chats.
+(defaction pin-artifact "/action/pin-artifact" (map-name node-id id)
+  (let ((a (and (select-map map-name) (find-artifact id))))
+    (cond ((null a) (json-reply "ok" nil "error" "No such artifact."))
+          ((not (find-node node-id)) (json-reply "ok" nil "error" "No such idea."))
+          (t (json-reply "ok" t "html" (artifact-item (pin-artifact! id node-id)))))))
+
+(defaction unpin-artifact "/action/unpin-artifact" (map-name id)
+  (if (and (select-map map-name) (unpin-artifact! id))
+      (json-reply "ok" t)
+      (json-reply "ok" nil "error" "That artifact was not pinned.")))

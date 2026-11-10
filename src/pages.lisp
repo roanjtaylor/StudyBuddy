@@ -95,6 +95,15 @@
             (:button :type "submit" :class "artifact-del-yes" "Delete")
             (:button :type "button" :class "artifact-del-no" "Cancel")))))
 
+;; Pin to the open idea (static/videos.js): kept in its tray, and given to later chats about it.
+;; Shown only on pages that have a tray (an idea's page).
+(defcomponent artifact-pin (a)
+  (html (:button :type "button" :class (if (getf a :pinned) "artifact-pin pinned" "artifact-pin")
+                 :data-artifact (getf a :id) :data-node (getf a :node)
+                 :title (if (getf a :pinned) "Pinned to this idea; click to unpin" "Pin to this idea")
+                 :aria-label "Pin to this idea" :aria-pressed (if (getf a :pinned) "true" "false")
+                 (icon "pin"))))
+
 ;; removable: where it may be deleted from (under its idea), the bin joins the corner tools.
 (defcomponent artifact-block (a &optional removable)
   (if (member (getf a :type) *inline-artifact-types* :test #'equal)
@@ -104,12 +113,14 @@
               ;; Over the top right corner: the bin, the name, and the way to full screen
               ;; (the frame swallows clicks, so that has to be a button over it).
               (:div :class "artifact-tools"
+                (artifact-pin a)
                 (when removable (artifact-remove a))
                 (:span :class "artifact-name" (getf a :title))
                 (:button :type "button" :class "artifact-expand" :title "Full screen" :aria-label "Full screen" (icon "expand")))
               (artifact-card a)))
       (html (artifact-card a)
-            (when removable (html (:div :class "artifact-tools" (artifact-remove a)))))))
+            (html (:div :class "artifact-tools" (artifact-pin a)
+                                       (when removable (artifact-remove a)))))))
 
 ;; The artifact as text, for the model to read back.
 (defun artifact-text (a)
@@ -160,6 +171,7 @@
     ("wide"   . "M4 12h16M14 6l6 6-6 6")
     ("expand" . "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5")
     ("globe"  . "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18")
+    ("pin"    . "M9 4h6l-1 6 3 3H7l3-3zM12 13v8")
     ("spark"  . "M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4")))
 
 (defcomponent icon (name &optional (class "ico"))
@@ -202,7 +214,7 @@
                   ;; The artifact open on the stage, so the model knows what "this" is.
                   (:input :type "hidden" :name "artifact" :value "")
                   (composer "Ask, ask for a change, or ask for cards, a quiz, a diagram, a page…"
-                            (focus-label focus))))
+                            (focus-label focus) t)))
               ;; The stage: where an artifact opens beside the chat, as on claude.ai.
               (:aside :id "dock-stage" :class "dock-stage" :hidden t
                 (:header
@@ -533,7 +545,9 @@
             ((equal type "mermaid")
              (artifact-frame a (html (:pre :class "mermaid" c)
                                      (:script :type "module"
+                                       ;; A lone ~ in a label pairs up as markdown strikethrough ("Unsupported markdown: del"), so show it as ≈.
                                        (:raw "import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';"
+                                             "for(const p of document.querySelectorAll('pre.mermaid'))p.textContent=p.textContent.replace(/(?<!~)~(?!~)/g,'\\u2248');"
                                              "mermaid.initialize({startOnLoad:true,theme:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'neutral'});")))))
             ((equal type "markdown")
              (artifact-frame a (html (:div :class "md doc" (:raw (markdown->html c))))))
@@ -567,7 +581,7 @@
                          ;; The whole explanation, one piece: no separate "why" line or notes box.
                          (:div :class "body md" :data-field "body" :hidden (blankp (getf n :body))
                            (:raw (markdown->html (getf n :body))))
-                         (let ((as (map-artifacts id)))
+                         (let ((as (remove-if (lambda (a) (getf a :pinned)) (map-artifacts id))))
                            (when as
                              (html (:h2 "Made for this idea")
                                    (:div :class "artifact-list"

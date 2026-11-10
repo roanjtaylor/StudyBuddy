@@ -1,0 +1,16 @@
+(:ID "computers/relay-vacuum-tube/MHKKLXJYJ7YR" :MAP "computers" :NODE "relay-vacuum-tube" :KEY
+ "MHKKLXJYJ7YR" :TITLE "Вакуумное реле В1В-1Т1 Миконд Ташкент (2)" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5c/%D0%92%D0%B0%D0%BA%D1%83%D1%83%D0%BC%D0%BD%D0%BE%D0%B5_%D1%80%D0%B5%D0%BB%D0%B5_%D0%921%D0%92-1%D0%A21_%D0%9C%D0%B8%D0%BA%D0%BE%D0%BD%D0%B4_%D0%A2%D0%B0%D1%88%D0%BA%D0%B5%D0%BD%D1%82_%282%29.jpg/500px-%D0%92%D0%B0%D0%BA%D1%83%D1%83%D0%BC%D0%BD%D0%BE%D0%B5_%D1%80%D0%B5%D0%BB%D0%B5_%D0%921%D0%92-1%D0%A21_%D0%9C%D0%B8%D0%BA%D0%BE%D0%BD%D0%B4_%D0%A2%D0%B0%D1%88%D0%BA%D0%B5%D0%BD%D1%82_%282%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE
+ "https://commons.wikimedia.org/wiki/File:%D0%92%D0%B0%D0%BA%D1%83%D1%83%D0%BC%D0%BD%D0%BE%D0%B5_%D1%80%D0%B5%D0%BB%D0%B5_%D0%921%D0%92-1%D0%A21_%D0%9C%D0%B8%D0%BA%D0%BE%D0%BD%D0%B4_%D0%A2%D0%B0%D1%88%D0%BA%D0%B5%D0%BD%D1%82_(2).jpg"
+ :AT "2026-11-10T11:22:56")
+(:ID "computers/relay-vacuum-tube/LTOE36Z050O5" :MAP "computers" :NODE "relay-vacuum-tube" :KEY
+ "LTOE36Z050O5" :TITLE "Omron G2R, Songle SMIH, Schrack RT series relays 02" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/77/Omron_G2R%2C_Songle_SMIH%2C_Schrack_RT_series_relays_02.jpg/500px-Omron_G2R%2C_Songle_SMIH%2C_Schrack_RT_series_relays_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE
+ "https://commons.wikimedia.org/wiki/File:Omron_G2R,_Songle_SMIH,_Schrack_RT_series_relays_02.jpg"
+ :AT "2026-11-10T11:23:14")
+(:ID "computers/relay-vacuum-tube/5XDY3FPCTRFO" :MAP "computers" :NODE "relay-vacuum-tube" :KEY
+ "5XDY3FPCTRFO" :TITLE "ENIAC Penn1" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6c/ENIAC_Penn1.jpg/500px-ENIAC_Penn1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE "https://commons.wikimedia.org/wiki/File:ENIAC_Penn1.jpg" :AT "2026-11-10T11:34:00")

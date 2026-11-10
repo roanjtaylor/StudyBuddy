@@ -1,16 +1,19 @@
 (:MAP :ID "computers" :TITLE "Computers" :COMPRESSION
  "A switch controls a switch; everything else is layers of programs loading programs." :AXIS
- ((:FROM 1850 :TO 1880 :SCALE 0.04) (:FROM 1880 :TO 1900 :SCALE 0.08)
-  (:FROM 1900 :TO 1930 :SCALE 0.3)))
+ ((:FROM 1855 :TO 1935 :SCALE 0.1)))
 (:GROUP :ID "switches" :COMPRESSION "A switch can control another switch.")
 (:GROUP :ID "stored-program" :COMPRESSION "Instructions are data in the same memory.")
 (:GROUP :ID "sharing" :COMPRESSION "Many programs share one machine.")
+(:GROUP :ID "symbolic-ai" :COMPRESSION
+ "Intelligence as hand-written symbols and rules, which worked in narrow cases and hit a wall.")
 (:GROUP :ID "languages" :COMPRESSION "Languages are compressions over machine code.")
-(:GROUP :ID "learned" :COMPRESSION "Programs can be found, not written.")
+(:GROUP :ID "connectionism" :COMPRESSION
+ "A function with adjustable weights can be fit to examples instead of being programmed.")
 (:GROUP :ID "loaders" :COMPRESSION "Every layer is a program that loads the next.")
 (:GROUP :ID "surfaces" :COMPRESSION
  "As switches shrink and get cheaper, the computer moves from a shared room to the desk, the pocket, the wall and the face.")
 (:GROUP :ID "network" :COMPRESSION "Machines talk.")
+(:GROUP :ID "learned" :COMPRESSION "Programs can be found, not written.")
 (:NODE :ID "transistor" :TITLE "Transistor as a switch" :COMPRESSION
  "A small voltage at one terminal lets or blocks a current between two others, so one signal can control another.
 Un voltaje pequeño en un terminal permite o bloquea una corriente entre otros dos, de modo que una señal puede controlar a otra."
@@ -174,10 +177,6 @@ Its weakness: the carry must ripple through every column, which limits speed. Ca
  :BODY
  "Programs are text files, so the editor is where software is born, including the next editor."
  :GROUP "loaders" :PREREQS ("shell") :ERA 1976)
-(:NODE :ID "lisp-image" :TITLE "The Lisp image" :COMPRESSION
- "A running program whose entire state, including its own compiler, can be saved to disk and resumed."
- :BODY "Loading becomes resuming: the layer you edit is the layer that is running." :GROUP
- "loaders" :PREREQS ("editor" "code-and-data-alike") :ERA 1962)
 (:NODE :ID "processes-threads" :TITLE "Processes and threads" :COMPRESSION
  "A process is a program plus its own memory; a thread is one program counter and stack inside it."
  :BODY "The unit the kernel shares the machine between. Everything you run is one of these." :GROUP
@@ -225,10 +224,16 @@ Its weakness: the carry must ripple through every column, which limits speed. Ca
  :BODY "Macros, interpreters-in-the-language and the whole bottom-up style follow from it." :GROUP
  "languages" :PREREQS ("compiler-vs-interpreter" "code-and-data-alike") :ERA 1960)
 (:NODE :ID "image-and-repl" :TITLE "The image and the REPL" :COMPRESSION
- "Read a form, evaluate it inside the running program, print the result; the program grows while it runs."
+ "A running program reads a form, evaluates it inside itself and prints the result, so it grows while it runs, and its whole state, compiler included, can be saved to disk and resumed."
  :BODY
- "Development without restarting. The program is a living thing you converse with, not a file you rebuild."
- :GROUP "languages" :PREREQS ("code-as-data" "lisp-image") :ERA 1962)
+ "Most programs are rebuilt from source and restarted from nothing. A Lisp system works the other way: the program stays alive, and you change it from the inside. This is why the language, the editor and the running program can all be one thing.
+
+**The REPL.** Read a form, evaluate it inside the running program, print the result, loop. Because code is data (see Code as data), the reader turns text into the same structures the evaluator runs. A new function defined at the prompt joins the program immediately, with no restart and no separate build step.
+
+**The image.** Because the compiler and evaluator are part of the running program, everything the program has become is just memory: functions, data, and the compiler itself. Dump that memory to disk and you have an image. Load the image later and the program resumes exactly where it was, with everything you defined still there.
+
+**Together.** The REPL grows the program while it runs. The image keeps what it grew. Development is then a conversation with a live system rather than a cycle of edit, compile and run."
+ :GROUP "languages" :PREREQS ("code-as-data") :ERA 1962)
 (:NODE :ID "types" :TITLE "Types" :COMPRESSION
  "A type is a claim about what a value is, checked before a run (static) or during it (dynamic) so wrong combinations are caught."
  :BODY
@@ -269,12 +274,12 @@ Its weakness: the carry must ripple through every column, which limits speed. Ca
 (:NODE :ID "neuron-weighted-sum" :TITLE "The neuron as a weighted sum" :COMPRESSION
  "Multiply each input by a weight, add them up, squash the result: a tiny adjustable function."
  :BODY "The unit everything in machine learning is made of; there is no cleverness inside it."
- :GROUP "learned" :PREREQS ("adder") :ERA 1958)
+ :GROUP "connectionism" :PREREQS ("adder") :ERA 1958)
 (:NODE :ID "gradient-training" :TITLE "Training by gradient descent" :COMPRESSION
  "Measure the error, compute how each weight moved it, nudge every weight the other way, repeat millions of times."
  :BODY
  "The program is not written; it is found by this loop. Learning is just optimisation with a lot of parameters."
- :GROUP "learned" :PREREQS ("neuron-weighted-sum") :ERA 1986)
+ :GROUP "connectionism" :PREREQS ("neuron-weighted-sum") :ERA 1986)
 (:NODE :ID "transformer" :TITLE "The transformer" :COMPRESSION
  "Each token looks at every other token, weighs how much it matters, and mixes in what it finds; stacked many times, this reads."
  :BODY
@@ -329,10 +334,16 @@ Its weakness: the carry must ripple through every column, which limits speed. Ca
  :BODY
  "The latest step in the same trend: smaller, closer, always on. Cameras and depth sensors track head and hands, and the program anchors drawings to places. It is the bitmap display and pointer idea with the screen replaced by your field of view."
  :GROUP "surfaces" :PREREQS NIL :ERA 2014)
-(:NODE :ID "computability" :TITLE "What can be computed" :COMPRESSION
- "A simple machine reading and writing symbols can compute anything computable, and some questions, like whether a program halts, no program can answer."
+(:NODE :ID "computability" :TITLE "Turing machines and computability" :COMPRESSION
+ "A simple machine reading and writing symbols on a tape can compute anything computable, and some questions, like whether a program halts, no program can answer."
  :BODY
- "Turing's 1936 machine defines the limits of everything else in the map. Any computer, whatever its surface, computes the same set of functions; the differences are speed and cost. It also underlies code and data in one memory, since one universal machine can run any other machine's description."
+ "Before building computers, Turing asked what 'computing' even means; his answer defines what every machine in this map can and cannot do.
+
+A Turing machine is a head on an endless tape of cells. It has a finite table of rules: in state S, reading symbol X, write Y, move left or right, go to state T. That is all. Yet anything any computer can compute, this can compute too (the Church–Turing thesis: a claim about the word 'computable', not a theorem).
+
+The limit: no program can decide, for every program and input, whether it will halt. If one could, feed it a program that does the opposite of whatever the decider predicts about it, and you get a contradiction. So some well-posed questions are unanswerable by any machine, however fast or large.
+
+Source: Turing, 'On Computable Numbers, with an Application to the Entscheidungsproblem' (1936)."
  :GROUP "stored-program" :PREREQS NIL :ERA 1936)
 (:NODE :ID "databases" :TITLE "Databases" :COMPRESSION
  "Keep structured data in tables behind a query language, and let the system handle storage, concurrency and crash recovery."
@@ -422,9 +433,106 @@ The architecture is the same and only the weights shift. This step is what makes
 Boole (*The Laws of Thought*, 1854) gave the rules. Any statement built from AND, OR and NOT can be rewritten, simplified and checked by symbol manipulation. Shannon's 1938 thesis showed that switching circuits obey the same algebra, so a logical expression can be turned directly into a circuit, and a circuit can be simplified with algebra."
  :GROUP "switches" :PREREQS NIL :ERA 1854)
 (:NODE :ID "relay-vacuum-tube" :TITLE "Relays and vacuum tubes" :COMPRESSION
- "Before transistors, a switch controlled by a signal was an electromagnet (relay) or a heated filament and grid (tube); the idea of one signal controlling another came first."
+ "Before transistors, a switch controlled by a signal was an electromagnet (relay) or a heated filament and grid (tube)."
  :BODY
- "The transistor was not the first switch that another signal could control. It was the first one that was small, cheap and cool.
+ "Relays and tubes are the same idea built two ways: a small signal controls a larger flow. So one switch's output can drive another's input. Chained together, they make gates, and gates wired in a loop make memory.
 
-A relay uses a small current in a coil to pull a metal contact open or closed. De Forest's triode (1906) uses a voltage on a grid to control a current flowing through a vacuum. Both give gain and switching, so both can build gates and memory. Early computers were made of them: Zuse's relay machines and ENIAC's 17,000+ tubes. Their size, heat, power draw and failure rate set the limits that the transistor removed."
+## How the ideas developed
+
+- **1820:** Ørsted shows an electric current deflects a compass needle, so currents make magnetism.
+- **1825:** Sturgeon builds the first electromagnet.
+- **1831:** Faraday shows induction, linking electricity and magnetism in both directions. This is the physics underneath, not the switch itself.
+- **1830s:** Joseph Henry builds strong electromagnets and uses them to switch a circuit at a distance. Edward Davy patents a telegraph relay in 1837.
+- **1847–54:** Boole's algebra of true/false values. It was only later applied to circuits.
+- **1880:** While working on carbon-filament light bulbs, Edison noticed carbon built up on the glass and a small current flowed from the hot filament to a metal plate within the bulb, but only when the plate was positively charged. He patented the findings, unsure what caused them. (The electron had not been discovered; J. J. Thomson identified it in 1897. Edison's discovery is now called thermionic emission. The carbon was a separate effect, caused by carbon evaporating from the hot filament.)
+- **1897:** J. J. Thomson identifies the electron as a particle. This is what later lets the Edison effect be understood.
+- **1904:** Fleming, who had studied the Edison effect, builds the diode, which passes current one way only. He sees it as a detector for radio waves.
+- **1906:** De Forest adds the grid (the triode). A voltage now controls a current, which gives amplification and fast switching.
+- **1900s–1910s:** Telephone exchanges are built from relays and switching machines, which makes large networks of switches normal engineering.
+- **1918:** Eccles and Jordan build the tube flip-flop. A circuit now stores one bit and holds its state until it is changed.
+- **1937–38:** Claude Shannon shows that Boolean algebra describes relay and switch circuits exactly. Logic design now has a theory behind it.
+- **1947:** The transistor. The logic and memory designs stay the same, but the switch under them becomes small, cool and cheap.
+
+## How they were applied
+
+- **1837–44:** Telegraph. Relays regenerate the signal along the line (Morse, Davy, Henry's work).
+- **1900s–1930s:** Telephone exchanges and railway signalling use relays at large scale.
+- **1906–1920s:** Radio detection and amplification with tubes. The 1915 transcontinental telephone line uses tube repeaters.
+- **1937–40:** Stibitz's relay adder and Bell Labs' relay calculators.
+- **1941:** Zuse's Z3, a programmable relay computer.
+- **1942:** Atanasoff–Berry computer, a tube-based special-purpose calculator.
+- **1943–44:** Colossus, designed by Tommy Flowers and used at Bletchley Park to break the German Lorenz cipher. It was a special-purpose machine built almost entirely from tubes (about 1,500 in the first version, about 2,400 in the second), doing Boolean logic and counting at electronic speed.
+- **1944:** Harvard Mark I, an electromechanical calculator.
+- **1943–46:** ENIAC, with over 17,000 tubes, built for artillery firing tables and unveiled in 1946.
+- **Late 1940s–50s:** The first transistor computers replace tube machines.
+
+## Why the transistor still mattered
+
+Size, heat, power draw and failure rate set the limits of these machines. Tube filaments burned out, so ENIAC's size and reliability were limited by its tube count. Relay contacts wore out, and the machines were slow. The logic design was already known, so the transistor was a hardware replacement that made the same designs far faster, smaller and more reliable."
  :GROUP "switches" :PREREQS NIL :ERA 1906)
+(:NODE :ID "symbolic-reasoning" :TITLE "Symbolic reasoning" :COMPRESSION
+ "Represent facts as symbols and search through logical steps, and a program can prove theorems and plan."
+ :BODY
+ "This was the first serious bet on machine intelligence: if thinking is manipulating symbols, a program that manipulates symbols can think. It sets up everything the later eras reacted against.
+
+Newell and Simon's Logic Theorist (1956) proved theorems by searching a tree of logical moves. McCarthy's Advice Taker (1958) proposed a program that holds facts as symbolic sentences and deduces what to do. Lisp was built for this work, because programs and symbol structures are the same kind of data (see Code as data).
+
+The limit is that every fact and rule has to be written by a person, and search explodes combinatorially outside small, tidy domains."
+ :GROUP "symbolic-ai" :PREREQS NIL :ERA 1956)
+(:NODE :ID "expert-systems" :TITLE "Expert systems" :COMPRESSION
+ "Encode a specialist's knowledge as if-then rules and let an inference engine chain them to reach conclusions."
+ :BODY
+ "Expert systems were the commercial peak of symbolic AI. They showed that narrow expertise could be turned into a program without solving general intelligence.
+
+A knowledge base holds rules such as \"if the infection is X and the patient is Y, then suspect Z\". An inference engine matches rules against known facts and fires them, chaining conclusions. MYCIN (1976) diagnosed infections. DEC's XCON (1980) configured computer orders and saved the company millions. Lisp machines were sold to run this kind of software.
+
+The cost was the knowledge bottleneck. Experts had to be interviewed and their know-how turned into rules by hand. The rules were brittle at the edges, and each one added had to be checked against the others."
+ :GROUP "symbolic-ai" :PREREQS NIL :ERA 1980)
+(:NODE :ID "ai-winters" :TITLE "The AI winters" :COMPRESSION
+ "When promises outran what rules, data and hardware could deliver, funding collapsed, and the idea that waited was learning from data."
+ :BODY
+ "The winters show that an idea can be right and still fail because the machine under it is too small. They also explain why the learned era began when it did.
+
+The first winter (mid-1970s) followed the Lighthill report and the limits of single-layer perceptrons that Minsky and Papert pointed out (1969). The second (1987 on) came when the Lisp-machine market collapsed and expert systems proved costly to maintain and brittle outside their narrow domains.
+
+The lesson is that hand-written knowledge does not scale and that learning from data needed far more compute than existed. Backpropagation (1986) was available, but it took GPUs and large datasets (2012 on) to make it pay off."
+ :GROUP "symbolic-ai" :PREREQS NIL :ERA 1987)
+(:NODE :ID "integrated-circuit" :TITLE "The integrated circuit" :COMPRESSION
+ "Build many transistors and their wiring on one piece of silicon, and a circuit becomes a manufactured part instead of an assembly of parts."
+ :BODY
+ "Wiring individual transistors by hand caps how complex a machine can be, because every connection is a place to fail. The integrated circuit removes that cap.
+
+Kilby (1958) and Noyce (1959) showed that transistors, resistors and the wires between them can all be made on one slab of silicon in the same steps. Complexity then costs the same per step however many transistors are on the chip, which is what makes Shrinking switches possible and later the microprocessor."
+ :GROUP "switches" :PREREQS NIL :ERA 1958)
+(:NODE :ID "microprocessor" :TITLE "The microprocessor" :COMPRESSION
+ "Put the whole CPU on a single chip, and a computer becomes a part you can buy for the price of a component."
+ :BODY
+ "Before 1971 a CPU was a board or a cabinet of chips. The Intel 4004 (1971) and then the 8080 and 6502 put registers, an adder and the fetch-decode-execute loop on one die.
+
+The cost of a processor then follows the chip cost curve, so hobbyists and small firms can build machines around it. This is the step that makes The personal computer possible."
+ :GROUP "surfaces" :PREREQS NIL :ERA 1971)
+(:NODE :ID "scaling-laws" :TITLE "Scaling laws" :COMPRESSION
+ "Model error falls smoothly and predictably as parameters, data and compute grow, so making models bigger becomes an engineering plan."
+ :BODY
+ "Kaplan et al. (2020) measured that loss on next-token prediction follows power laws in model size, dataset size and compute across many orders of magnitude. Training runs can therefore be planned by extrapolating from small ones.
+
+This explains why the field shifted toward larger runs on GPUs: the returns were forecastable before the money was spent. Later work (Hoffmann et al., 2022) refined the balance between model size and data."
+ :GROUP "learned" :PREREQS NIL :ERA 2020)
+(:NODE :ID "reasoning-rl" :TITLE "Reasoning through reinforcement learning" :COMPRESSION
+ "Train a model against outcomes that can be checked, and it learns to spend tokens working a problem out before it answers."
+ :BODY
+ "Post-training with human preferences teaches style and obedience. For math, code and puzzles the answer can be verified automatically, so a model can be rewarded for being right.
+
+Reinforcement learning against that reward makes models produce long chains of intermediate steps, backtrack and check themselves (OpenAI o1, 2024; DeepSeek-R1, 2025). Capability then grows with compute spent at answer time as well as at training time."
+ :GROUP "learned" :PREREQS NIL :ERA 2024)
+(:NODE :ID "universal-machine" :TITLE "The universal machine" :COMPRESSION
+ "One fixed machine can read the description of any other machine from its tape and imitate it, so a single device can do every computation."
+ :BODY
+ "This is why general-purpose computers exist at all: you need not build a new machine per task, only supply a new description.
+
+Turing encoded a machine's rule table as symbols on a tape. A universal machine reads that encoded table plus the input, then step by step does what the described machine would do. Program and data are the same kind of thing: symbols to be read.
+
+Every stored-program computer is this idea in hardware: the fetch-decode-execute loop is the universal machine, and the program in RAM is the description it imitates. It also explains why interpreters, emulators and virtual machines are possible.
+
+Source: Turing, 'On Computable Numbers' (1936), section 6."
+ :GROUP "stored-program" :PREREQS NIL :ERA 1936)
