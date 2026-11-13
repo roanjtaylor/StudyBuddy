@@ -327,12 +327,34 @@
                    "toolTimeoutMs" 60000
                    "previewChars" 200
                    "thinkingDisplay" "summarized"))
-        (run-id nil) (reply '()) (error-text nil) (after-tool nil))
+        (run-id nil) (reply '()) (error-text nil) (after-tool nil)
+        ;; Timing (see log-timing): when each first thing happened, and every tool call.
+        (t0 (get-internal-real-time)) (firsts '()) (usage nil) (sent 0)
+        (tool-ids '()) (tool-times (make-hash-table :test #'equal)) (app-tools '()))
     (when system (setf (gethash "systemPrompt" body) system))
     (when effort (setf (gethash "effort" body) effort))
     (when tools (setf (gethash "tools" body) (tool-manifest tools)))
     (flet ((handle (name data-text)
-             (let ((data (handler-case (jzon:parse data-text) (error () (obj)))))
+             (let ((data (handler-case (jzon:parse data-text) (error () (obj))))
+                   (now (ms-since t0)))
+               (flet ((first! (key) (unless (getf firsts key) (setf (getf firsts key) now))))
+                 (cond ((equal name "run") (first! :run))
+                       ((equal name "thinking") (first! :first-thinking) (first! :first-activity))
+                       ((equal name "delta") (first! :first-delta) (first! :first-activity))
+                       ((equal name "tokens") (first! :first-activity))
+                       ((equal name "tool_start")
+                        (first! :first-activity)
+                        (let ((id (gethash "id" data)))
+                          (push id tool-ids)
+                          (setf (gethash id tool-times) (list :name (gethash "name" data) :start now))))
+                       ((equal name "tool_call")
+                        (let ((entry (gethash (gethash "id" data) tool-times)))
+                          (when entry (setf (getf (gethash (gethash "id" data) tool-times) :input-done) now))))
+                       ((equal name "tool_result")
+                        (let ((entry (gethash (gethash "id" data) tool-times)))
+                          (when entry (setf (getf (gethash (gethash "id" data) tool-times) :result) now))))
+                       ((equal name "usage") (setf usage data))
+                       ((equal name "done") (first! :done))))
                ;; Words before a tool call and words after it are separate paragraphs, not one run-on.
                (when (and (equal name "delta") after-tool)
                  (setf after-tool nil)
@@ -346,17 +368,77 @@
                      ((equal name "delta") (push (gethash "text" data) reply))
                      ((equal name "error") (setf error-text (gethash "error" data)))
                      ((equal name "tool_request")
-                      (multiple-value-bind (text failed)
-                          (run-tool tools (gethash "name" data) (json->lisp (gethash "input" data)))
-                        (answer-tool-call run-id (gethash "callId" data) text failed))))
+                      (let ((start (ms-since t0)) (ran nil))
+                        (multiple-value-bind (text failed)
+                            (run-tool tools (gethash "name" data) (json->lisp (gethash "input" data)))
+                          (setf ran (ms-since t0))
+                          (answer-tool-call run-id (gethash "callId" data) text failed))
+                        (push (list :name (gethash "name" data) :at start
+                                    :run-ms (- ran start) :post-ms (- (ms-since t0) ran))
+                              app-tools))))
                (when on-event (funcall on-event name data)))))
-      (handler-case
-          (stream-post (str *server-url* "/api/agent") (relay-headers) (jzon:stringify body)
-                       (make-line-feeder (make-sse-parser #'handle)))
-        (llm-error (e) (error e))
-        (error (e) (llm-fail (princ-to-string e))))
-      (when error-text (llm-fail error-text))
-      (join "" (nreverse reply)))))
+      (unwind-protect
+           (progn
+             (handler-case
+                 (let ((json (jzon:stringify body)))
+                   (setf sent (length json))
+                   (stream-post (str *server-url* "/api/agent") (relay-headers) json
+                                (make-line-feeder (make-sse-parser #'handle))))
+               (llm-error (e) (error e))
+               (error (e) (llm-fail (princ-to-string e))))
+             (when error-text (llm-fail error-text))
+             (join "" (reverse reply)))
+        (log-timing
+         (append (list :at (now-iso) :model model :effort effort
+                       :messages (length messages) :sent-chars sent)
+                 (loop for key in '(:run :first-activity :first-thinking :first-delta :done)
+                       append (list key (getf firsts key)))
+                 (list :total (ms-since t0)
+                       :reply-chars (reduce #'+ reply :key (lambda (s) (if (stringp s) (length s) 0)))
+                       :relay (usage-summary usage)
+                       :tools (loop for id in (reverse tool-ids)
+                                    for e = (gethash id tool-times)
+                                    collect (list :name (getf e :name) :at (getf e :start)
+                                                  ;; writing the call's input, then waiting for its result
+                                                  :input-ms (and (getf e :input-done) (- (getf e :input-done) (getf e :start)))
+                                                  :wait-ms (and (getf e :result) (getf e :input-done)
+                                                                (- (getf e :result) (getf e :input-done)))))
+                       :app-tools (reverse app-tools)
+                       :error error-text)))))))
+
+;;; ---- Timing ------------------------------------------------------------
+;;; Every conversation call appends one plist to data/timing.log (git-ignored), all
+;;; times in ms since the request was sent:
+;;;   :run            the relay answered — network, plus the Space waking if it slept
+;;;   :first-activity the model's first sign of life — the relay starting its engine and
+;;;                   Anthropic's time to first token
+;;;   :first-thinking / :first-delta   reasoning began / the answer's first words
+;;;   :done / :total  the stream ended / converse returned
+;;;   :relay          the engine's own count: its duration, model turns, tokens in and out
+;;;   :tools          per call: when it began, ms writing its input, ms waiting for its result
+;;;   :app-tools      per app tool: ms running it here, ms posting the answer back
+;;; (timings) at the REPL shows the latest.
+
+(defun ms-since (t0)
+  (round (* 1000 (- (get-internal-real-time) t0)) internal-time-units-per-second))
+
+(defun usage-summary (usage)
+  (when usage
+    (let ((u (gethash "usage" usage)))
+      (flet ((tokens (key) (let ((v (and (hash-table-p u) (gethash key u)))) (and (numberp v) v)))
+             (num (v) (and (numberp v) v)))
+        (list :duration-ms (num (gethash "durationMs" usage)) :turns (num (gethash "turns" usage))
+              :in (tokens "input_tokens") :cache-read (tokens "cache_read_input_tokens")
+              :cache-write (tokens "cache_creation_input_tokens") :out (tokens "output_tokens"))))))
+
+(defun log-timing (record)
+  (ignore-errors (append-file-form (data-path "timing.log") record))
+  (ignore-errors (format *trace-output* "~&[timing] ~s~%" record)))
+
+;; (timings 5) → the last five records, newest first.
+(defun timings (&optional (n 5))
+  (let ((all (read-file-forms (data-path "timing.log"))))
+    (reverse (last all n))))
 
 (defun answer-tool-call (run-id call-id text failed)
   (handler-case

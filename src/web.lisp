@@ -159,6 +159,7 @@
         (:main (dolist (p parts) (html (:raw p))))
         (:script :src (static-url "map.js"))
         (when *focus* (html (:script :src (static-url "md.js"))
+                            (:script :src (static-url "draft.js"))
                             (:script :src (static-url "dock.js"))
                             (:script :src (static-url "study.js"))
                             (:script :src (static-url "videos.js"))))))))

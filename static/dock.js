@@ -24,6 +24,23 @@ window.growPane = function (pane) {
   setTimeout(done, 600);
 };
 
+// Shared by both chats: a reply is read from its start while the rest arrives. The returned
+// function follows the growing reply only until the question that prompted it reaches the top
+// of the log, then leaves the scroll alone for good. Scrolling by hand ends it at once.
+window.followFrom = function (log, msg) {
+  var over = false;
+  function stop() { over = true; }
+  ['wheel', 'touchmove', 'mousedown'].forEach(function (ev) {
+    log.addEventListener(ev, stop, { once: true, passive: true });
+  });
+  return function () {
+    if (over) return;
+    var top = log.scrollTop + msg.getBoundingClientRect().top - log.getBoundingClientRect().top - 8;
+    log.scrollTop = top;
+    if (log.scrollTop >= top - 1) over = true;   // the question is at the top: stay put
+  };
+};
+
 // A document artifact's preview grows to the document's own height, so all of it shows and
 // can be used where it stands (the frame reports it; see the artifact view).
 window.addEventListener('message', function (e) {
@@ -31,7 +48,7 @@ window.addEventListener('message', function (e) {
   if (!h) return;
   var frames = document.querySelectorAll('.artifact-inline-html .artifact-preview');
   for (var i = 0; i < frames.length; i++) {
-    if (frames[i].closest('.artifact-tile, .pin-art')) continue;   // thumbnails keep their fixed size
+    if (frames[i].closest('.artifact-tile, .pin-art, .msg-artifacts')) continue;   // thumbnails keep their fixed size
     if (frames[i].contentWindow === e.source) frames[i].style.height = Math.min(h, 4000) + 'px';
   }
 });
@@ -161,7 +178,7 @@ window.addEventListener('message', function (e) {
     var t = e.target.closest && (e.target.closest('.artifact-expand') || e.target.closest('.artifact-card'));
     // A thumbnail of a page opens full screen on a click anywhere on it (not on its buttons).
     if (!t && e.target.closest && !e.target.closest('button, a')) {
-      var th = e.target.closest('.artifact-tile .artifact-inline-html, .pin-art .artifact-inline-html');
+      var th = e.target.closest('.artifact-tile .artifact-inline-html, .pin-art .artifact-inline-html, .msg-artifacts .artifact-inline-html');
       if (th) t = th.querySelector('.artifact-expand');
     }
     if (!t) return;
@@ -195,7 +212,7 @@ window.addEventListener('message', function (e) {
 
   // ---- The live reply: built up from events, replaced by the stored one at the end ----
   var frames = ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'];
-  function liveMessage() {
+  function liveMessage(follow) {
     var el = document.createElement('article');
     el.className = 'msg msg-buddy live';
     var mark = document.createElement('span'); mark.className = 'msg-mark';
@@ -207,9 +224,12 @@ window.addEventListener('message', function (e) {
     var thinkBody = document.createElement('div'); thinkBody.className = 'thinking-text'; think.appendChild(thinkBody);
     var body = document.createElement('div'); body.className = 'md';
     var cards = document.createElement('div'); cards.className = 'msg-artifacts'; cards.hidden = true;
-    el.appendChild(mark); el.appendChild(think); el.appendChild(activity); el.appendChild(body); el.appendChild(cards); el.appendChild(status);
+    // What a tool is being given, readable while it is written (draft.js).
+    var draftBox = document.createElement('div'); draftBox.className = 'drafts'; draftBox.hidden = true;
+    el.appendChild(mark); el.appendChild(think); el.appendChild(activity); el.appendChild(body); el.appendChild(draftBox); el.appendChild(cards); el.appendChild(status);
 
     var t0 = Date.now(), i = 0, text = '', thinking = '', renderTimer = null, verb = 'Thinking';
+    var draft = window.toolDrafts ? window.toolDrafts(draftBox, follow, function (label) { verb = label; }) : function () {};
     var thinkFrom = 0, thinkTo = 0;
     function tick() {
       status.innerHTML = '<span class="spin">' + frames[i++ % frames.length] + '</span> ' + md.escape(verb) + '… ' +
@@ -217,13 +237,17 @@ window.addEventListener('message', function (e) {
     }
     tick();
     var timer = setInterval(tick, 130);
-    function render() { body.innerHTML = md.render(text); log.scrollTop = log.scrollHeight; }
+    function render() { body.innerHTML = md.render(text); follow(); }
     function thoughtFor() {
       if (!thinkFrom) return;
       sum.textContent = 'Thought for ' + Math.max(1, Math.round(((thinkTo || Date.now()) - thinkFrom) / 1000)) + 's';
     }
     return {
       el: el,
+      draft: function (data) {
+        if (thinkFrom && !thinkTo) { thinkTo = Date.now(); thoughtFor(); }
+        draft(data);
+      },
       delta: function (s) {
         text += s; verb = 'Writing';
         if (thinkFrom && !thinkTo) { thinkTo = Date.now(); thoughtFor(); }
@@ -235,7 +259,7 @@ window.addEventListener('message', function (e) {
       },
       status: function (s) {
         var p = document.createElement('p'); p.className = 'did'; p.textContent = s; activity.appendChild(p);
-        log.scrollTop = log.scrollHeight;
+        follow();
       },
       artifact: function (html) {
         cards.hidden = false;
@@ -255,7 +279,7 @@ window.addEventListener('message', function (e) {
             if (!block.contains(f)) f.src = fresh.getAttribute('src');
           });
         }
-        log.scrollTop = log.scrollHeight;
+        follow();
         // A visual shows itself in the chat; anything else opens on the stage. A click on a card opens either.
         // In full screen, whatever it makes or changes appears on the stage at once.
         if (block === card || dock.classList.contains('focus') || card.dataset.artifact === openId)
@@ -321,9 +345,10 @@ window.addEventListener('message', function (e) {
     p.textContent = text;
     mine.appendChild(p);
     log.appendChild(mine);
-    var live = liveMessage();
+    var follow = window.followFrom(log, mine);
+    var live = liveMessage(follow);
     log.appendChild(live.el);
-    log.scrollTop = log.scrollHeight;
+    follow();
     input.value = ''; grow();
     form.classList.add('busy'); sendBtn.hidden = true; stopBtn.hidden = false;
     if (clearBtn) clearBtn.hidden = true;
@@ -334,7 +359,6 @@ window.addEventListener('message', function (e) {
       if (!form.classList.contains('busy')) return;
       form.classList.remove('busy'); sendBtn.hidden = false; stopBtn.hidden = true;
       if (clearBtn) clearBtn.hidden = false;
-      log.scrollTop = log.scrollHeight;
       input.focus();
     }
 
@@ -346,6 +370,7 @@ window.addEventListener('message', function (e) {
           else if (name === 'thinking') live.thinking(data.text || '');
           else if (name === 'status') live.status(data.text || '');
           else if (name === 'artifact') live.artifact(data.html || '');
+          else if (name === 'draft') live.draft(data);
           else if (name === 'proposal') proposals.push(data);
           else if (name === 'message') {
             changed = !!data.changed; reply = data.text; live.finish(data.html); if (!changed) release();

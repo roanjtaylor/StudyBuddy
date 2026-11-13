@@ -2,4 +2,4 @@
   (:use :cl)
   (:local-nicknames (:jzon :com.inuoe.jzon)
                     (:ht :hunchentoot))
-  (:export #:start #:stop #:refresh))
+  (:export #:start #:stop #:refresh #:timings))

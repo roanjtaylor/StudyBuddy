@@ -415,38 +415,6 @@
   </g>
 </svg>"
  :AT "2026-11-09T11:31:01" :VERSION 1)
-(:ID "4-bit-ripple-adder" :MAP "computers" :NODE "adder" :TYPE "html" :TITLE "4-bit ripple adder"
- :LANGUAGE NIL :CONTENT "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
-body{font-family:system-ui,sans-serif;margin:16px;color:#222;max-width:640px}
-.row{display:flex;gap:8px;justify-content:center;margin:6px 0}
-.col{width:130px;border:2px solid #888;border-radius:8px;padding:6px;text-align:center;font-size:13px}
-button{font-size:20px;width:44px;height:44px;border-radius:8px;border:2px solid #444;cursor:pointer}
-.on{background:#2a9d4a;color:#fff}.off{background:#eee}
-.bit{display:inline-block;width:30px;height:30px;line-height:30px;border-radius:50%;font-weight:bold;color:#fff}
-.b1{background:#2a9d4a}.b0{background:#999}
-.carry{color:#c0392b;font-weight:bold}
-h3{margin:4px 0}
-</style></head><body>
-<h3>Add two 4-bit numbers</h3>
-<p style=\"font-size:14px\">Click bits to flip them. Each column is a full adder: it takes A, B and the carry from its right, and outputs a sum bit and a carry to its left.</p>
-<div>A: <span id=\"A\"></span> = <b id=\"an\"></b></div><div>B: <span id=\"B\"></span> = <b id=\"bn\"></b></div>
-<div class=\"row\" id=\"cols\" style=\"flex-direction:row\"></div>
-<div id=\"out\" style=\"text-align:center;font-size:18px;margin-top:10px\"></div>
-<script>
-let A=[0,1,1,0],B=[0,0,1,1]; // index 0 = leftmost (bit3)
-function mk(id,arr){const s=document.getElementById(id);s.innerHTML='';arr.forEach((v,i)=>{const b=document.createElement('button');b.textContent=v;b.className=v?'on':'off';b.onclick=()=>{arr[i]^=1;draw()};s.appendChild(b)})}
-function draw(){mk('A',A);mk('B',B);
-const val=a=>parseInt(a.join(''),2);an.textContent=val(A);bn.textContent=val(B);
-let c=0,sums=[],html=[];
-for(let i=3;i>=0;i--){const a=A[i],b=B[i],x=a^b,s=x^c,co=(a&b)|(c&x);
-html[i]=`<div class=\"col\"><b>bit ${3-i}</b><br>A=${a} B=${b}<br>carry in=<span class=\"carry\">${c}</span><br>a XOR b = ${x}<br><b>sum = ${x} XOR ${c} = ${s}</b><br>carry out = (${a}&amp;${b}) OR (${c}&amp;${x}) = <span class=\"carry\">${co}</span></div>`;
-sums[i]=s;c=co}
-cols.innerHTML=html.join('');
-const r=(c<<4)+val(sums);
-out.innerHTML=`Result: <span class=\"bit b${c}\">${c}</span> `+sums.map(s=>`<span class=\"bit b${s}\">${s}</span>`).join(' ')+` = <b>${r}</b> &nbsp;(${val(A)} + ${val(B)} = ${val(A)+val(B)})`}
-draw();
-</script></body></html>"
- :AT "2026-11-09T15:34:06" :VERSION 1)
 (:ID "relay-line-across-america" :MAP "computers" :NODE NIL :TYPE "html" :TITLE
  "Relay line across America" :LANGUAGE NIL :CONTENT "<!DOCTYPE html>
 <html><head><meta charset=\"utf-8\">
@@ -1329,3 +1297,590 @@ render();
   <text x=\"330\" y=\"408\" class=\"note\">1  1   not allowed</text>
 </svg>"
  :AT "2026-11-10T19:08:10" :VERSION 2)
+(:ID "4-bit-ripple-adder" :MAP "computers" :NODE "adder" :TYPE "html" :TITLE "4-bit ripple adder"
+ :LANGUAGE NIL :CONTENT "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:16px;color:#222;max-width:680px}
+.row{display:flex;gap:8px;justify-content:center;margin:6px 0}
+.col{width:140px;border:2px solid #888;border-radius:8px;padding:8px;font-size:14px;line-height:1.5}
+.col h4{margin:0 0 4px;text-align:center}
+.col .lbl{font-size:11px;text-transform:uppercase;color:#777;margin-top:6px;letter-spacing:.05em}
+button{font-size:20px;width:44px;height:44px;border-radius:8px;border:2px solid #444;cursor:pointer}
+.on{background:#2a9d4a;color:#fff}.off{background:#eee}
+.bit{display:inline-block;width:30px;height:30px;line-height:30px;border-radius:50%;font-weight:bold;color:#fff;text-align:center}
+.b1{background:#2a9d4a}.b0{background:#999}
+.carry{color:#c0392b;font-weight:bold}
+h3{margin:4px 0}
+</style></head><body>
+<h3>Add two 4-bit numbers</h3>
+<p style=\"font-size:14px\">Click bits to flip them. Each column adds its two bits plus the carry from the column on its right.</p>
+<div>A: <span id=\"A\"></span> = <b id=\"an\"></b></div><div>B: <span id=\"B\"></span> = <b id=\"bn\"></b></div>
+<div class=\"row\" id=\"cols\"></div>
+<div id=\"out\" style=\"text-align:center;font-size:18px;margin-top:10px\"></div>
+<script>
+let A=[0,1,1,0],B=[0,0,1,1]; // index 0 = leftmost (bit3)
+function mk(id,arr){const s=document.getElementById(id);s.innerHTML='';arr.forEach((v,i)=>{const b=document.createElement('button');b.textContent=v;b.className=v?'on':'off';b.onclick=()=>{arr[i]^=1;draw()};s.appendChild(b)})}
+function draw(){mk('A',A);mk('B',B);
+const val=a=>parseInt(a.join(''),2);an.textContent=val(A);bn.textContent=val(B);
+let c=0,sums=[],html=[];
+for(let i=3;i>=0;i--){const a=A[i],b=B[i],x=a^b,s=x^c,co=(a&b)|(c&x);
+const first=i===3;
+html[i]=`<div class=\"col\"><h4>Bit ${3-i}</h4>
+<div class=\"lbl\">Inputs</div>A = ${a}<br>B = ${b}${first?'':`<br>Carry in = <span class=\"carry\">${c}</span>`}
+<div class=\"lbl\">Outputs</div><b>Sum = ${s}</b><br>Carry out = <span class=\"carry\">${co}</span></div>`;
+sums[i]=s;c=co}
+cols.innerHTML=html.join('');
+const r=(c<<4)+val(sums);
+out.innerHTML=`Result: <span class=\"bit b${c}\">${c}</span> `+sums.map(s=>`<span class=\"bit b${s}\">${s}</span>`).join(' ')+` = <b>${r}</b> &nbsp;(${val(A)} + ${val(B)} = ${val(A)+val(B)})`}
+draw();
+</script></body></html>
+"
+ :AT "2026-11-13T17:01:25" :VERSION 2)
+(:PINNED T :ID "and-or-not-from-transistors" :MAP "computers" :NODE "logic-gates" :TYPE "html"
+ :TITLE "AND, OR, NOT from transistors" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:12px;background:#fafafa;color:#222}
+h2{font-size:16px;margin:0 0 4px}p.s{margin:0 0 12px;font-size:13px;color:#555}
+.row{display:flex;flex-wrap:wrap;gap:12px}
+.card{background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px;flex:1;min-width:230px;max-width:300px}
+.card h3{margin:0 0 4px;font-size:15px}
+button{font-size:14px;padding:6px 12px;margin:2px;border-radius:6px;border:1px solid #888;background:#eee;cursor:pointer}
+button.on{background:#2f9e44;color:#fff;border-color:#2f9e44}
+.r{font-size:13px;margin-top:4px;min-height:34px}
+</style></head><body>
+<h2>Transistors as switches</h2>
+<p class=\"s\">Each box is an NMOS transistor: input 1 = closed (green), 0 = open (grey). Orange wire = connected to supply (1). Click the buttons or the transistors.</p>
+<div class=\"row\">
+<div class=\"card\"><h3>AND: switches in series</h3><svg id=\"s0\" viewBox=\"0 0 240 270\"></svg><div id=\"b0\"></div><div class=\"r\" id=\"r0\"></div></div>
+<div class=\"card\"><h3>OR: switches in parallel</h3><svg id=\"s1\" viewBox=\"0 0 240 270\"></svg><div id=\"b1\"></div><div class=\"r\" id=\"r1\"></div></div>
+<div class=\"card\"><h3>NOT: switch to ground</h3><svg id=\"s2\" viewBox=\"0 0 240 270\"></svg><div id=\"b2\"></div><div class=\"r\" id=\"r2\"></div></div>
+</div>
+<script>
+const S=[[0,0],[0,0],[0]], N=['A','B'];
+const ln=(x1,y1,x2,y2,l)=>`<line x1=\"${x1}\" y1=\"${y1}\" x2=\"${x2}\" y2=\"${y2}\" stroke=\"${l?'#e8590c':'#adb5bd'}\" stroke-width=\"5\" stroke-linecap=\"round\"/>`;
+const tr=(c,x,y,i,on)=>`<g onclick=\"t(${c},${i})\" style=\"cursor:pointer\"><rect x=\"${x-24}\" y=\"${y}\" width=\"48\" height=\"36\" rx=\"6\" fill=\"${on?'#2f9e44':'#dee2e6'}\" stroke=\"#495057\" stroke-width=\"2\"/><text x=\"${x}\" y=\"${y+23}\" text-anchor=\"middle\" font-size=\"14\" fill=\"${on?'#fff':'#333'}\">${N[i]} ${on?'on':'off'}</text></g>`;
+const lamp=(x,y,on)=>`<circle cx=\"${x}\" cy=\"${y}\" r=\"16\" fill=\"${on?'#ffd43b':'#f1f3f5'}\" stroke=\"#495057\" stroke-width=\"2\"/><text x=\"${x}\" y=\"${y+5}\" text-anchor=\"middle\" font-size=\"13\">out</text>`;
+const tx=(x,y,s)=>`<text x=\"${x}\" y=\"${y}\" text-anchor=\"middle\" font-size=\"12\" fill=\"#555\">${s}</text>`;
+function draw(){
+ let [a,b]=S[0],o,h;
+ o=a&b;
+ h=tx(120,12,'VCC (1)')+ln(120,18,120,40,1)+tr(0,120,40,0,a)+ln(120,76,120,108,a)+tr(0,120,108,1,b)+ln(120,144,120,190,o)+lamp(120,206,o)+ln(120,222,120,243,0)+tx(120,260,'GND (0)');
+ s0.innerHTML=h; r0.textContent=`A=${a} B=${b} → out ${o}: current reaches the lamp only if both are closed.`;
+ [a,b]=S[1];o=a|b;
+ h=tx(120,12,'VCC (1)')+ln(120,18,120,30,1)+ln(60,30,180,30,1)+ln(60,30,60,46,1)+ln(180,30,180,46,1)+tr(1,60,46,0,a)+tr(1,180,46,1,b)+ln(60,82,60,130,a)+ln(180,82,180,130,b)+ln(60,130,180,130,o)+ln(120,130,120,190,o)+lamp(120,206,o)+ln(120,222,120,243,0)+tx(120,260,'GND (0)');
+ s1.innerHTML=h; r1.textContent=`A=${a} B=${b} → out ${o}: either closed switch gives a path.`;
+ a=S[2][0];o=a?0:1;
+ h=tx(100,12,'VCC (1)')+ln(100,18,100,40,1)+`<rect x=\"86\" y=\"40\" width=\"28\" height=\"36\" fill=\"#fff\" stroke=\"#495057\" stroke-width=\"2\"/>`+tx(100,63,'R')+ln(100,76,100,108,o)+ln(100,93,190,93,o)+ln(190,93,190,190,o)+tr(2,100,108,0,a)+ln(100,144,100,243,0)+tx(100,260,'GND (0)')+lamp(190,206,o)+ln(190,222,190,243,0)+tx(190,260,'GND');
+ s2.innerHTML=h; r2.textContent=`A=${a} → out ${o}: closed switch pulls the output to ground (0); open lets the resistor pull it up (1).`;
+ for(let c=0;c<3;c++){document.getElementById('b'+c).innerHTML=S[c].map((v,i)=>`<button class=\"${v?'on':''}\" onclick=\"t(${c},${i})\">${N[i]} = ${v}</button>`).join('')}
+}
+function t(c,i){S[c][i]^=1;draw()}
+draw();
+</script></body></html>"
+ :AT "2026-11-13T18:56:50" :VERSION 1)
+(:PINNED T :ID "gates-are-voltages-with-delay" :MAP "computers" :NODE "logic-gates" :TYPE "html"
+ :TITLE "Gates are voltages, with delay" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:12px;background:#fafafa;color:#222;max-width:760px}
+h2{font-size:16px;margin:14px 0 4px}p{font-size:13px;color:#444;margin:4px 0 8px;line-height:1.45}
+.box{background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px;margin-bottom:12px}
+canvas{width:100%;display:block}
+label{font-size:13px;display:block;margin:6px 0 2px}input[type=range]{width:100%}
+.st{display:flex;gap:6px;margin-top:6px}.st div{flex:1;text-align:center;font-size:12px;border:1px solid #ccc;border-radius:8px;padding:6px;background:#f8f9fa}
+.bar{height:60px;border:2px solid #495057;border-radius:4px;position:relative;background:#f1f3f5;margin:4px auto;width:34px;overflow:hidden}
+.fill{position:absolute;bottom:0;left:0;right:0;background:#e8590c}
+.th{position:absolute;left:0;right:0;border-top:2px dashed #1971c2}
+b.b0{color:#1971c2}b.b1{color:#e8590c}b.bx{color:#c92a2a}
+</style></head><body>
+<h2>1. A gate reads a voltage, not a number</h2>
+<p>Supply = 1.0 V. Drag the input voltage. Each stage is an inverter (NOT) whose output is a voltage too. Below 0.35 V reads as 0, above 0.65 V as 1, in between is undefined. Try 0.78 V: the input is sloppy, yet by stage 2 it's a clean level again. That restoring is why digital survives noise.</p>
+<div class=\"box\">
+<label>Input voltage: <b id=\"vl\"></b></label><input id=\"vin\" type=\"range\" min=\"0\" max=\"1\" step=\"0.01\" value=\"0.78\">
+<canvas id=\"c1\" width=\"700\" height=\"250\"></canvas>
+<div class=\"st\" id=\"stg\"></div>
+</div>
+
+<h2>2. Why a gate takes time</h2>
+<p>Your guess is close, but the delay is not the material \"priming\". Electrons in the silicon respond almost instantly. The delay is <b>charging</b>: the next transistor's gate is a tiny capacitor (like a bucket) and the wire has capacitance too. A transistor passes only limited current, so the bucket fills gradually (an RC curve). The next transistor switches only when the bucket passes its threshold (dashed line, 0.5 V). Each stage waits for the one before it.</p>
+<div class=\"box\">
+<canvas id=\"c2\" width=\"700\" height=\"260\"></canvas>
+<label>Load per stage (RC time constant): <b id=\"tl\"></b> ps</label><input id=\"tau\" type=\"range\" min=\"5\" max=\"60\" value=\"20\">
+<label>Clock half-period (time before input flips again): <b id=\"pl\"></b> ps</label><input id=\"per\" type=\"range\" min=\"20\" max=\"300\" value=\"150\">
+<div class=\"st\" id=\"bk\"></div>
+<p id=\"msg\" style=\"margin-top:8px\"></p>
+</div>
+<script>
+// ---------- part 1
+const sig=x=>1/(1+Math.exp((x-0.5)*18));
+const rd=v=>v<0.35?0:v>0.65?1:'?';
+function p1(){
+ const v0=+vin.value;vl.textContent=v0.toFixed(2)+' V';
+ const vs=[v0];for(let i=0;i<4;i++)vs.push(sig(vs[i]));
+ const c=c1.getContext('2d'),W=700,H=250;c.clearRect(0,0,W,H);
+ // transfer curve
+ const x0=30,y0=10,w=300,h=210;c.strokeStyle='#999';c.strokeRect(x0,y0,w,h);
+ c.fillStyle='rgba(25,113,194,.12)';c.fillRect(x0,y0,0.35*w,h);c.fillStyle='rgba(232,89,12,.12)';c.fillRect(x0+0.65*w,y0,0.35*w,h);
+ c.fillStyle='rgba(201,42,42,.08)';c.fillRect(x0+0.35*w,y0,0.3*w,h);
+ c.strokeStyle='#222';c.lineWidth=2;c.beginPath();for(let i=0;i<=100;i++){const x=i/100,y=sig(x);i?c.lineTo(x0+x*w,y0+h-y*h):c.moveTo(x0+x*w,y0+h-y*h)}c.stroke();
+ c.fillStyle='#e8590c';c.beginPath();c.arc(x0+v0*w,y0+h-vs[1]*h,6,0,7);c.fill();
+ c.fillStyle='#333';c.font='12px system-ui';c.fillText('Inverter: output V vs input V',x0+60,y0+14);c.fillText('input V →',x0+w/2-25,y0+h+16);
+ c.fillText('0',x0+40,y0+h-6);c.fillText('?',x0+w/2-3,y0+h-6);c.fillText('1',x0+w-40,y0+h-6);
+ // voltage bars
+ const bx=380;c.fillText('Voltage along the chain',bx,24);
+ vs.forEach((v,i)=>{const y=40+i*40,bw=300*v;c.fillStyle='#e9ecef';c.fillRect(bx,y,300,22);c.fillStyle=rd(v)===1?'#e8590c':rd(v)===0?'#1971c2':'#c92a2a';c.fillRect(bx,y,bw,22);
+  c.fillStyle='#222';c.fillText((i?'after NOT '+i:'input')+': '+v.toFixed(2)+' V → '+(rd(v)==='?'?'undefined':rd(v)),bx+4,y+15);});
+ stg.innerHTML=vs.map((v,i)=>{const r=rd(v);return `<div>${i?'stage '+i:'input'}<br><b class=\"${r===0?'b0':r===1?'b1':'bx'}\">${r==='?'?'undefined':'logic '+r}</b></div>`}).join('');
+}
+vin.oninput=p1;p1();
+// ---------- part 2
+const N=4,TH=0.5,WIN=420;let t=0,v=[0,1,0,1],inp=0,nextFlip=40;const hist=[];let cross=[null,null,null,null,null],dly=[null,null,null,null],last=null;
+const col=['#2b8a3e','#1971c2','#e8590c','#9c36b5','#c92a2a'];
+tau.oninput=()=>tl.textContent=tau.value;per.oninput=()=>pl.textContent=per.value;tau.oninput();per.oninput();
+bk.innerHTML=[0,1,2,3].map(i=>`<div>gate cap of<br>NOT ${i+1}<div class=\"bar\"><div class=\"fill\" id=\"f${i}\"></div><div class=\"th\" style=\"bottom:50%\"></div></div><span id=\"s${i}\"></span><br><span id=\"d${i}\"></span></div>`).join('');
+function step(dt){
+ t+=dt;if(t>=nextFlip){inp^=1;nextFlip=t+ +per.value;cross[0]=t;}
+ let prev=inp;
+ const tt=+tau.value;
+ for(let i=0;i<N;i++){const tg=(i?v[i-1]:inp)<TH?1:0;const o=v[i];v[i]+=(tg-v[i])*(1-Math.exp(-dt/tt));
+  if((o-TH)*(v[i]-TH)<0&&i<N){cross[i+1]=t;const ref=cross[i];if(ref!=null)dly[i]=t-ref;}}
+ hist.push([t,inp,...v]);while(hist[0][0]<t-WIN)hist.shift();
+}
+let lt=performance.now();
+function loop(n){const real=Math.min(0.05,(n-lt)/1000);lt=n;const sim=real*60; // 60 ps per second
+ for(let k=0;k<sim/0.5;k++)step(0.5);draw();requestAnimationFrame(loop)}
+function draw(){
+ const c=c2.getContext('2d'),W=700,H=260,L=40,T=10,w=650,h=210;c.clearRect(0,0,W,H);
+ c.strokeStyle='#bbb';c.strokeRect(L,T,w,h);c.setLineDash([5,4]);c.strokeStyle='#1971c2';c.beginPath();c.moveTo(L,T+h/2);c.lineTo(L+w,T+h/2);c.stroke();c.setLineDash([]);
+ c.fillStyle='#1971c2';c.font='11px system-ui';c.fillText('threshold',L+4,T+h/2-3);c.fillStyle='#555';c.fillText('1 V',8,T+12);c.fillText('0 V',8,T+h);c.fillText('time → (ps)',L+w-70,T+h+16);
+ for(let s=0;s<5;s++){c.strokeStyle=col[s];c.lineWidth=2;c.beginPath();hist.forEach((p,i)=>{const x=L+(p[0]-(t-WIN))/WIN*w,y=T+h-(p[1+s])*h*0.92-h*0.04;i?c.lineTo(x,y):c.moveTo(x,y)});c.stroke();
+  c.fillStyle=col[s];c.fillText(s?'NOT '+s+' out':'input',L+6+s*90,T+h+16);}
+ const tot=dly.reduce((a,b)=>a+(b||0),0);
+ for(let i=0;i<N;i++){document.getElementById('f'+i).style.height=(v[i]*100)+'%';document.getElementById('s'+i).innerHTML=(i?v[i-1]:inp)>0&&0;
+  const on=(i?v[i-1]:inp)>TH;// this gate's input high => its pull-down transistor is on
+  document.getElementById('s'+i).textContent='Pull-down: '+(on?'ON':'off');
+  document.getElementById('d'+i).textContent=dly[i]!=null?'delay ≈ '+dly[i].toFixed(0)+' ps':'';}
+ const need=tot, half=+per.value;
+ msg.innerHTML=`Total chain delay ≈ <b>${tot.toFixed(0)} ps</b>. `+(tot>half?'<b class=\"bx\">The input flips before the last stage has finished, so the output is wrong or glitchy. In a chip, this is why clock speed is limited by delay.</b>':'The output settles before the next input change, so this speed is safe. Shrink the half-period or raise the load to break it.');
+}
+requestAnimationFrame(loop);
+</script></body></html>"
+ :AT "2026-11-13T19:08:08" :VERSION 1)
+(:PINNED T :ID "baby-computer-a-clocked-counter" :MAP "computers" :NODE "clock" :TYPE "html" :TITLE
+ "Baby computer: a clocked counter" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:0;padding:14px;background:#fafafa;color:#222}
+h2{margin:0 0 4px;font-size:18px}p{margin:4px 0 10px;font-size:13px;color:#555}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:8px 0;font-size:13px}
+button{padding:6px 12px;border:1px solid #888;border-radius:6px;background:#fff;cursor:pointer;font-size:13px}
+button:hover{background:#eef}
+svg,canvas{background:#fff;border:1px solid #ddd;border-radius:8px;width:100%;display:block}
+#status{font-size:14px;font-weight:600;padding:6px 10px;border-radius:6px;margin-top:8px}
+.ok{background:#e3f5e6;color:#1d6b2c}.bad{background:#fde5e0;color:#a3260f}
+label{display:flex;align-items:center;gap:6px}
+</style></head><body>
+<h2>A 3-bit counter: the smallest computer that does something</h2>
+<p>Three flip-flops hold a number. Gates compute \"number + 1\". On each clock rising edge, the flip-flops copy the gates' answer. Between edges, the gates are free to wobble.</p>
+<div class=\"row\">
+<button id=\"run\">Pause</button><button id=\"step\">Step 1 tick</button><button id=\"reset\">Reset</button>
+<label>Clock period <input type=\"range\" id=\"per\" min=\"2\" max=\"16\" step=\"0.5\" value=\"10\"><b id=\"perv\"></b></label>
+<label>Gate delay <input type=\"range\" id=\"gd\" min=\"0.5\" max=\"4\" step=\"0.25\" value=\"1.5\"><b id=\"gdv\"></b></label>
+<label>Slow-mo <input type=\"range\" id=\"spd\" min=\"1\" max=\"10\" value=\"3\"></label>
+</div>
+<svg id=\"c\" viewBox=\"0 0 660 270\"></svg>
+<canvas id=\"w\" width=\"660\" height=\"190\" style=\"margin-top:8px\"></canvas>
+<div id=\"status\" class=\"ok\"></div>
+<p>Try it: drag the clock period down until it is shorter than the slowest path (the carry into bit 2: AND then XOR = 2 gate delays, plus setup). The flip-flops then look too early, copy a half-finished answer, and the count goes wrong. That is why a CPU has a maximum clock speed.</p>
+<script>
+const NS=\"http://www.w3.org/2000/svg\",svg=document.getElementById('c');
+function el(t,a,txt){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt)e.textContent=txt;svg.appendChild(e);return e}
+const X=[470,290,110]; // bit0 right? put bit2 left, bit0 right
+const bitX=i=>X[i], gates=[\"NOT Q0\",\"Q1 XOR Q0\",\"Q2 XOR (Q1 AND Q0)\"];
+el('text',{x:10,y:20,'font-size':13,fill:'#555'},'combinational logic (gates): computes Q + 1');
+el('text',{x:10,y:150,'font-size':13,fill:'#555'},'register (flip-flops): remembers Q');
+const gb=[],dw=[],ff=[],qt=[],dt=[];
+for(let i=0;i<3;i++){const x=bitX(i);
+ gb[i]=el('rect',{x:x-70,y:35,width:140,height:44,rx:8,fill:'#eef3ff',stroke:'#46f'});
+ el('text',{x:x,y:62,'text-anchor':'middle','font-size':12},gates[i]);
+ dw[i]=el('line',{x1:x,y1:79,x2:x,y2:150,'stroke-width':4,stroke:'#3a3'});
+ dt[i]=el('text',{x:x+8,y:118,'font-size':13,'font-weight':600},'D'+i);
+ ff[i]=el('rect',{x:x-45,y:150,width:90,height:60,rx:8,fill:'#fff',stroke:'#333','stroke-width':2});
+ el('text',{x:x-38,y:172,'font-size':12},'D');el('text',{x:x+28,y:172,'font-size':12},'Q'+i);
+ el('path',{d:`M${x-45},190 l12,6 l-12,6`,fill:'none',stroke:'#333'});
+ qt[i]=el('text',{x:x,y:198,'text-anchor':'middle','font-size':26,'font-weight':700},'0');
+ el('line',{x1:x,y1:210,x2:x,y2:236,stroke:'#999'});}
+el('text',{x:490,y:20,'font-size':12,fill:'#555'},'');
+const clkLine=el('line',{x1:20,y1:196,x2:640,y2:196,stroke:'#ccc','stroke-width':0});
+const clkBox=el('rect',{x:560,y:100,width:90,height:30,rx:6,fill:'#ddd',stroke:'#333'});
+el('text',{x:605,y:120,'text-anchor':'middle','font-size':13},'CLOCK');
+const clkW=el('path',{d:'M560,115 L540,115 L540,235 L10,235',fill:'none',stroke:'#888','stroke-width':2});
+for(let i=0;i<3;i++)el('path',{d:`M${bitX(i)-45},196 L${bitX(i)-60},196 L${bitX(i)-60},235`,fill:'none',stroke:'#888','stroke-width':2});
+const cnt=el('text',{x:330,y:262,'text-anchor':'middle','font-size':15,'font-weight':700},'');
+const P=()=>+per.value,G=()=>+gd.value,delays=()=>[G(),G(),2*G()],SETUP=0.5;
+const f=q=>(q+1)&7,bit=(q,i)=>(q>>i)&1;
+let t=0,Q=0,Qprev=7,tc=-100,running=true,stepping=false,lastEdge=-1,msg='',bad=false,hist=[],wrong=false,expected=0;
+per.oninput=gd.oninput=()=>{perv.textContent=P()+' ns';gdv.textContent=G()+' ns'};per.oninput();
+run.onclick=()=>{running=!running;stepping=false;run.textContent=running?'Pause':'Run'};
+step.onclick=()=>{running=true;stepping=true;run.textContent='Pause'};
+reset.onclick=()=>{t=0;Q=0;Qprev=7;tc=-100;lastEdge=-1;hist=[];expected=0;bad=false;msg=''};
+function Dshown(i){return (t-tc>=delays()[i])?bit(f(Q),i):bit(f(Qprev),i)}
+function tick(dt){ if(!running)return;
+ t+=dt;const e=Math.floor(t/P());
+ if(e>lastEdge){lastEdge=e; if(e>0){ // rising edge at e*P
+   const d=[0,1,2].map(i=>(e*P()-tc>=delays()[i]+SETUP)?bit(f(Q),i):bit(f(Qprev),i));
+   const nq=d[0]|d[1]<<1|d[2]<<2, want=f(Q); Qprev=Q;Q=nq;tc=e*P();
+   expected=(expected+1)&7; bad=(nq!==expected); msg=bad?`Edge ${e}: gates had not settled. Flip-flops captured ${nq}, should be ${expected}.`:`Edge ${e}: captured ${nq}. Correct.`;
+   if(bad)expected=nq;
+   if(stepping){running=false;stepping=false;run.textContent='Run'}}}
+}
+function clk(){return (t%P())<P()/2?1:0}
+function draw(){
+ const s=[0,1,2].map(i=>(t-tc>=delays()[i]+SETUP));
+ for(let i=0;i<3;i++){const ok=s[i];dw[i].setAttribute('stroke',ok?'#3a3':'#e90');dw[i].setAttribute('stroke-dasharray',ok?'':'6 4');
+  gb[i].setAttribute('fill',ok?'#eef3ff':'#fff1d6');dt[i].textContent='D'+i+'='+Dshown(i)+(ok?'':' ?');
+  qt[i].textContent=bit(Q,i);qt[i].setAttribute('fill',bit(Q,i)?'#c20':'#333');
+  ff[i].setAttribute('fill',bit(Q,i)?'#ffe9e4':'#fff')}
+ const c=clk();clkBox.setAttribute('fill',c?'#ffd84a':'#ddd');clkW.setAttribute('stroke',c?'#e90':'#888');
+ cnt.textContent='Stored number = '+Q+'   (binary '+[2,1,0].map(i=>bit(Q,i)).join('')+')';
+ const S=document.getElementById('status');S.className=bad?'bad':'ok';S.textContent=msg||('Safe period needs to be above about '+(2*G()+SETUP)+' ns. Press Run or Step.');
+ hist.push({t,c,q:[0,1,2].map(i=>bit(Q,i)),d:[0,1,2].map(Dshown)});
+ while(hist.length&&hist[0].t<t-40)hist.shift();
+ const cv=document.getElementById('w'),x=cv.getContext('2d');x.clearRect(0,0,660,190);x.font='12px sans-serif';
+ const names=['clock','Q0','Q1','Q2'],W=560,ox=60;
+ x.fillStyle='#555';x.fillText('last 40 ns',ox,12);
+ for(let r=0;r<4;r++){const y0=40+r*38;x.fillStyle='#222';x.fillText(names[r],8,y0-6);
+  x.strokeStyle=r?'#c20':'#e90';x.lineWidth=2;x.beginPath();
+  hist.forEach((h,k)=>{const px=ox+W-(t-h.t)/40*W,v=r?h.q[r-1]:h.c,py=y0-(v?20:0);if(!k)x.moveTo(px,py);else{x.lineTo(px,k&&((r?hist[k-1].q[r-1]:hist[k-1].c)!==v)?y0-((r?hist[k-1].q[r-1]:hist[k-1].c)?20:0):py);x.lineTo(px,py)}});x.stroke();}
+ // edge markers
+ x.strokeStyle='#bbb';x.setLineDash([3,4]);x.lineWidth=1;
+ for(let e=Math.floor((t-40)/P());e*P()<=t;e++){if(e<0)continue;const px=ox+W-(t-e*P())/40*W;if(px<ox)continue;x.beginPath();x.moveTo(px,22);x.lineTo(px,175);x.stroke()}
+ x.setLineDash([]);x.fillStyle='#777';x.fillText('dashed = rising edges: the only moments Q is allowed to change',ox,186);
+}
+let last=performance.now();
+(function loop(n){const dt=(n-last)/1000;last=n;tick(dt*(+spd.value)*1.0);draw();requestAnimationFrame(loop)})(last);
+</script></body></html>"
+ :AT "2026-11-13T19:20:33" :VERSION 1)
+(:PINNED T :ID "clock-circuit-crystal-to-flip-flops" :MAP "computers" :NODE "clock" :TYPE "svg"
+ :TITLE "Clock circuit: crystal to flip-flops" :LANGUAGE NIL :CONTENT
+ "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 825\" font-family=\"system-ui,sans-serif\">
+<defs><marker id=\"a\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto\"><path d=\"M0,0 L10,5 L0,10z\" fill=\"#333\"/></marker></defs>
+<rect width=\"900\" height=\"825\" fill=\"#fff\"/>
+<text x=\"450\" y=\"26\" text-anchor=\"middle\" font-size=\"18\" font-weight=\"700\">Where the clock comes from: four stages</text>
+
+<!-- ===== Stages 1-2 ===== -->
+<text x=\"20\" y=\"56\" font-size=\"14\" font-weight=\"700\" fill=\"#1a4fd0\">1–2. Pierce oscillator (crystal + inverter), then a squaring gate</text>
+<g stroke=\"#333\" stroke-width=\"2\" fill=\"none\">
+ <!-- input/output of inverter -->
+ <line x1=\"220\" y1=\"190\" x2=\"300\" y2=\"190\"/>
+ <line x1=\"384\" y1=\"190\" x2=\"560\" y2=\"190\"/>
+ <!-- Rf feedback -->
+ <polyline points=\"220,190 220,110 290,110\"/>
+ <polyline points=\"370,110 450,110 450,190\"/>
+ <!-- crystal branch -->
+ <polyline points=\"220,190 220,290 310,290\"/>
+ <polyline points=\"370,290 450,290 450,190\"/>
+ <!-- C1 -->
+ <polyline points=\"220,240 170,240 170,252\"/>
+ <line x1=\"170\" y1=\"262\" x2=\"170\" y2=\"300\"/>
+ <!-- C2 -->
+ <polyline points=\"450,240 500,240 500,252\"/>
+ <line x1=\"500\" y1=\"262\" x2=\"500\" y2=\"300\"/>
+ <!-- gate out to PLL -->
+ <polyline points=\"610,190 820,190 820,235\" marker-end=\"url(#a)\"/>
+</g>
+<g stroke=\"#333\" stroke-width=\"3\">
+ <line x1=\"155\" y1=\"252\" x2=\"185\" y2=\"252\"/><line x1=\"155\" y1=\"262\" x2=\"185\" y2=\"262\"/>
+ <line x1=\"485\" y1=\"252\" x2=\"515\" y2=\"252\"/><line x1=\"485\" y1=\"262\" x2=\"515\" y2=\"262\"/>
+ <line x1=\"310\" y1=\"275\" x2=\"310\" y2=\"305\"/><line x1=\"370\" y1=\"275\" x2=\"370\" y2=\"305\"/>
+</g>
+<!-- grounds -->
+<g stroke=\"#333\" stroke-width=\"2\">
+ <line x1=\"160\" y1=\"300\" x2=\"180\" y2=\"300\"/><line x1=\"164\" y1=\"305\" x2=\"176\" y2=\"305\"/><line x1=\"168\" y1=\"310\" x2=\"172\" y2=\"310\"/>
+ <line x1=\"490\" y1=\"300\" x2=\"510\" y2=\"300\"/><line x1=\"494\" y1=\"305\" x2=\"506\" y2=\"305\"/><line x1=\"498\" y1=\"310\" x2=\"502\" y2=\"310\"/>
+</g>
+<!-- junction dots -->
+<g fill=\"#333\"><circle cx=\"220\" cy=\"190\" r=\"4\"/><circle cx=\"450\" cy=\"190\" r=\"4\"/><circle cx=\"220\" cy=\"240\" r=\"4\"/><circle cx=\"450\" cy=\"240\" r=\"4\"/></g>
+<!-- Rf -->
+<rect x=\"290\" y=\"100\" width=\"80\" height=\"20\" fill=\"#fff\" stroke=\"#333\" stroke-width=\"2\"/>
+<text x=\"330\" y=\"90\" text-anchor=\"middle\" font-size=\"12\">Rf (bias, about 1 MΩ)</text>
+<!-- inverter -->
+<polygon points=\"300,150 300,230 370,190\" fill=\"#eef3ff\" stroke=\"#1a4fd0\" stroke-width=\"2.5\"/>
+<circle cx=\"377\" cy=\"190\" r=\"7\" fill=\"#fff\" stroke=\"#1a4fd0\" stroke-width=\"2.5\"/>
+<text x=\"318\" y=\"195\" font-size=\"12\" fill=\"#1a4fd0\">INV</text>
+<!-- crystal body -->
+<rect x=\"322\" y=\"277\" width=\"36\" height=\"26\" fill=\"#ffe9a8\" stroke=\"#b07a00\" stroke-width=\"2\"/>
+<text x=\"340\" y=\"328\" text-anchor=\"middle\" font-size=\"12\" fill=\"#b07a00\" font-weight=\"700\">quartz crystal</text>
+<text x=\"340\" y=\"344\" text-anchor=\"middle\" font-size=\"12\" fill=\"#b07a00\">sets the frequency</text>
+<text x=\"145\" y=\"262\" text-anchor=\"end\" font-size=\"12\">C1</text>
+<text x=\"525\" y=\"262\" font-size=\"12\">C2</text>
+<!-- squaring gate -->
+<polygon points=\"560,160 560,220 610,190\" fill=\"#eef3ff\" stroke=\"#1a4fd0\" stroke-width=\"2.5\"/>
+<text x=\"585\" y=\"244\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1a4fd0\">squaring gate</text>
+<!-- waveforms -->
+<path d=\"M470,170 q10,-20 20,0 t20,0 t20,0 t20,0\" fill=\"none\" stroke=\"#c20\" stroke-width=\"2\"/>
+<text x=\"510\" y=\"140\" text-anchor=\"middle\" font-size=\"12\" fill=\"#c20\">sine-like</text>
+<path d=\"M650,170 h10 v-20 h20 v20 h20 v-20 h20 v20 h10\" fill=\"none\" stroke=\"#2a8a3a\" stroke-width=\"2\"/>
+<text x=\"710\" y=\"140\" text-anchor=\"middle\" font-size=\"12\" fill=\"#2a8a3a\">square: 0s and 1s (e.g. 25 MHz)</text>
+<text x=\"820\" y=\"256\" text-anchor=\"middle\" font-size=\"12\" fill=\"#555\">to PLL</text>
+<!-- notes -->
+<g font-size=\"12\" fill=\"#555\">
+ <text x=\"580\" y=\"285\">Loop: the inverter amplifies noise;</text>
+ <text x=\"580\" y=\"301\">the crystal passes back only energy</text>
+ <text x=\"580\" y=\"317\">at its resonance, so the loop settles</text>
+ <text x=\"580\" y=\"333\">at that one frequency.</text>
+</g>
+
+<line x1=\"20\" y1=\"368\" x2=\"880\" y2=\"368\" stroke=\"#ddd\"/>
+
+<!-- ===== Stage 3 ===== -->
+<g transform=\"translate(0,10)\">
+<text x=\"20\" y=\"381\" font-size=\"14\" font-weight=\"700\" fill=\"#1a4fd0\">3. PLL: multiply the crystal up</text>
+<g stroke=\"#1a4fd0\" stroke-width=\"2\" fill=\"#eef3ff\">
+ <rect x=\"30\" y=\"430\" width=\"100\" height=\"60\" rx=\"8\"/>
+ <rect x=\"170\" y=\"430\" width=\"110\" height=\"60\" rx=\"8\"/>
+ <rect x=\"360\" y=\"430\" width=\"120\" height=\"60\" rx=\"8\"/>
+ <rect x=\"560\" y=\"430\" width=\"110\" height=\"60\" rx=\"8\"/>
+ <rect x=\"560\" y=\"520\" width=\"110\" height=\"50\" rx=\"8\"/>
+</g>
+<g font-size=\"13\" text-anchor=\"middle\">
+ <text x=\"80\" y=\"456\">Crystal</text><text x=\"80\" y=\"474\">25 MHz</text>
+ <text x=\"225\" y=\"456\">Phase</text><text x=\"225\" y=\"474\">detector</text>
+ <text x=\"420\" y=\"456\">Loop filter</text><text x=\"420\" y=\"474\">(charge pump)</text>
+ <text x=\"615\" y=\"456\">VCO</text><text x=\"615\" y=\"474\">fast oscillator</text>
+ <text x=\"615\" y=\"542\">÷ N</text><text x=\"615\" y=\"560\">(N = 30)</text>
+</g>
+<g stroke=\"#333\" stroke-width=\"2\" fill=\"none\">
+ <line x1=\"130\" y1=\"460\" x2=\"170\" y2=\"460\" marker-end=\"url(#a)\"/>
+ <line x1=\"280\" y1=\"460\" x2=\"360\" y2=\"460\" marker-end=\"url(#a)\"/>
+ <line x1=\"480\" y1=\"460\" x2=\"560\" y2=\"460\" marker-end=\"url(#a)\"/>
+ <line x1=\"670\" y1=\"460\" x2=\"740\" y2=\"460\"/>
+ <polyline points=\"710,460 710,545 670,545\" marker-end=\"url(#a)\"/>
+ <polyline points=\"560,545 225,545 225,490\" marker-end=\"url(#a)\"/>
+</g>
+<circle cx=\"710\" cy=\"460\" r=\"4\" fill=\"#333\"/>
+<g font-size=\"12\" fill=\"#555\" text-anchor=\"middle\">
+ <text x=\"320\" y=\"452\">error</text>
+ <text x=\"520\" y=\"438\">control</text><text x=\"520\" y=\"452\">voltage</text>
+ <text x=\"390\" y=\"537\">VCO ÷ N = 25 MHz? If not, steer the VCO</text>
+</g>
+<text x=\"750\" y=\"455\" font-size=\"14\" font-weight=\"700\" fill=\"#2a8a3a\">750 MHz</text>
+<text x=\"750\" y=\"474\" font-size=\"12\" fill=\"#555\">then × or ÷ to</text>
+<text x=\"750\" y=\"490\" font-size=\"12\" fill=\"#555\">the CPU speed</text>
+</g>
+
+<line x1=\"20\" y1=\"595\" x2=\"880\" y2=\"595\" stroke=\"#ddd\"/>
+
+<!-- ===== Stage 4 ===== -->
+<g transform=\"translate(0,12)\">
+<text x=\"20\" y=\"606\" font-size=\"14\" font-weight=\"700\" fill=\"#1a4fd0\">4. Clock tree</text>
+<g stroke=\"#333\" stroke-width=\"2\" fill=\"none\">
+ <line x1=\"30\" y1=\"710\" x2=\"90\" y2=\"710\"/>
+ <line x1=\"120\" y1=\"710\" x2=\"170\" y2=\"710\"/>
+ <line x1=\"170\" y1=\"665\" x2=\"170\" y2=\"755\"/>
+ <line x1=\"170\" y1=\"665\" x2=\"210\" y2=\"665\"/>
+ <line x1=\"170\" y1=\"755\" x2=\"210\" y2=\"755\"/>
+ <line x1=\"240\" y1=\"665\" x2=\"290\" y2=\"665\"/>
+ <line x1=\"240\" y1=\"755\" x2=\"290\" y2=\"755\"/>
+ <line x1=\"290\" y1=\"640\" x2=\"290\" y2=\"690\"/>
+ <line x1=\"290\" y1=\"730\" x2=\"290\" y2=\"780\"/>
+ <line x1=\"290\" y1=\"640\" x2=\"340\" y2=\"640\" marker-end=\"url(#a)\"/>
+ <line x1=\"290\" y1=\"690\" x2=\"340\" y2=\"690\" marker-end=\"url(#a)\"/>
+ <line x1=\"290\" y1=\"730\" x2=\"340\" y2=\"730\" marker-end=\"url(#a)\"/>
+ <line x1=\"290\" y1=\"780\" x2=\"340\" y2=\"780\" marker-end=\"url(#a)\"/>
+</g>
+<g fill=\"#eef3ff\" stroke=\"#1a4fd0\" stroke-width=\"2\">
+ <polygon points=\"90,695 90,725 120,710\"/>
+ <polygon points=\"210,650 210,680 240,665\"/>
+ <polygon points=\"210,740 210,770 240,755\"/>
+</g>
+<g fill=\"#fff\" stroke=\"#333\" stroke-width=\"2\">
+ <rect x=\"340\" y=\"628\" width=\"50\" height=\"24\"/><rect x=\"340\" y=\"678\" width=\"50\" height=\"24\"/>
+ <rect x=\"340\" y=\"718\" width=\"50\" height=\"24\"/><rect x=\"340\" y=\"768\" width=\"50\" height=\"24\"/>
+</g>
+<g font-size=\"12\" text-anchor=\"middle\"><text x=\"365\" y=\"644\">FF</text><text x=\"365\" y=\"694\">FF</text><text x=\"365\" y=\"734\">FF</text><text x=\"365\" y=\"784\">FF</text></g>
+<text x=\"30\" y=\"696\" font-size=\"12\" fill=\"#555\">PLL clock</text>
+<g font-size=\"12\" fill=\"#555\">
+ <text x=\"420\" y=\"690\">Buffers (triangles) split the clock again and again.</text>
+ <text x=\"420\" y=\"710\">Every branch has the same length, so millions of</text>
+ <text x=\"420\" y=\"730\">flip-flop clock pins see the rising edge at nearly</text>
+ <text x=\"420\" y=\"750\">the same instant: small skew.</text>
+</g>
+</g>
+</svg>"
+ :AT "2026-11-13T19:32:31" :VERSION 2)
+(:PINNED T :ID "ram-grid-and-one-cell" :MAP "computers" :NODE "ram" :TYPE "svg" :TITLE
+ "RAM: grid and one cell" :LANGUAGE NIL :CONTENT
+ "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1000 1010\" font-family=\"system-ui, sans-serif\">
+<rect width=\"1000\" height=\"1010\" fill=\"#fafafa\"/>
+<text x=\"20\" y=\"30\" font-size=\"18\" font-weight=\"700\" fill=\"#222\">A. The grid: address → decoder → one word line → one row of cells</text>
+<text x=\"20\" y=\"50\" font-size=\"13\" fill=\"#555\">Tiny 4-word × 4-bit RAM. Address 10 (=2) is applied, so row 2 is selected.</text>
+
+<!-- address pins -->
+<text x=\"22\" y=\"150\" font-size=\"13\" fill=\"#222\">A1 = 1</text>
+<text x=\"22\" y=\"230\" font-size=\"13\" fill=\"#222\">A0 = 0</text>
+<line x1=\"70\" y1=\"145\" x2=\"110\" y2=\"145\" stroke=\"#d4a017\" stroke-width=\"4\"/>
+<line x1=\"70\" y1=\"225\" x2=\"110\" y2=\"225\" stroke=\"#d4a017\" stroke-width=\"4\"/>
+<!-- decoder -->
+<rect x=\"110\" y=\"95\" width=\"120\" height=\"270\" rx=\"6\" fill=\"#dfe6ee\" stroke=\"#556\" stroke-width=\"2\"/>
+<text x=\"170\" y=\"120\" font-size=\"14\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#223\">DECODER</text>
+<text x=\"170\" y=\"138\" font-size=\"12\" text-anchor=\"middle\" fill=\"#445\">AND gates only</text>
+<text x=\"170\" y=\"190\" font-size=\"12\" text-anchor=\"middle\" fill=\"#445\">row0 = ¬A1·¬A0</text>
+<text x=\"170\" y=\"236\" font-size=\"12\" text-anchor=\"middle\" fill=\"#445\">row1 = ¬A1·A0</text>
+<text x=\"170\" y=\"282\" font-size=\"12\" text-anchor=\"middle\" fill=\"#a33\" font-weight=\"700\">row2 = A1·¬A0 ✓</text>
+<text x=\"170\" y=\"328\" font-size=\"12\" text-anchor=\"middle\" fill=\"#445\">row3 = A1·A0</text>
+
+<!-- word lines -->
+<g stroke-width=\"5\">
+<line x1=\"230\" y1=\"180\" x2=\"600\" y2=\"180\" stroke=\"#8a7a50\" opacity=\".55\"/>
+<line x1=\"230\" y1=\"226\" x2=\"600\" y2=\"226\" stroke=\"#8a7a50\" opacity=\".55\"/>
+<line x1=\"230\" y1=\"272\" x2=\"600\" y2=\"272\" stroke=\"#ffc400\"/>
+<line x1=\"230\" y1=\"318\" x2=\"600\" y2=\"318\" stroke=\"#8a7a50\" opacity=\".55\"/>
+</g>
+<text x=\"610\" y=\"277\" font-size=\"12\" fill=\"#a33\" font-weight=\"700\">word line 2 = HIGH</text>
+<text x=\"610\" y=\"185\" font-size=\"12\" fill=\"#666\">word line 0 (low)</text>
+<!-- bit lines -->
+<g stroke=\"#b87333\" stroke-width=\"5\">
+<line x1=\"285\" y1=\"150\" x2=\"285\" y2=\"400\"/><line x1=\"375\" y1=\"150\" x2=\"375\" y2=\"400\"/>
+<line x1=\"465\" y1=\"150\" x2=\"465\" y2=\"400\"/><line x1=\"555\" y1=\"150\" x2=\"555\" y2=\"400\"/>
+</g>
+<text x=\"420\" y=\"145\" font-size=\"12\" text-anchor=\"middle\" fill=\"#8a4f1c\">bit lines (vertical, a different metal layer)</text>
+<!-- cells -->
+<g font-size=\"14\" font-weight=\"700\" text-anchor=\"middle\">
+<!-- row 0 -->
+<rect x=\"250\" y=\"164\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#3f8f5a\"/><text x=\"285\" y=\"186\" fill=\"#fff\">0</text>
+<rect x=\"340\" y=\"164\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#3f8f5a\"/><text x=\"375\" y=\"186\" fill=\"#fff\">1</text>
+<rect x=\"430\" y=\"164\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#3f8f5a\"/><text x=\"465\" y=\"186\" fill=\"#fff\">1</text>
+<rect x=\"520\" y=\"164\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#3f8f5a\"/><text x=\"555\" y=\"186\" fill=\"#fff\">0</text>
+<!-- row 1 -->
+<rect x=\"250\" y=\"210\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#3f8f5a\"/><text x=\"285\" y=\"232\" fill=\"#fff\">1</text>
+<rect x=\"340\" y=\"210\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#3f8f5a\"/><text x=\"375\" y=\"232\" fill=\"#fff\">0</text>
+<rect x=\"430\" y=\"210\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#3f8f5a\"/><text x=\"465\" y=\"232\" fill=\"#fff\">0</text>
+<rect x=\"520\" y=\"210\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#3f8f5a\"/><text x=\"555\" y=\"232\" fill=\"#fff\">1</text>
+<!-- row 2 selected -->
+<rect x=\"250\" y=\"256\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#2e7d4a\" stroke=\"#ffc400\" stroke-width=\"4\"/><text x=\"285\" y=\"278\" fill=\"#fff\">1</text>
+<rect x=\"340\" y=\"256\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#2e7d4a\" stroke=\"#ffc400\" stroke-width=\"4\"/><text x=\"375\" y=\"278\" fill=\"#fff\">0</text>
+<rect x=\"430\" y=\"256\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#2e7d4a\" stroke=\"#ffc400\" stroke-width=\"4\"/><text x=\"465\" y=\"278\" fill=\"#fff\">1</text>
+<rect x=\"520\" y=\"256\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#2e7d4a\" stroke=\"#ffc400\" stroke-width=\"4\"/><text x=\"555\" y=\"278\" fill=\"#fff\">1</text>
+<!-- row 3 -->
+<rect x=\"250\" y=\"302\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#3f8f5a\"/><text x=\"285\" y=\"324\" fill=\"#fff\">0</text>
+<rect x=\"340\" y=\"302\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#3f8f5a\"/><text x=\"375\" y=\"324\" fill=\"#fff\">0</text>
+<rect x=\"430\" y=\"302\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#3f8f5a\"/><text x=\"465\" y=\"324\" fill=\"#fff\">0</text>
+<rect x=\"520\" y=\"302\" width=\"70\" height=\"32\" rx=\"4\" fill=\"#3f8f5a\"/><text x=\"555\" y=\"324\" fill=\"#fff\">1</text>
+</g>
+<!-- IO -->
+<rect x=\"250\" y=\"400\" width=\"340\" height=\"40\" rx=\"6\" fill=\"#dfe6ee\" stroke=\"#556\" stroke-width=\"2\"/>
+<text x=\"420\" y=\"425\" font-size=\"13\" text-anchor=\"middle\" fill=\"#223\">sense amps / write drivers → data pins: 1 0 1 1</text>
+<text x=\"20\" y=\"470\" font-size=\"13\" fill=\"#555\">Only the selected row's access transistors conduct, so only that row's 4 cells talk to the bit lines. Everything else is disconnected.</text>
+
+<text x=\"20\" y=\"515\" font-size=\"18\" font-weight=\"700\" fill=\"#222\">B. Inside one cell: a transistor, cut open (side view, not to scale)</text>
+<!-- substrate -->
+<rect x=\"60\" y=\"680\" width=\"560\" height=\"90\" fill=\"#8e949b\"/>
+<!-- oxide insulator -->
+<rect x=\"60\" y=\"560\" width=\"560\" height=\"120\" fill=\"#bcd6ea\" opacity=\".75\"/>
+<!-- n+ regions -->
+<rect x=\"130\" y=\"660\" width=\"110\" height=\"20\" fill=\"#2fa84f\"/>
+<rect x=\"440\" y=\"660\" width=\"110\" height=\"20\" fill=\"#2fa84f\"/>
+<!-- gate oxide -->
+<rect x=\"240\" y=\"650\" width=\"200\" height=\"10\" fill=\"#f5e9f2\" stroke=\"#999\" stroke-width=\".5\"/>
+<!-- poly gate -->
+<rect x=\"240\" y=\"615\" width=\"200\" height=\"35\" fill=\"#c0392b\"/>
+<!-- contacts -->
+<rect x=\"170\" y=\"590\" width=\"30\" height=\"72\" fill=\"#4a4a52\"/>
+<rect x=\"490\" y=\"590\" width=\"30\" height=\"72\" fill=\"#4a4a52\"/>
+<!-- metal1 -->
+<rect x=\"130\" y=\"570\" width=\"110\" height=\"22\" fill=\"#e0b020\"/>
+<rect x=\"440\" y=\"570\" width=\"110\" height=\"22\" fill=\"#e0b020\"/>
+<!-- via + metal2 -->
+<rect x=\"490\" y=\"540\" width=\"30\" height=\"32\" fill=\"#4a4a52\"/>
+<rect x=\"300\" y=\"518\" width=\"290\" height=\"24\" fill=\"#b87333\"/>
+<text x=\"310\" y=\"535\" font-size=\"12\" fill=\"#fff\">metal 2 → bit line</text>
+<text x=\"140\" y=\"585\" font-size=\"12\" fill=\"#222\">metal 1</text>
+<text x=\"255\" y=\"637\" font-size=\"12\" fill=\"#fff\">poly gate ← word line</text>
+<text x=\"150\" y=\"676\" font-size=\"12\" fill=\"#fff\">source</text>
+<text x=\"470\" y=\"676\" font-size=\"12\" fill=\"#fff\">drain</text>
+<text x=\"300\" y=\"730\" font-size=\"13\" fill=\"#fff\" text-anchor=\"middle\">p-type silicon substrate</text>
+<!-- channel -->
+<rect x=\"240\" y=\"660\" width=\"200\" height=\"6\" fill=\"#ffc400\" opacity=\".9\"/>
+<text x=\"340\" y=\"690\" font-size=\"11\" text-anchor=\"middle\" fill=\"#fff\">channel forms when gate is HIGH</text>
+<g font-size=\"13\" fill=\"#333\">
+<text x=\"650\" y=\"560\">Word line HIGH → electric field through the</text>
+<text x=\"650\" y=\"578\">gate oxide pulls electrons under the gate →</text>
+<text x=\"650\" y=\"596\">a conducting channel joins source to drain →</text>
+<text x=\"650\" y=\"614\">the cell's stored voltage reaches the bit line.</text>
+<text x=\"650\" y=\"650\">Word line LOW → no channel → cell is cut off.</text>
+<text x=\"650\" y=\"690\">Each real cell has two of these access</text>
+<text x=\"650\" y=\"708\">transistors plus four more forming the</text>
+<text x=\"650\" y=\"726\">cross-coupled inverters (the latch): 6T SRAM.</text>
+</g>
+
+<text x=\"20\" y=\"805\" font-size=\"18\" font-weight=\"700\" fill=\"#222\">Colour key</text>
+<g font-size=\"13\" fill=\"#333\">
+<rect x=\"20\" y=\"820\" width=\"22\" height=\"22\" fill=\"#8e949b\"/><text x=\"52\" y=\"836\">Grey: bulk p-type silicon wafer. Real silicon is a dull, mirror-like grey.</text>
+<rect x=\"20\" y=\"848\" width=\"22\" height=\"22\" fill=\"#2fa84f\"/><text x=\"52\" y=\"864\">Green: n+ doped silicon (source/drain), the layout-diagram convention. Under a microscope it is not green.</text>
+<rect x=\"20\" y=\"876\" width=\"22\" height=\"22\" fill=\"#c0392b\"/><text x=\"52\" y=\"892\">Red: polysilicon gate, the control terminal. Also a layout convention (real poly looks grey-brown).</text>
+<rect x=\"20\" y=\"904\" width=\"22\" height=\"22\" fill=\"#bcd6ea\"/><text x=\"52\" y=\"920\">Pale blue: silicon dioxide, glass insulator. Transparent in reality; thin-film interference gives it rainbow tints.</text>
+<rect x=\"20\" y=\"932\" width=\"22\" height=\"22\" fill=\"#e0b020\"/><text x=\"52\" y=\"948\">Gold/yellow: lowest metal wiring (metal 1). Real chips use copper or aluminium, not gold; gold is only in the bond wires.</text>
+<rect x=\"20\" y=\"960\" width=\"22\" height=\"22\" fill=\"#b87333\"/><text x=\"52\" y=\"976\">Copper: upper metal layers (bit lines). Real modern wiring really is copper, which looks orange-pink.</text>
+<rect x=\"20\" y=\"984\" width=\"22\" height=\"18\" fill=\"#4a4a52\"/><text x=\"52\" y=\"998\">Dark grey: tungsten plugs (contacts/vias) joining layers.   Bright yellow in panel A = signal active.</text>
+</g>
+</svg>"
+ :AT "2026-11-13T20:11:48" :VERSION 1)
+(:PINNED T :ID "ram-in-action" :MAP "computers" :NODE "ram" :TYPE "html" :TITLE "RAM in action"
+ :LANGUAGE NIL :CONTENT "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;background:#fafafa;margin:0;padding:16px;color:#222}
+h2{margin:0 0 6px;font-size:18px}p.s{margin:0 0 12px;color:#555;font-size:13px}
+.row{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+.box{background:#fff;border:1px solid #ccd;border-radius:8px;padding:10px}
+.sw{display:inline-block;width:44px;height:44px;margin:3px;border-radius:6px;border:2px solid #556;background:#eef;font:700 18px monospace;cursor:pointer}
+.sw.on{background:#ffc400}
+table{border-collapse:collapse}
+td{padding:2px 4px;font:13px monospace}
+.dec{width:150px;text-align:right;color:#667}
+.wl{width:60px}.wl div{height:6px;background:#bbb;border-radius:3px}
+.wl.on div{background:#ffc400;box-shadow:0 0 6px #ffc400}
+.cell{width:46px;height:30px;border-radius:5px;background:#3f8f5a;color:#fff;font:700 15px monospace;text-align:center;line-height:30px}
+tr.sel .cell{background:#2e7d4a;outline:3px solid #ffc400}
+tr.sel .dec{color:#a33;font-weight:700}
+button{padding:10px 16px;font-size:15px;border-radius:6px;border:0;background:#2f6fdb;color:#fff;cursor:pointer;margin:4px 0}
+button.w{background:#c0392b}
+#log{font-size:13px;color:#333;min-height:36px;margin-top:8px}
+.lbl{font-size:12px;color:#556;margin-top:6px}
+</style></head><body>
+<h2>RAM in action: 8 words × 4 bits</h2>
+<p class=\"s\">Click the address switches (A2 A1 A0) and data switches (D3..D0). The decoder lights exactly one word line. Output always shows the selected row. WRITE overwrites it.</p>
+<div class=\"row\">
+<div class=\"box\">
+<div class=\"lbl\">ADDRESS</div><div id=\"addr\"></div>
+<div class=\"lbl\">DATA IN</div><div id=\"din\"></div>
+<button class=\"w\" onclick=\"wr()\">WRITE pulse</button><br>
+<div class=\"lbl\">DATA OUT (read of selected row)</div><div id=\"dout\" style=\"font:700 24px monospace\"></div>
+<div class=\"lbl\"><button onclick=\"rnd()\" style=\"background:#667;font-size:12px;padding:6px 10px\">fill with random</button> <button onclick=\"clr()\" style=\"background:#667;font-size:12px;padding:6px 10px\">clear</button></div>
+</div>
+<div class=\"box\"><table id=\"t\"></table></div>
+</div>
+<div id=\"log\"></div>
+<script>
+let a=[0,0,0],d=[1,0,1,1],mem=[0,0,0,0,0,0,0,0].map(()=>[0,0,0,0]);
+mem[0]=[0,1,1,0];mem[3]=[1,1,0,1];mem[5]=[0,0,1,1];
+const A=document.getElementById('addr'),D=document.getElementById('din');
+function sw(el,arr,i,name){const b=document.createElement('button');b.className='sw';b.onclick=()=>{arr[i]^=1;draw()};b.dataset.n=name;el.appendChild(b);return b}
+const ab=[2,1,0].map((n,i)=>sw(A,a,i,'A'+n)),db=[3,2,1,0].map((n,i)=>sw(D,d,i,'D'+n));
+const t=document.getElementById('t');
+for(let r=0;r<8;r++){const bits=r.toString(2).padStart(3,'0');
+ const expr=[...bits].map((b,i)=>(b=='1'?'':'¬')+'A'+(2-i)).join('·');
+ let h='<tr id=\"r'+r+'\"><td>'+r+'</td><td class=\"dec\">'+expr+' →</td><td class=\"wl\"><div></div></td>';
+ for(let c=0;c<4;c++)h+='<td><div class=\"cell\" id=\"c'+r+c+'\"></div></td>';
+ t.insertAdjacentHTML('beforeend',h+'</tr>')}
+function sel(){return a[0]*4+a[1]*2+a[2]}
+function draw(msg){
+ ab.forEach((b,i)=>{b.textContent=b.dataset.n+'\\n'+a[i];b.style.fontSize='13px';b.classList.toggle('on',!!a[i])});
+ db.forEach((b,i)=>{b.textContent=b.dataset.n+'\\n'+d[i];b.style.fontSize='13px';b.classList.toggle('on',!!d[i])});
+ const s=sel();
+ for(let r=0;r<8;r++){const row=document.getElementById('r'+r);row.className=r==s?'sel':'';row.querySelector('.wl').className='wl'+(r==s?' on':'');
+  for(let c=0;c<4;c++)document.getElementById('c'+r+c).textContent=mem[r][c]}
+ document.getElementById('dout').textContent=mem[s].join(' ');
+ document.getElementById('log').innerHTML=msg||('Address '+a.join('')+' = '+s+'. The decoder raised word line '+s+' and the other 7 stay low. Only row '+s+' is connected to the bit lines.')}
+function wr(){const s=sel();mem[s]=d.slice();draw('Wrote '+d.join('')+' into row '+s+'. Only that row\\'s cells were connected to the bit lines, so no other row changed.')}
+function rnd(){mem=mem.map(()=>[0,0,0,0].map(()=>Math.random()<.5?1:0));draw()}
+function clr(){mem=mem.map(()=>[0,0,0,0]);draw()}
+draw();
+</script></body></html>"
+ :AT "2026-11-13T20:12:00" :VERSION 1)

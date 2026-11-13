@@ -104,6 +104,15 @@ body.field { --gutter: calc(200px + 1rem); }
 .msg details.sources a { color: var(--cl-orange-ink); }
 .msg-artifacts { display: flex; flex-direction: column; gap: .4rem; margin: .6rem 0 0; }
 .msg-artifacts[hidden] { display: none; }
+/* What a tool is being given, shown while it is written (draft.js): prose to read, source to watch. */
+.msg .drafts { display: flex; flex-direction: column; gap: .5rem; margin: .6rem 0 0; }
+.msg .drafts[hidden] { display: none; }
+.msg .draft { border: 1px solid var(--cl-line); border-left: 2px solid var(--cl-line-strong); border-radius: .5rem; padding: .5rem .75rem; background: var(--cl-panel); }
+.msg .draft.writing { border-left-color: var(--cl-orange); }
+.msg .draft-head { display: flex; justify-content: space-between; gap: .75rem; margin: 0; font-size: .78rem; color: var(--cl-muted); }
+.msg .draft-count { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.msg .draft-body { margin-top: .4rem; }
+.msg .draft-code { margin: .4rem 0 0; max-height: 9rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: .72rem/1.45 var(--cl-mono); color: var(--cl-muted); background: var(--cl-sunk); border-radius: .35rem; padding: .5rem .6rem; }
 .dock .artifact-card { background: var(--cl-panel); border: 1px solid var(--cl-line); border-radius: .75rem; }
 .dock .artifact-card:hover { border-color: var(--cl-line-strong); background: var(--cl-sunk); }
 .dock .artifact-icon { background: var(--cl-sunk); }
@@ -289,12 +298,16 @@ body:has(.pin-tray) .artifact-pin { display: grid; }
 
 /* A page, in the depth section and the pinned tray, is a small thumbnail like the images and
    videos: the page laid out at desktop size, then scaled down to the tile. Go full screen to use it. */
-.pin-list .pin-art:has(.artifact-inline-html), .artifact-tile:has(.artifact-inline-html) { width: 12rem; }
-.pin-art .artifact-inline-html, .artifact-tile .artifact-inline-html {
+.pin-list .pin-art:has(.artifact-inline-html) { width: min(100%, 24rem); }
+/* The depth "Made" tiles are twice that size; the chat shows its pages the same way (compact, landscape). */
+.artifact-tile:has(.artifact-inline-html) { width: min(100%, 24rem); }
+.msg-artifacts .artifact-inline-html { max-width: 24rem; }
+.pin-art .artifact-inline-html, .artifact-tile .artifact-inline-html, .msg-artifacts .artifact-inline-html {
   container-type: inline-size; position: relative; overflow: hidden; aspect-ratio: 16 / 10;
   border: 1px solid var(--cl-line); border-radius: .5rem; background: #fff; cursor: zoom-in;
 }
-.pin-art .artifact-inline-html .artifact-preview, .artifact-tile .artifact-inline-html .artifact-preview {
+.pin-art .artifact-inline-html .artifact-preview, .artifact-tile .artifact-inline-html .artifact-preview,
+.msg-artifacts .artifact-inline-html .artifact-preview {
   position: absolute; top: 0; left: 0; width: 1000px; height: 625px; max-width: none; border: 0; border-radius: 0;
   transform-origin: 0 0; scale: .2; scale: tan(atan2(100cqw, 1000px));
   pointer-events: none;

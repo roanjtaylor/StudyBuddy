@@ -413,7 +413,16 @@
 (defun relay-event (name data)
   (cond ((equal name "delta") (emit-event "delta" "text" (gethash "text" data)))
         ((equal name "thinking") (emit-event "thinking" "text" (gethash "text" data)))
+        ;; What a tool call is being given, as it is written (static/draft.js shows it): the
+        ;; call begins, its input arrives in pieces of unfinished JSON, the input is whole.
+        ((equal name "tool_start")
+         (let ((tool (gethash "name" data)))
+           (when (and (stringp tool) (prefix-p "mcp__app__" tool))
+             (emit-event "draft" "id" (gethash "id" data) "tool" (subseq tool (length "mcp__app__"))))))
+        ((equal name "tool_input")
+         (emit-event "draft" "id" (gethash "id" data) "partial" (gethash "partial" data)))
         ((equal name "tool_call")
+         (emit-event "draft" "id" (gethash "id" data) "done" t)
          (let ((tool (gethash "name" data)) (input (gethash "input" data)))
            (cond ((equal tool "WebSearch")
                   (emit-event "status" "text" (str "Searched the web: " (and (hash-table-p input) (gethash "query" input)))))

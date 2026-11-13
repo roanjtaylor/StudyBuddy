@@ -251,9 +251,12 @@
     var activity = el('div', 'activity'), md_ = el('div', 'md'), status = el('p', 'dock-status');
     status.setAttribute('role', 'status');
     var cards = el('div', 'msg-artifacts'); cards.hidden = true;
-    live.appendChild(mark); live.appendChild(activity); live.appendChild(md_); live.appendChild(cards); live.appendChild(status);
+    // What a tool is being given, readable while it is written (draft.js).
+    var draftBox = el('div', 'drafts'); draftBox.hidden = true;
+    live.appendChild(mark); live.appendChild(activity); live.appendChild(md_); live.appendChild(draftBox); live.appendChild(cards); live.appendChild(status);
     log.appendChild(live);
-    function scroll() { log.scrollTop = log.scrollHeight; }
+    // Follows the reply only until the question is at the top of the log; then it is read undisturbed.
+    var scroll = window.followFrom(log, mine);
     scroll();
 
     var t0 = Date.now(), i = 0, verb = 'Thinking', reply = '', timer = null;
@@ -264,6 +267,7 @@
     tick(); timer = setInterval(tick, 130);
     var renderTimer = null;
     function render() { md_.innerHTML = window.md.render(reply); scroll(); }
+    var draft = window.toolDrafts ? window.toolDrafts(draftBox, scroll, function (label) { verb = label; }) : function () {};
 
     box.value = ''; grow(box);
     var send_ = form.querySelector('.dock-send:not(.dock-stop):not(.dock-clear)'), stop = form.querySelector('.dock-stop');
@@ -275,14 +279,13 @@
     // A proposed edit takes over both columns for review; the last one of a reply stands.
     function showProposals(where) {
       if (proposals.length) review(proposals[proposals.length - 1], form, pane, where);
-      else scroll();
     }
 
     function done() {
       clearInterval(timer); if (renderTimer) clearTimeout(renderTimer);
       form.classList.remove('busy'); send_.hidden = false; stop.hidden = true;
       if (clear) clear.hidden = false;
-      box.focus(); scroll();
+      box.focus();
     }
 
     fetch(form.action, { method: 'POST', body: body, signal: ctl.signal })
@@ -304,6 +307,8 @@
             if (old) old.replaceWith(block); else cards.appendChild(block);
             scroll();
             if (block === card && window.openInDock) window.openInDock(card.dataset.artifact, card.dataset.type, card.dataset.title);
+          } else if (name === 'draft') {
+            draft(data);
           } else if (name === 'proposal') {
             proposals.push(data); verb = 'Proposing an edit';
           } else if (name === 'message') {

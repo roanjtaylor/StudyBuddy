@@ -3,73 +3,95 @@
  ((:FROM 1855 :TO 1935 :SCALE 0.1)))
 (:GROUP :ID "switches" :COMPRESSION "A switch can control another switch.")
 (:GROUP :ID "stored-program" :COMPRESSION "Instructions are data in the same memory.")
-(:GROUP :ID "sharing" :COMPRESSION "Many programs share one machine.")
 (:GROUP :ID "symbolic-ai" :COMPRESSION
  "Intelligence as hand-written symbols and rules, which worked in narrow cases and hit a wall.")
+(:GROUP :ID "sharing" :COMPRESSION "Many programs share one machine.")
+(:GROUP :ID "loaders" :COMPRESSION "Every layer is a program that loads the next.")
 (:GROUP :ID "languages" :COMPRESSION "Languages are compressions over machine code.")
+(:GROUP :ID "network" :COMPRESSION "Machines talk.")
 (:GROUP :ID "connectionism" :COMPRESSION
  "A function with adjustable weights can be fit to examples instead of being programmed.")
-(:GROUP :ID "loaders" :COMPRESSION "Every layer is a program that loads the next.")
 (:GROUP :ID "surfaces" :COMPRESSION
  "As switches shrink and get cheaper, the computer moves from a shared room to the desk, the pocket, the wall and the face.")
-(:GROUP :ID "network" :COMPRESSION "Machines talk.")
 (:GROUP :ID "learned" :COMPRESSION "Programs can be found, not written.")
 (:NODE :ID "transistor" :TITLE "Transistor as a switch" :COMPRESSION
- "A small voltage at one terminal lets or blocks a current between two others, so one signal can control another.
-Un voltaje pequeño en un terminal permite o bloquea una corriente entre otros dos, de modo que una señal puede controlar a otra."
+ "A small voltage at one terminal lets or blocks a current between two others, so one signal can control another."
  :BODY
- "Every computer is billions of these and nothing else is physical; all the rest is arrangement."
+ "Every computer is billions of these and nothing else is physical; all the rest is arrangement. A transistor is a switch that no hand flips: a voltage does it. Because the output of one transistor can be the control input of the next, switches can be chained into logic, memory and arithmetic.
+
+**How it works (the MOSFET, the type in chips):** a voltage on one leg creates or removes a conducting path between the other two. No voltage on the control leg means no path and the switch is off. Enough voltage means a path and the switch is on.
+
+**The three legs**
+
+- **Gate**: the control input. You apply the small voltage here. Almost no current flows into it.
+- **Source**: where the current enters the switch.
+- **Drain**: where the current leaves. The gate decides whether current can get from source to drain.
+
+**The materials**
+
+- **Conductor (metal or polysilicon)**: forms the gate electrode and the wires. Current flows freely.
+- **Insulator (silicon dioxide or a modern high-k oxide)**: a very thin layer between the gate and the silicon. The gate's electric field passes through it, but current does not. This is why the gate draws almost no current.
+- **Semiconductor (silicon)**: the borderline material, neither a good conductor nor a good insulator. Its conductivity can be changed:
+  - Doping adds impurities that make regions rich in free electrons (n-type) or in missing electrons, called holes (p-type). The source and drain are one type, and the body between them is the other.
+  - The gate's field pulls charge into the thin region under the oxide, called the channel. That turns the silicon from insulating to conducting, and current can flow from source to drain.
+
+**How it is made**
+
+Transistors are not assembled one by one. Billions are printed at once on a wafer by repeating a cycle of depositing a layer, patterning it with light, and etching or implanting through the pattern. The steps for a simple planar n-type transistor:
+
+1. **Wafer**: start with a slice of ultra-pure single-crystal silicon, lightly doped p-type, polished flat.
+2. **Gate insulator**: heat the wafer in oxygen so a few nanometres of silicon dioxide grow on the surface (modern chips deposit a high-k oxide instead).
+3. **Gate electrode**: deposit a layer of polysilicon (or metal) over the oxide.
+4. **Pattern the gate** (photolithography): coat with light-sensitive resist, shine light through a mask, wash away the exposed resist, then etch away the gate material everywhere the resist is gone. A small strip of gate stays.
+5. **Source and drain**: fire dopant ions (for example phosphorus or arsenic) into the wafer. The gate strip blocks them, so the n-type source and drain form on either side of it, automatically lined up with the gate (self-aligned). Heating (annealing) repairs the crystal and activates the dopants. The p-type body is left between them.
+6. **Wiring**: cover everything with insulating oxide, etch small holes down to the gate, source and drain, fill them with metal (tungsten) as contacts, then add many layers of copper wires, each separated by insulator, to connect transistors into circuits.
+
+Smaller transistors need finer patterning (extreme-ultraviolet light in the newest chips) and different shapes: FinFETs and gate-all-around transistors wrap the gate around the channel for better control, but the idea of gate, oxide, channel, source and drain is the same.
+
+**Off and on**
+
+- Gate voltage low: no channel, so source and drain are isolated (off, a 0).
+- Gate voltage high: a channel forms, so source and drain are connected (on, a 1).
+
+Silicon is useful because its conductivity can be switched by a voltage. The oxide keeps the control signal separate from the current it controls."
  :GROUP "switches" :PREREQS NIL :ERA 1947)
 (:NODE :ID "logic-gates" :TITLE "Logic gates" :COMPRESSION
  "Two switches in series is AND, in parallel is OR, one that inverts is NOT; every other function is made of these."
  :BODY
- "Boolean logic becomes hardware: a claim about truth is now a circuit you can buy. A logic gate is a circuit whose output is a fixed function of its inputs, where each signal is one of two levels (low = 0, high = 1). The function is a Boolean operation (Boole 1854), and Shannon showed in 1937 that circuits of switches implement it.
+ "A computer is just switches that control other switches, and wiring them in a few ways gives you logic: a claim about truth becomes a circuit. A logic gate is a circuit whose output is a fixed function of its inputs, where each signal is one of two voltage levels (low = 0, high = 1).
 
-## What it is made of
-Switches that control other switches. Today the switch is a MOSFET transistor: a voltage on the gate connects or disconnects a path between source and drain. Earlier generations used relays, vacuum tubes, or diode-resistor networks. The gate's logic comes from how the switches are wired, not from the switch type.
+## The three basic gates
 
-- **Series** (path conducts only if both switches are on) = AND
-- **Parallel** (path conducts if either is on) = OR
-- **Inverting** (switch on pulls output to 0; off lets a pull-up make it 1) = NOT
+Each switch is a transistor: a voltage on its gate connects or disconnects a path.
 
-## Primitive examples
+- **AND**: two switches in series. Current flows only if A and B are both on.
+- **OR**: two switches in parallel. Current flows if A or B is on.
+- **NOT**: a switch to ground with a pull-up. On pulls the output to 0; off lets the output rise to 1.
 
-**Switch/relay level (the idea in its purest form)**
-- AND: a battery, two switches in series, a lamp. Lamp lights only if A and B are closed.
-- OR: two switches in parallel. Lamp lights if A or B is closed.
-- NOT: a relay whose normally-closed contact feeds the lamp. Energise the coil and the lamp goes out.
-
-**Truth tables**
-
-| A | B | AND | OR | NAND | NOR | XOR |
-|---|---|-----|----|------|-----|-----|
-| 0 | 0 | 0 | 0 | 1 | 1 | 0 |
-| 0 | 1 | 0 | 1 | 1 | 0 | 1 |
-| 1 | 0 | 0 | 1 | 1 | 0 | 1 |
-| 1 | 1 | 1 | 1 | 0 | 0 | 0 |
+| A | B | AND | OR | NAND | XOR |
+|---|---|-----|----|------|-----|
+| 0 | 0 | 0 | 0 | 1 | 0 |
+| 0 | 1 | 0 | 1 | 1 | 1 |
+| 1 | 0 | 0 | 1 | 1 | 1 |
+| 1 | 1 | 1 | 1 | 0 | 0 |
 
 NOT: 0→1, 1→0.
 
-**CMOS (how chips do it)**
-- NOT: one PMOS from supply to output, one NMOS from output to ground, same input on both gates. Exactly one conducts, so the output is always actively driven.
-- NAND: two NMOS in series to ground, two PMOS in parallel to supply. Output is 0 only when both inputs are 1.
-- NOR: the dual: NMOS in parallel, PMOS in series.
-- AND and OR are NAND/NOR followed by a NOT, so they cost more transistors. That is why NAND and NOR are the natural CMOS gates.
-
 ## Why a few gates are enough
-NAND alone is *functionally complete*: NOT(A) = NAND(A,A); AND = NOT(NAND); OR(A,B) = NAND(NOT A, NOT B) (De Morgan). So any Boolean function, hence any digital computer, can be built from one gate type. NOR is also complete.
 
-## Gates to memory and arithmetic
-- Half adder: sum = A XOR B, carry = A AND B. Chain adders to add numbers.
-- Feed gates back on themselves (two cross-coupled NORs) and you get an SR latch: memory from logic.
+NAND alone is functionally complete: NOT(A) = NAND(A,A); AND = NOT(NAND); OR(A,B) = NAND(NOT A, NOT B) (De Morgan). So any Boolean function, and any digital computer, can be built from one gate type. In CMOS, NAND and NOR are the cheapest gates, so chips use them.
+
+From gates you get arithmetic (half adder: sum = A XOR B, carry = A AND B) and memory (two cross-coupled NORs make an SR latch).
 
 ## Common confusions
-- Gates are not \"software\": a gate is a physical voltage relationship; 0 and 1 are voltage ranges, not exact values.
-- Real gates take time (propagation delay) and that limits clock speed.
+
+- **Gates are voltages, not software.** 0 and 1 are voltage ranges (for example, below 0.35 V reads as 0 and above 0.65 V as 1 on a 1 V supply), and the band between them is undefined. A gate's output is itself a voltage, driven firmly towards the supply or ground, so a sloppy input is restored to a clean level after a stage or two. This is why digital circuits tolerate noise.
+- **Gates take time (propagation delay).** The delay is not the silicon \"warming up\"; carriers respond almost instantly. It is charging: the next transistor's gate and the wire are capacitors, and a transistor can supply only limited current, so the voltage rises along an RC curve. The next stage switches only when that voltage crosses its threshold. Delays add along a chain of gates, and the clock period must be longer than the slowest chain, which limits clock speed.
 
 ## Primary sources
-- Boole, *An Investigation of the Laws of Thought* (1854)
-- Shannon, \"A Symbolic Analysis of Relay and Switching Circuits\" (1937)"
+
+- Boole, \"*An Investigation of the Laws of Thought*\" (1854)
+- Shannon, \"*A Symbolic Analysis of Relay and Switching Circuits*\" (1937)"
  :GROUP "switches" :PREREQS ("transistor") :ERA 1938)
 (:NODE :ID "adder" :TITLE "Adding with gates" :COMPRESSION
  "XOR gives the sum bit and AND the carry; chain one per bit and you add numbers of any width."
@@ -110,7 +132,25 @@ Its weakness: the carry must ripple through every column, which limits speed. Ca
 (:NODE :ID "clock" :TITLE "The clock" :COMPRESSION
  "A square wave tells every gate when to look at its inputs, turning a chaos of signals into a sequence of steps."
  :BODY
- "Time inside a computer is discrete because of this. Every 'cycle' you ever hear about is one tick."
+ "Gates are never instantaneous: after an input changes, an output wobbles for a moment before it settles. Without a shared beat, a computer would be a chaos of half-finished answers. The clock is a square wave that tells every flip-flop when to look at its input, so time inside a computer becomes discrete. Every \"cycle\" you ever hear about is one tick.
+
+## How it works
+
+- **Gates compute, flip-flops remember.** Combinational gates work out the next state (in a counter, \"Q + 1\"). Flip-flops hold the current state.
+- **Only the rising edge counts.** On each rising edge, every flip-flop copies its D input into Q. Between edges, the gates are free to wobble, and nobody is looking.
+- **The period has a floor.** The period must be longer than the slowest gate path plus the flip-flop's setup time. If it is shorter, a flip-flop copies an answer that isn't ready yet and the state goes wrong. This is why a CPU has a maximum clock speed. Shorter gate delays (smaller transistors) allow a faster clock.
+- **Skew.** If the edge reaches some flip-flops later than others, the same problem appears from another direction. This is called clock skew.
+
+## Where the clock comes from
+
+It is a crystal **and** an oscillating circuit: the crystal sets the frequency, and the circuit keeps it going.
+
+1. **Quartz crystal.** Quartz is piezoelectric: squeezing it makes a voltage, and a voltage makes it flex. A thin cut slice has a very sharp mechanical resonance set by its size, typically 8–50 MHz, or 32,768 Hz in watches. It has no power of its own. It is a very precise tuning fork that can be driven electrically.
+2. **Sustaining circuit (a Pierce oscillator).** One inverter has its output fed back to its input through the crystal, with two small capacitors. The inverter amplifies noise, and the crystal passes back only energy near its resonance. The loop builds up and settles at that one frequency. A gate then squares the sine-like output into 0s and 1s.
+3. **PLL (phase-locked loop).** Crystals top out at tens of MHz, so a 3 GHz CPU does not use a 3 GHz crystal. An on-chip voltage-controlled oscillator is divided down, compared with the crystal, and steered until it runs at an exact multiple (for example 100 MHz × 30). Changing the multiplier is how a CPU changes its speed.
+4. **Clock tree.** Buffers arranged in a branching tree deliver the square wave to millions of flip-flops at nearly the same instant, to keep skew small.
+
+A bare ring of inverters can also act as a clock, because its period is set by the gate delay. It is cheap but drifts with temperature and voltage, so it is used only where precision doesn't matter."
  :GROUP "switches" :PREREQS ("logic-gates") :ERA 1945)
 (:NODE :ID "flip-flop" :TITLE "Flip-flop as one bit of memory" :COMPRESSION
  "Two gates wired in a loop hold a value until pushed." :BODY
@@ -133,7 +173,30 @@ This is one bit of RAM."
 (:NODE :ID "ram" :TITLE "RAM as an addressed grid" :COMPRESSION
  "A decoder turns an address number into one selected row of flip-flops you can read or overwrite."
  :BODY
- "The address is the first abstraction: a number names a place. Pointers, arrays and files all descend from it."
+ "Computers need somewhere to keep millions of values and a way to say *which one* — the answer is to give every place a number. That number, the address, is the first abstraction in computing; pointers, arrays, files and variables all descend from it.
+
+## The mechanism
+
+RAM is a grid. Each cell holds one bit in a tiny latch (a flip-flop-like loop of transistors that holds 0 or 1 as long as power is on). A row of cells is a *word*, for example 8 bits.
+
+1. **Address in.** The address is just binary wires, e.g. A2 A1 A0 = 101 (5).
+2. **Decoder.** A circuit of AND gates and inverters. Each output is an AND of the address bits, true or inverted, so exactly one output goes high. For 3 address bits, row 5 = A2 · ¬A1 · A0. That output is the *word line* for that row.
+3. **Word line → access transistors.** The high word line switches on one transistor per cell in the row, joining each cell to a vertical *bit line*. All other rows stay disconnected. This is the core idea of the group: a switch (the decoder output) controls other switches (the access transistors).
+4. **Read or write.** To read, sense amplifiers on the bit lines see each selected cell's stored voltage. To write, drivers force the bit lines to the new values and overwrite the latches in the selected row.
+
+n address wires select among 2^n rows, so 30 wires reach about a billion words.
+
+## Is the decoder a circuit or a protocol?
+
+A circuit. It is pure combinational logic with no memory, no steps and no negotiation: change the address and the outputs follow after a few gate delays. A protocol is a set of agreed rules for timing and messages, such as how a CPU asks DRAM for data. A protocol sits *around* RAM and decides when the address and the read/write signals are valid. The decoder is the hardware that makes the address mean something.
+
+## What it physically is
+
+Real SRAM cells are not clocked D flip-flops. Each is 6 transistors: four form two cross-coupled inverters (the same feedback idea as an SR latch built from two NOR gates) and two are the access transistors. The word line is wired to their gates, and the bit lines run to their source/drain terminals. Gates are polysilicon, wiring is layered metal (copper in modern chips) separated by glass insulator, and the whole thing is patterned on silicon. DRAM, the main memory in most computers, stores the bit as charge on a capacitor with a single access transistor, so it needs periodic refreshing. The addressing scheme (decoder, word line, bit line) is the same.
+
+## Why it matters
+
+Because any address is reached in about the same time, the memory is called *random access*. A CPU can fetch anything by number without scanning through what comes before it. Every higher-level structure, such as an array index, a pointer or a file offset, is a number that eventually arrives at a decoder like this one."
  :GROUP "switches" :PREREQS ("flip-flop" "adder") :ERA 1968)
 (:NODE :ID "fetch-decode-execute" :TITLE "The fetch-decode-execute loop" :COMPRESSION
  "Read the word at the program counter, work out which operation it names, do it, move on, forever."
@@ -547,3 +610,26 @@ Every stored-program computer is this idea in hardware: the fetch-decode-execute
 
 Source: Turing, 'On Computable Numbers' (1936), section 6."
  :GROUP "stored-program" :PREREQS NIL :ERA 1936)
+(:NODE :ID "crystal-oscillator" :TITLE "Crystal oscillator" :COMPRESSION
+ "A quartz slice resonates at one sharp frequency, and an inverter looped through it keeps that vibration going as a steady square wave."
+ :BODY
+ "Every clock needs a beat that does not drift, and quartz supplies it: it is piezoelectric, so a voltage makes it flex and flexing makes a voltage, with a mechanical resonance fixed by its cut and size (typically 8–50 MHz, or 32,768 Hz in watches).
+
+A Pierce oscillator wires one inverter with the crystal between its output and input, plus two small capacitors to ground and a large bias resistor across the inverter. The inverter amplifies noise; the crystal passes back only energy near its resonance, so the loop builds up and settles at that one frequency. A gate then squares the sine-like signal into 0s and 1s.
+
+A bare ring of inverters can also oscillate, with its period set by gate delay, but it drifts with temperature and voltage, so it is used only where precision does not matter."
+ :GROUP "switches" :PREREQS NIL :ERA 1923)
+(:NODE :ID "pll" :TITLE "Phase-locked loop" :COMPRESSION
+ "A fast on-chip oscillator is divided down, compared with the slow crystal and steered until it runs at an exact multiple of it."
+ :BODY
+ "Crystals top out at tens of MHz, yet a CPU runs at GHz, so the clock must be multiplied up on the chip.
+
+A voltage-controlled oscillator (VCO) runs fast. A divider cuts its output by N. A phase detector compares that with the crystal reference, and a loop filter turns the difference into a control voltage that speeds up or slows the VCO. When the divided VCO matches the crystal, the loop is locked and the VCO runs at N times the crystal (25 MHz × 30 = 750 MHz). Changing N is how a CPU changes its speed."
+ :GROUP "switches" :PREREQS NIL :ERA 1932)
+(:NODE :ID "clock-tree" :TITLE "Clock tree and skew" :COMPRESSION
+ "Branching buffers of equal path length deliver the clock edge to millions of flip-flops at nearly the same instant."
+ :BODY
+ "One oscillator output cannot drive millions of flip-flop clock pins directly, and wires of different length delay the edge by different amounts. If some flip-flops see the edge late (skew), they may copy a neighbour's already-changed output, and the state goes wrong.
+
+Chips therefore distribute the clock through a tree of buffers, each stage splitting into several branches, laid out so every path to a leaf has about the same length and delay. Skew eats into the period, so keeping it small is part of what sets the maximum clock speed."
+ :GROUP "switches" :PREREQS NIL :ERA 1980)

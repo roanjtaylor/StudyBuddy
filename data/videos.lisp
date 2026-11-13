@@ -14,3 +14,12 @@
  :AT "2026-11-10T13:00:54")
 (:ID "computers/flip-flop/I0-izyq6q5s" :MAP "computers" :NODE "flip-flop" :VIDEO "I0-izyq6q5s"
  :TITLE "How Do Computers Remember?" :CHANNEL "Sebastian Lague" :AT "2026-11-10T18:22:06")
+(:ID "computers/bits-representation/Xpk67YzOn5w" :MAP "computers" :NODE "bits-representation"
+ :VIDEO "Xpk67YzOn5w" :TITLE "Why Do Computers Use 1s and 0s? Binary and Transistors Explained."
+ :CHANNEL "Basics Explained, H3Vtux" :AT "2026-11-13T19:42:55")
+(:ID "computers/bits-representation/qsC3YUI98dM" :MAP "computers" :NODE "bits-representation"
+ :VIDEO "qsC3YUI98dM" :TITLE "Bits and Bytes explained For beginners" :CHANNEL
+ "Internet for dummies" :AT "2026-11-13T19:43:06")
+(:ID "computers/integrated-circuit/rAYw43BqN6M" :MAP "computers" :NODE "integrated-circuit" :VIDEO
+ "rAYw43BqN6M" :TITLE "Integrated Circuits in 100 Seconds" :CHANNEL "V Electronics" :AT
+ "2026-11-13T19:46:44")

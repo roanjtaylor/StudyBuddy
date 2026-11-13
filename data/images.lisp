@@ -18,3 +18,12 @@
  :TITLE "Flip flop circuit" :THUMB
  "https://upload.wikimedia.org/wikipedia/commons/e/ed/Flip_flop_circuit.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled"
  :PAGE "https://commons.wikimedia.org/wiki/File:Flip_flop_circuit.png" :AT "2026-11-10T18:23:14")
+(:ID "computers/integrated-circuit/PUH1EECIQPYZ" :MAP "computers" :NODE "integrated-circuit" :KEY
+ "PUH1EECIQPYZ" :TITLE "HP 1820-0250" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f1/HP_1820-0250.jpg/500px-HP_1820-0250.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE "https://commons.wikimedia.org/wiki/File:HP_1820-0250.jpg" :AT "2026-11-13T19:44:27")
+(:ID "computers/integrated-circuit/61J58M0M2F05" :MAP "computers" :NODE "integrated-circuit" :KEY
+ "61J58M0M2F05" :TITLE "Integrated circuit on microchip" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1b/Integrated_circuit_on_microchip.jpg/500px-Integrated_circuit_on_microchip.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE "https://commons.wikimedia.org/wiki/File:Integrated_circuit_on_microchip.jpg" :AT
+ "2026-11-13T19:44:31")

@@ -24,7 +24,7 @@ Built bottom-up, one small language per layer, each live-editable from the REPL:
 | L4 | `src/llm.lisp` | `defprompt`, `ask`, `ask-structured`, `ask-with-search` — structured answers as plists, never prose; `deftool` and `converse` — a streamed conversation in which the model calls the app's tools |
 | L5 | `src/nodes.lisp`, `src/pages.lisp`, `src/actions.lisp` | Field, Node, Level, Attempt, Message, Artifact; the pages and the artifact viewers; the `converse` prompt, the tools (`propose_map_changes` … `create_quiz`) and the streaming `ask` action |
 
-In the browser: `static/dock.js` runs the dock and the stage, `static/md.js` renders markdown while a reply streams (the same subset as `markdown->html`), `static/artifact.js` is the flashcard and quiz viewer.
+In the browser: `static/dock.js` runs the dock and the stage, `static/md.js` renders markdown while a reply streams (the same subset as `markdown->html`), `static/draft.js` shows what a tool is being given (an artifact, a proposed edit) while the model is still writing it, `static/artifact.js` is the flashcard and quiz viewer.
 
 ## Data
 
