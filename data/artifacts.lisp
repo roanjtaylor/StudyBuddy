@@ -1825,62 +1825,850 @@ let last=performance.now();
  :AT "2026-11-13T20:11:48" :VERSION 1)
 (:PINNED T :ID "ram-in-action" :MAP "computers" :NODE "ram" :TYPE "html" :TITLE "RAM in action"
  :LANGUAGE NIL :CONTENT "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
-body{font-family:system-ui,sans-serif;background:#fafafa;margin:0;padding:16px;color:#222}
-h2{margin:0 0 6px;font-size:18px}p.s{margin:0 0 12px;color:#555;font-size:13px}
-.row{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
-.box{background:#fff;border:1px solid #ccd;border-radius:8px;padding:10px}
-.sw{display:inline-block;width:44px;height:44px;margin:3px;border-radius:6px;border:2px solid #556;background:#eef;font:700 18px monospace;cursor:pointer}
-.sw.on{background:#ffc400}
-table{border-collapse:collapse}
-td{padding:2px 4px;font:13px monospace}
-.dec{width:150px;text-align:right;color:#667}
-.wl{width:60px}.wl div{height:6px;background:#bbb;border-radius:3px}
-.wl.on div{background:#ffc400;box-shadow:0 0 6px #ffc400}
-.cell{width:46px;height:30px;border-radius:5px;background:#3f8f5a;color:#fff;font:700 15px monospace;text-align:center;line-height:30px}
-tr.sel .cell{background:#2e7d4a;outline:3px solid #ffc400}
-tr.sel .dec{color:#a33;font-weight:700}
-button{padding:10px 16px;font-size:15px;border-radius:6px;border:0;background:#2f6fdb;color:#fff;cursor:pointer;margin:4px 0}
-button.w{background:#c0392b}
-#log{font-size:13px;color:#333;min-height:36px;margin-top:8px}
-.lbl{font-size:12px;color:#556;margin-top:6px}
+body{font-family:system-ui,sans-serif;background:#fafafa;margin:0;padding:12px;color:#222}
+h2{margin:0 0 4px;font-size:18px}p.s{margin:0 0 8px;color:#555;font-size:13px}
+svg{width:100%;max-width:1100px;background:#fff;border:1px solid #ccd;border-radius:8px;display:block}
+svg text{font-family:ui-monospace,monospace}
+.clk{cursor:pointer}
+#log{font-size:14px;color:#222;margin-top:8px;padding:8px 10px;background:#fff8dc;border:1px solid #e6d58a;border-radius:6px;max-width:1080px}
+.bar{margin:8px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+button{padding:7px 12px;font-size:13px;border-radius:6px;border:0;background:#667;color:#fff;cursor:pointer}
+.leg span{display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:middle;margin:0 4px 0 10px}
 </style></head><body>
 <h2>RAM in action: 8 words × 4 bits</h2>
-<p class=\"s\">Click the address switches (A2 A1 A0) and data switches (D3..D0). The decoder lights exactly one word line. Output always shows the selected row. WRITE overwrites it.</p>
-<div class=\"row\">
-<div class=\"box\">
-<div class=\"lbl\">ADDRESS</div><div id=\"addr\"></div>
-<div class=\"lbl\">DATA IN</div><div id=\"din\"></div>
-<button class=\"w\" onclick=\"wr()\">WRITE pulse</button><br>
-<div class=\"lbl\">DATA OUT (read of selected row)</div><div id=\"dout\" style=\"font:700 24px monospace\"></div>
-<div class=\"lbl\"><button onclick=\"rnd()\" style=\"background:#667;font-size:12px;padding:6px 10px\">fill with random</button> <button onclick=\"clr()\" style=\"background:#667;font-size:12px;padding:6px 10px\">clear</button></div>
+<p class=\"s\">Click the yellow/grey switches. Set an address, set data, switch WE (write enable) on, then toggle the clock: the data is stored on the clock's <b>rising edge</b>, in the one row the decoder selected.</p>
+<div class=\"bar\">
+<button onclick=\"tick()\" style=\"background:#2f6fdb\">Toggle clock</button>
+<label><input type=\"checkbox\" id=\"auto\" onchange=\"autoRun()\"> run clock automatically</label>
+<button onclick=\"rnd()\">fill random</button><button onclick=\"clr()\">clear</button>
+<span class=\"leg\"><span style=\"background:#f5b800\"></span>1 / high<span style=\"background:#b8bcc8\"></span>0 / low<span style=\"background:#c0392b\"></span>just written</span>
 </div>
-<div class=\"box\"><table id=\"t\"></table></div>
-</div>
+<svg id=\"svg\" viewBox=\"0 0 1100 600\"></svg>
 <div id=\"log\"></div>
 <script>
-let a=[0,0,0],d=[1,0,1,1],mem=[0,0,0,0,0,0,0,0].map(()=>[0,0,0,0]);
-mem[0]=[0,1,1,0];mem[3]=[1,1,0,1];mem[5]=[0,0,1,1];
-const A=document.getElementById('addr'),D=document.getElementById('din');
-function sw(el,arr,i,name){const b=document.createElement('button');b.className='sw';b.onclick=()=>{arr[i]^=1;draw()};b.dataset.n=name;el.appendChild(b);return b}
-const ab=[2,1,0].map((n,i)=>sw(A,a,i,'A'+n)),db=[3,2,1,0].map((n,i)=>sw(D,d,i,'D'+n));
-const t=document.getElementById('t');
-for(let r=0;r<8;r++){const bits=r.toString(2).padStart(3,'0');
- const expr=[...bits].map((b,i)=>(b=='1'?'':'¬')+'A'+(2-i)).join('·');
- let h='<tr id=\"r'+r+'\"><td>'+r+'</td><td class=\"dec\">'+expr+' →</td><td class=\"wl\"><div></div></td>';
- for(let c=0;c<4;c++)h+='<td><div class=\"cell\" id=\"c'+r+c+'\"></div></td>';
- t.insertAdjacentHTML('beforeend',h+'</tr>')}
-function sel(){return a[0]*4+a[1]*2+a[2]}
-function draw(msg){
- ab.forEach((b,i)=>{b.textContent=b.dataset.n+'\\n'+a[i];b.style.fontSize='13px';b.classList.toggle('on',!!a[i])});
- db.forEach((b,i)=>{b.textContent=b.dataset.n+'\\n'+d[i];b.style.fontSize='13px';b.classList.toggle('on',!!d[i])});
- const s=sel();
- for(let r=0;r<8;r++){const row=document.getElementById('r'+r);row.className=r==s?'sel':'';row.querySelector('.wl').className='wl'+(r==s?' on':'');
-  for(let c=0;c<4;c++)document.getElementById('c'+r+c).textContent=mem[r][c]}
- document.getElementById('dout').textContent=mem[s].join(' ');
- document.getElementById('log').innerHTML=msg||('Address '+a.join('')+' = '+s+'. The decoder raised word line '+s+' and the other 7 stay low. Only row '+s+' is connected to the bit lines.')}
-function wr(){const s=sel();mem[s]=d.slice();draw('Wrote '+d.join('')+' into row '+s+'. Only that row\\'s cells were connected to the bit lines, so no other row changed.')}
-function rnd(){mem=mem.map(()=>[0,0,0,0].map(()=>Math.random()<.5?1:0));draw()}
-function clr(){mem=mem.map(()=>[0,0,0,0]);draw()}
+const HI='#f5b800',LO='#b8bcc8',RED='#c0392b';
+let a=[0,0,0],d=[1,0,1,1],we=0,oe=1,clk=0,flash=-1,msg='',timer=null;
+let mem=[[0,1,1,0],[0,0,0,0],[0,0,0,0],[1,1,0,1],[0,0,0,0],[0,0,1,1],[0,0,0,0],[0,0,0,0]];
+let hist=[{v:0,w:0}];
+const XS=[150,166,182,198,214,230],CX=[548,628,708,788];
+const col=v=>v?HI:LO;
+const sel=()=>a[0]*4+a[1]*2+a[2];
+function tgl(arr,i){arr[i]^=1;flash=-1;msg='';draw()}
+function setWE(){we^=1;flash=-1;msg='';draw()}
+function setOE(){oe^=1;flash=-1;msg='';draw()}
+function tick(){
+ clk^=1;flash=-1;const s=sel();let w=0;
+ if(clk){ if(we){mem[s]=d.slice();flash=s;w=1;
+   msg='<b>Rising edge with WE=1</b>: strobe = WE AND CLK went high, the write drivers pushed '+d.join('')+' onto the bit lines, and only word line '+s+' was high, so only row '+s+' captured it.';}
+  else msg='<b>Rising edge, but WE=0</b>: the strobe stays low, the drivers are off, nothing is stored. The clock alone changes nothing.';}
+ else msg='Clock fell. Stores happen only on the rising edge, so nothing changes now.';
+ hist.push({v:clk,w:w});if(hist.length>11)hist.shift();draw()}
+function autoRun(){clearInterval(timer);if(document.getElementById('auto').checked)timer=setInterval(tick,1000)}
+function rnd(){mem=mem.map(()=>[0,0,0,0].map(()=>Math.random()<.5?1:0));flash=-1;msg='';draw()}
+function clr(){mem=mem.map(()=>[0,0,0,0]);flash=-1;msg='';draw()}
+function T(x,y,t,sz,c,an){return `<text x=\"${x}\" y=\"${y}\" font-size=\"${sz||12}\" fill=\"${c||'#334'}\" text-anchor=\"${an||'start'}\">${t}</text>`}
+function draw(){
+ const s=sel(),strobe=we&&clk,names=['A2','A1','A0'];
+ let o='';
+ // titles
+ o+=T(150,16,'ADDRESS IN',12,'#556')+T(150,448+40,'DECODER  3 → 8',13,'#2a5')+T(400,16,'',12);
+ o+=T(548,16,'DATA IN (D3 D2 D1 D0)',12,'#556');
+ o+=T(300,150,'WORD LINES',11,'#2a5');
+ o+=T(860,16,'CONTROL PINS',12,'#556');
+ // decoder vertical lines
+ const lv=[];for(let i=0;i<3;i++){lv.push(a[i]);lv.push(1-a[i])}
+ for(let k=0;k<6;k++)o+=`<line x1=\"${XS[k]}\" y1=\"100\" x2=\"${XS[k]}\" y2=\"452\" stroke=\"${col(lv[k])}\" stroke-width=\"3\"/>`;
+ // address switches + inverters
+ for(let i=0;i<3;i++){const t=XS[2*i],c=XS[2*i+1],m=(t+c)/2;
+  o+=`<line x1=\"${m}\" y1=\"62\" x2=\"${m}\" y2=\"76\" stroke=\"${col(a[i])}\" stroke-width=\"3\"/>`;
+  o+=`<line x1=\"${t}\" y1=\"76\" x2=\"${c}\" y2=\"76\" stroke=\"${col(a[i])}\" stroke-width=\"3\"/>`;
+  o+=`<line x1=\"${t}\" y1=\"76\" x2=\"${t}\" y2=\"100\" stroke=\"${col(a[i])}\" stroke-width=\"3\"/>`;
+  o+=`<line x1=\"${c}\" y1=\"76\" x2=\"${c}\" y2=\"86\" stroke=\"${col(a[i])}\" stroke-width=\"3\"/><circle cx=\"${c}\" cy=\"90\" r=\"4\" fill=\"#fff\" stroke=\"#334\" stroke-width=\"2\"/>`+`<line x1=\"${c}\" y1=\"94\" x2=\"${c}\" y2=\"100\" stroke=\"${col(1-a[i])}\" stroke-width=\"3\"/>`;
+  o+=`<g class=\"clk\" onclick=\"tgl(a,${i})\"><rect x=\"${m-20}\" y=\"26\" width=\"40\" height=\"36\" rx=\"6\" fill=\"${col(a[i])}\" stroke=\"#445\" stroke-width=\"2\"/>${T(m,41,names[i],11,'#222','middle')}${T(m,56,a[i],14,'#000','middle')}</g>`;
+ }
+ o+=T(256,75,'← ¬ = inverter',11,'#778')+T(256,95,'each bit as true &',10,'#778')+T(256,108,'complement line',10,'#778');
+ // rows
+ for(let r=0;r<8;r++){const y=164+40*r,on=r==s;
+  const bits=[(r>>2)&1,(r>>1)&1,r&1];
+  o+=`<line x1=\"146\" y1=\"${y}\" x2=\"258\" y2=\"${y}\" stroke=\"${on?HI:'#ddd'}\" stroke-width=\"2\"/>`;
+  for(let i=0;i<3;i++){const k=2*i+(bits[i]?0:1);o+=`<circle cx=\"${XS[k]}\" cy=\"${y}\" r=\"4.5\" fill=\"#334\"/>`}
+  o+=`<rect x=\"258\" y=\"${y-13}\" width=\"34\" height=\"26\" rx=\"6\" fill=\"${on?HI:'#eee'}\" stroke=\"#445\" stroke-width=\"1.5\"/>${T(275,y+4,'AND',10,'#222','middle')}`;
+  o+=`<line x1=\"292\" y1=\"${y}\" x2=\"810\" y2=\"${y}\" stroke=\"${on?HI:'#ddd'}\" stroke-width=\"${on?4:2}\"/>`;
+  o+=T(30,y+4,'row '+r+'  '+bits.join(''),12,on?'#a33':'#889');
+ }
+ // bit lines
+ const bl=[0,1,2,3].map(c=>we?d[c]:mem[s][c]);
+ for(let c=0;c<4;c++)o+=`<line x1=\"${CX[c]}\" y1=\"112\" x2=\"${CX[c]}\" y2=\"470\" stroke=\"${col(bl[c])}\" stroke-width=\"4\"/>`;
+ o+=T(812,300,'← bit lines',11,'#778')+T(812,314,'carry data',11,'#778')+T(812,328,'in or out',11,'#778');
+ // cells
+ for(let r=0;r<8;r++){const y=164+40*r,on=r==s;
+  for(let c=0;c<4;c++){const f=flash==r;
+   o+=`<rect x=\"${CX[c]-26}\" y=\"${y-14}\" width=\"52\" height=\"28\" rx=\"5\" fill=\"${f?RED:(on?'#2e7d4a':'#3f8f5a')}\" stroke=\"${on?HI:'#235'}\" stroke-width=\"${on?3:1}\"/>${T(CX[c],y+6,mem[r][c],16,'#fff','middle')}`}}
+ o+=T(548,148,'cells: each is a flip-flop (one bit)',11,'#2a5').replace('x=\"548\"','x=\"520\"');
+ // data in switches and write drivers
+ for(let c=0;c<4;c++){const n=3-c;
+  o+=`<line x1=\"${CX[c]}\" y1=\"62\" x2=\"${CX[c]}\" y2=\"84\" stroke=\"${col(d[c])}\" stroke-width=\"3\"/>`;
+  o+=`<g class=\"clk\" onclick=\"tgl(d,${c})\"><rect x=\"${CX[c]-22}\" y=\"26\" width=\"44\" height=\"36\" rx=\"6\" fill=\"${col(d[c])}\" stroke=\"#445\" stroke-width=\"2\"/>${T(CX[c],41,'D'+n,11,'#222','middle')}${T(CX[c],56,d[c],14,'#000','middle')}</g>`;
+  o+=`<rect x=\"${CX[c]-24}\" y=\"84\" width=\"48\" height=\"26\" rx=\"4\" fill=\"${we?'#cfe8ff':'#eee'}\" stroke=\"${we?'#2f6fdb':'#aaa'}\" stroke-width=\"2\"/>${T(CX[c],101,'driver',11,we?'#124':'#999','middle')}`;
+ }
+ o+=T(300,40,'DATA IN → write drivers',11,'#556').replace('x=\"300\"','x=\"330\"');
+ // output buffers
+ for(let c=0;c<4;c++){
+  o+=`<rect x=\"${CX[c]-24}\" y=\"470\" width=\"48\" height=\"26\" rx=\"4\" fill=\"${oe?'#d9f2d9':'#eee'}\" stroke=\"${oe?'#2a7':'#aaa'}\" stroke-width=\"2\"/>${T(CX[c],487,'buffer',11,oe?'#141':'#999','middle')}`;
+  o+=`<line x1=\"${CX[c]}\" y1=\"496\" x2=\"${CX[c]}\" y2=\"512\" stroke=\"${oe?col(bl[c]):LO}\" stroke-width=\"3\" ${oe?'':'stroke-dasharray=\"3 3\"'}/>`;
+  o+=`<circle cx=\"${CX[c]}\" cy=\"530\" r=\"16\" fill=\"${oe?col(bl[c]):'#f4f4f4'}\" stroke=\"#445\" stroke-width=\"2\"/>${T(CX[c],535,oe?bl[c]:'Z',14,'#000','middle')}`;
+  o+=T(CX[c],566,'Q'+(3-c),11,'#556','middle');
+ }
+ o+=T(400,530,'DATA OUT',13,'#556','end')+T(400,546,oe?'(selected row)':'(disconnected)',11,'#778','end');
+ // control pins
+ o+=`<g class=\"clk\" onclick=\"setWE()\"><rect x=\"860\" y=\"26\" width=\"90\" height=\"36\" rx=\"6\" fill=\"${col(we)}\" stroke=\"#445\" stroke-width=\"2\"/>${T(905,41,'WE (write)',11,'#222','middle')}${T(905,56,we,14,'#000','middle')}</g>`;
+ o+=`<g class=\"clk\" onclick=\"tick()\"><rect x=\"970\" y=\"26\" width=\"90\" height=\"36\" rx=\"6\" fill=\"${col(clk)}\" stroke=\"#445\" stroke-width=\"2\"/>${T(1015,41,'CLK',11,'#222','middle')}${T(1015,56,clk,14,'#000','middle')}</g>`;
+ o+=`<line x1=\"905\" y1=\"62\" x2=\"905\" y2=\"80\" stroke=\"${col(we)}\" stroke-width=\"3\"/><line x1=\"1015\" y1=\"62\" x2=\"1015\" y2=\"80\" stroke=\"${col(clk)}\" stroke-width=\"3\"/>`;
+ o+=`<path d=\"M885 80 H1035 V104 Q1035 124 960 124 Q885 124 885 104 Z\" fill=\"${strobe?HI:'#eee'}\" stroke=\"#445\" stroke-width=\"2\"/>${T(960,106,'AND  → strobe',12,'#222','middle')}`;
+ o+=`<path d=\"M960 124 V136 H830 V105 H812\" fill=\"none\" stroke=\"${col(strobe)}\" stroke-width=\"3\"/>`;
+ o+=T(1060,142,'strobe='+(strobe?1:0),11,strobe?'#a60':'#778','end');
+ o+=T(830,150,'',10);
+ // OE
+ o+=`<g class=\"clk\" onclick=\"setOE()\"><rect x=\"860\" y=\"468\" width=\"90\" height=\"36\" rx=\"6\" fill=\"${col(oe)}\" stroke=\"#445\" stroke-width=\"2\"/>${T(905,483,'OE (read)',11,'#222','middle')}${T(905,498,oe,14,'#000','middle')}</g>`;
+ o+=`<line x1=\"860\" y1=\"486\" x2=\"812\" y2=\"486\" stroke=\"${col(oe)}\" stroke-width=\"3\"/>`;
+ // waveform
+ o+=T(860,190,'CLOCK HISTORY',11,'#556');
+ const x0=860,yH=210,yL=250;let p='',prev=hist[0].v;p+=`M${x0} ${prev?yH:yL}`;
+ hist.forEach((h,i)=>{const x=x0+i*20,y=h.v?yH:yL,py=prev?yH:yL;if(i>0)p+=` L${x} ${py} L${x} ${y}`;p+=` L${x+20} ${y}`;prev=h.v});
+ o+=`<path d=\"${p}\" fill=\"none\" stroke=\"#2f6fdb\" stroke-width=\"2.5\"/>`;
+ hist.forEach((h,i)=>{if(h.w)o+=`<text x=\"${x0+i*20}\" y=\"${yH-6}\" font-size=\"12\" fill=\"${RED}\" text-anchor=\"middle\">▲W</text>`});
+ o+=T(860,270,'▲W = rising edge that wrote a row',10,RED);
+ // legend explainer
+ o+=T(860,310,'HOW TO READ IT',11,'#556');
+ ['1 Address bits (A2 A1 A0)','  and their inverses feed','  eight AND gates.','2 Exactly one AND fires:','  that word line goes high.','3 Read: row connects to bit','  lines, OE passes it to Q.','4 Write: WE and CLK make a','  strobe; drivers put D on','  the bit lines; the selected','  row stores it.'].forEach((t,i)=>o+=T(860,328+i*15,t,11,'#445'));
+ document.getElementById('svg').innerHTML=o;
+ document.getElementById('log').innerHTML=msg||('Address <b>'+a.join('')+'</b> = '+s+': the decoder raised word line '+s+' (the other 7 stay low). '+(we?'WE=1, so the bit lines show your data '+d.join('')+' and the row will take it on the next clock rising edge.':'WE=0, so the bit lines carry row '+s+'\\'s contents '+mem[s].join('')+(oe?' out to Q.':', but OE=0 so the output is disconnected (Z).')));
+}
 draw();
 </script></body></html>"
- :AT "2026-11-13T20:12:00" :VERSION 1)
+ :AT "2026-11-14T09:42:32" :VERSION 2)
+(:PINNED T :ID "clock-skew-vs-clock-tree" :MAP "computers" :NODE "clock-tree" :TYPE "html" :TITLE
+ "Clock skew vs clock tree" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:0;padding:12px;background:#fafafa;color:#222}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+button{padding:6px 12px;border:1px solid #888;border-radius:6px;background:#fff;cursor:pointer;font-size:14px}
+button.on{background:#222;color:#fff}
+svg{width:100%;background:#fff;border:1px solid #ddd;border-radius:8px}
+#info{margin-top:8px;font-size:14px;line-height:1.45;padding:8px 10px;border-radius:6px;background:#eef}
+.sk{font-weight:600}
+text{font-family:system-ui,sans-serif}
+#buf{margin-top:20px;font-size:14px;line-height:1.5}
+#buf h3{margin:0 0 6px}
+</style></head><body>
+<div class=\"bar\">
+<button id=\"bN\" class=\"on\">Naive: direct wires</button>
+<button id=\"bT\">Clock tree: balanced + buffers</button>
+<button id=\"bR\">▶ Replay</button>
+<label style=\"font-size:13px\">slow-mo <input type=\"range\" id=\"sp\" min=\"0.3\" max=\"2\" step=\"0.1\" value=\"1\"></label>
+</div>
+<svg id=\"s\" viewBox=\"0 0 780 390\"></svg>
+<div id=\"info\"></div>
+
+<div id=\"buf\">
+<h3>What is a buffer?</h3>
+<p>A buffer is a gate that outputs <b>the same value it receives</b>, but with much more current behind it. It doesn't change the logic; it re-drives the signal. A long wire and many flip-flop inputs act like a big capacitor, and a weak source charges it slowly (a slow, mushy edge). A buffer's output stage is built from wide transistors that charge it fast, and it also restores a clean edge.</p>
+<p>It is made of <b>two inverters in series</b>: the first small (light load for whoever drives it), the second large (strong drive). Each inverter is one PMOS and one NMOS transistor.</p>
+<svg viewBox=\"0 0 780 330\" id=\"bsvg\">
+ <!-- Panel A -->
+ <text x=\"130\" y=\"20\" text-anchor=\"middle\" font-size=\"14\" font-weight=\"600\">A. One inverter (CMOS)</text>
+ <line x1=\"90\" y1=\"38\" x2=\"190\" y2=\"38\" stroke=\"#c33\" stroke-width=\"3\"/>
+ <text x=\"200\" y=\"42\" font-size=\"12\" fill=\"#c33\">VDD (1)</text>
+ <line x1=\"140\" y1=\"38\" x2=\"140\" y2=\"62\" stroke=\"#222\" stroke-width=\"2\"/>
+ <rect x=\"112\" y=\"62\" width=\"56\" height=\"50\" rx=\"5\" fill=\"#fde8e8\" stroke=\"#c33\" stroke-width=\"1.5\"/>
+ <text x=\"140\" y=\"85\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"600\">PMOS</text>
+ <text x=\"140\" y=\"101\" text-anchor=\"middle\" font-size=\"11\" fill=\"#555\">on when in=0</text>
+ <line x1=\"140\" y1=\"112\" x2=\"140\" y2=\"182\" stroke=\"#222\" stroke-width=\"2\"/>
+ <circle cx=\"140\" cy=\"147\" r=\"4\" fill=\"#222\"/>
+ <line x1=\"140\" y1=\"147\" x2=\"230\" y2=\"147\" stroke=\"#222\" stroke-width=\"2\"/>
+ <text x=\"236\" y=\"151\" font-size=\"12\" font-weight=\"600\">OUT</text>
+ <rect x=\"112\" y=\"182\" width=\"56\" height=\"50\" rx=\"5\" fill=\"#e6eefc\" stroke=\"#27c\" stroke-width=\"1.5\"/>
+ <text x=\"140\" y=\"205\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"600\">NMOS</text>
+ <text x=\"140\" y=\"221\" text-anchor=\"middle\" font-size=\"11\" fill=\"#555\">on when in=1</text>
+ <line x1=\"140\" y1=\"232\" x2=\"140\" y2=\"262\" stroke=\"#222\" stroke-width=\"2\"/>
+ <line x1=\"110\" y1=\"262\" x2=\"170\" y2=\"262\" stroke=\"#222\" stroke-width=\"3\"/>
+ <line x1=\"120\" y1=\"268\" x2=\"160\" y2=\"268\" stroke=\"#222\" stroke-width=\"2\"/>
+ <line x1=\"130\" y1=\"274\" x2=\"150\" y2=\"274\" stroke=\"#222\" stroke-width=\"2\"/>
+ <text x=\"180\" y=\"266\" font-size=\"12\">GND (0)</text>
+ <!-- gate wire -->
+ <line x1=\"20\" y1=\"147\" x2=\"70\" y2=\"147\" stroke=\"#222\" stroke-width=\"2\"/>
+ <text x=\"20\" y=\"139\" font-size=\"12\" font-weight=\"600\">IN</text>
+ <polyline points=\"112,87 70,87 70,207 112,207\" fill=\"none\" stroke=\"#222\" stroke-width=\"2\"/>
+ <circle cx=\"70\" cy=\"147\" r=\"4\" fill=\"#222\"/>
+ <text x=\"130\" y=\"305\" text-anchor=\"middle\" font-size=\"12\" fill=\"#555\">in=1: bottom on, top off → out pulled to 0</text>
+ <text x=\"130\" y=\"321\" text-anchor=\"middle\" font-size=\"12\" fill=\"#555\">in=0: top on, bottom off → out pulled to 1</text>
+ <!-- divider -->
+ <line x1=\"285\" y1=\"14\" x2=\"285\" y2=\"320\" stroke=\"#ddd\"/>
+ <!-- Panel B -->
+ <text x=\"530\" y=\"20\" text-anchor=\"middle\" font-size=\"14\" font-weight=\"600\">B. Buffer = two inverters, small then big</text>
+ <rect x=\"335\" y=\"55\" width=\"215\" height=\"140\" rx=\"8\" fill=\"none\" stroke=\"#2a7\" stroke-dasharray=\"6 4\" stroke-width=\"1.5\"/>
+ <text x=\"442\" y=\"212\" text-anchor=\"middle\" font-size=\"12\" fill=\"#164\">buffer</text>
+ <line x1=\"300\" y1=\"125\" x2=\"350\" y2=\"125\" stroke=\"#222\" stroke-width=\"2\"/>
+ <text x=\"300\" y=\"115\" font-size=\"12\" font-weight=\"600\">IN</text>
+ <polygon points=\"350,100 350,150 395,125\" fill=\"#e6f5ee\" stroke=\"#164\" stroke-width=\"2\"/>
+ <circle cx=\"400\" cy=\"125\" r=\"5\" fill=\"#fff\" stroke=\"#164\" stroke-width=\"2\"/>
+ <text x=\"375\" y=\"170\" text-anchor=\"middle\" font-size=\"12\">1×</text>
+ <line x1=\"405\" y1=\"125\" x2=\"425\" y2=\"125\" stroke=\"#222\" stroke-width=\"2\"/>
+ <text x=\"415\" y=\"113\" text-anchor=\"middle\" font-size=\"11\" fill=\"#555\">inverted</text>
+ <polygon points=\"425,80 425,170 505,125\" fill=\"#e6f5ee\" stroke=\"#164\" stroke-width=\"2\"/>
+ <circle cx=\"510\" cy=\"125\" r=\"5\" fill=\"#fff\" stroke=\"#164\" stroke-width=\"2\"/>
+ <text x=\"462\" y=\"187\" text-anchor=\"middle\" font-size=\"12\">4× (wider transistors)</text>
+ <line x1=\"515\" y1=\"125\" x2=\"700\" y2=\"125\" stroke=\"#222\" stroke-width=\"2\"/>
+ <text x=\"560\" y=\"115\" font-size=\"12\" font-weight=\"600\">OUT (same as IN)</text>
+ <!-- load cap -->
+ <circle cx=\"650\" cy=\"125\" r=\"4\" fill=\"#222\"/>
+ <line x1=\"650\" y1=\"125\" x2=\"650\" y2=\"148\" stroke=\"#222\" stroke-width=\"2\"/>
+ <line x1=\"632\" y1=\"148\" x2=\"668\" y2=\"148\" stroke=\"#222\" stroke-width=\"3\"/>
+ <line x1=\"632\" y1=\"156\" x2=\"668\" y2=\"156\" stroke=\"#222\" stroke-width=\"3\"/>
+ <line x1=\"650\" y1=\"156\" x2=\"650\" y2=\"176\" stroke=\"#222\" stroke-width=\"2\"/>
+ <line x1=\"636\" y1=\"176\" x2=\"664\" y2=\"176\" stroke=\"#222\" stroke-width=\"3\"/>
+ <text x=\"676\" y=\"156\" font-size=\"12\" fill=\"#c40\">load: wire + gate</text>
+ <text x=\"676\" y=\"170\" font-size=\"12\" fill=\"#c40\">capacitance</text>
+ <text x=\"530\" y=\"250\" text-anchor=\"middle\" font-size=\"12\" fill=\"#555\">Values: IN=1 → middle=0 → OUT=1. Logic unchanged.</text>
+ <text x=\"530\" y=\"270\" text-anchor=\"middle\" font-size=\"12\" fill=\"#555\">The first inverter is easy for the source to drive; the second has</text>
+ <text x=\"530\" y=\"286\" text-anchor=\"middle\" font-size=\"12\" fill=\"#555\">the muscle to charge the load quickly. Each stage is about 3–4× bigger</text>
+ <text x=\"530\" y=\"302\" text-anchor=\"middle\" font-size=\"12\" fill=\"#555\">than the last; a chain of them lets a tiny gate drive a huge load.</text>
+ <text x=\"530\" y=\"322\" text-anchor=\"middle\" font-size=\"12\" fill=\"#164\">In the clock tree each green triangle above is one of these.</text>
+</svg>
+</div>
+
+<script>
+const NS=\"http://www.w3.org/2000/svg\",svg=document.getElementById('s');
+const V=250,DD=0.8,PS=2; // px/s, data delay (s), ps per px (exaggerated)
+const sinks=[{id:'reg',name:'Register file',sub:'flip-flops',L:1,y:80,cx:200},
+{id:'pc',name:'Control / PC',sub:'flip-flops',L:1,y:320,cx:200},
+{id:'alu',name:'ALU result reg',sub:'flip-flops',L:0,y:80,cx:700},
+{id:'ram',name:'RAM',sub:'write port',L:0,y:320,cx:700}];
+let mode='N',t=0,last=null,els={};
+function el(n,a,p=svg,txt){const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);if(txt!==undefined)e.textContent=txt;p.appendChild(e);return e}
+function pathFor(s){const pin=s.L?260:640;
+ if(mode=='T')return`M60 200 H450 V${s.y} H${pin}`;
+ return s.L?`M60 200 H300 V${s.y} H260`:`M60 200 H600 V${s.y} H640`}
+function build(){
+ svg.innerHTML='';els={};
+ el('path',{d:'M200 50 V22 H410 M490 22 H700 V50',fill:'none',stroke:'#9ab','stroke-width':2,'stroke-dasharray':'5 4'});
+ el('rect',{x:410,y:6,width:80,height:32,rx:5,fill:'#e8f0ff',stroke:'#58a'});
+ el('text',{x:450,y:27,'text-anchor':'middle','font-size':13},svg,'ALU (logic)');
+ el('text',{x:330,y:16,'text-anchor':'middle','font-size':11,fill:'#678'},svg,'data wire');
+ el('rect',{x:6,y:175,width:54,height:50,rx:6,fill:'#fff3d6',stroke:'#c90'});
+ el('text',{x:33,y:197,'text-anchor':'middle','font-size':12},svg,'Clock');
+ el('text',{x:33,y:213,'text-anchor':'middle','font-size':12},svg,'source');
+ sinks.forEach(s=>{
+  const d=pathFor(s);
+  el('path',{d,fill:'none',stroke:'#ccc','stroke-width':4});
+  const ov=el('path',{d,fill:'none',stroke:'#e63',\"stroke-width\":4});
+  const dot=el('circle',{r:7,fill:'#e63',stroke:'#fff','stroke-width':2,visibility:'hidden'});
+  const bx=s.L?140:640;
+  const rect=el('rect',{x:bx,y:s.y-30,width:120,height:60,rx:7,fill:'#f4f4f4',stroke:'#555','stroke-width':1.5});
+  el('text',{x:bx+60,y:s.y-10,'text-anchor':'middle','font-size':13,'font-weight':600},svg,s.name);
+  el('text',{x:bx+60,y:s.y+5,'text-anchor':'middle','font-size':11,fill:'#666'},svg,s.sub);
+  const st=el('text',{x:bx+60,y:s.y+22,'text-anchor':'middle','font-size':12,fill:'#666'},svg,'waiting…');
+  el('rect',{x:s.L?256:636,y:s.y-4,width:8,height:8,fill:'#222'});
+  els[s.id]={ov,dot,rect,st,path:ov,len:ov.getTotalLength()};
+ });
+ if(mode=='T'){
+  [[450,200,'root'],[450,80,'mid'],[450,320,'mid']].forEach(([x,y])=>{
+   const g=el('path',{d:`M${x-9} ${y-10} L${x+11} ${y} L${x-9} ${y+10}Z`,fill:'#2a7',stroke:'#164'});
+  });
+  el('text',{x:462,y:222,'font-size':12,fill:'#164'},svg,'buffers');
+  el('text',{x:462,y:68,'font-size':12,fill:'#164'},svg,'every leaf = 700 px path');
+ }
+ els.q=el('text',{x:200,y:140,'text-anchor':'middle','font-size':13,'font-weight':600},svg,'Q = 0');
+ els.dd=el('circle',{r:6,fill:'#27c',visibility:'hidden'});
+ els.dp=svg.querySelector('path[stroke-dasharray]');
+ els.dl=els.dp.getTotalLength();
+ els.verdict=el('text',{x:700,y:140,'text-anchor':'middle','font-size':13,'font-weight':600},svg,'');
+ el('text',{x:390,y:375,'text-anchor':'middle','font-size':12,fill:'#666'},svg,'Orange = clock edge travelling at a fixed wire speed. Arrival times shown in ps (exaggerated, schematic).');
+}
+function arr(s){return els[s.id].len/V}
+function frame(ms){
+ if(last==null)last=ms;const dt=(ms-last)/1000;last=ms;
+ t+=dt*document.getElementById('sp').value;
+ const tA=arr(sinks[0]),tB=arr(sinks[2]);
+ sinks.forEach(s=>{const e=els[s.id],d=Math.min(t*V,e.len);
+  e.ov.setAttribute('stroke-dasharray',`${d} ${e.len+10}`);
+  const p=e.path.getPointAtLength(d);
+  e.dot.setAttribute('cx',p.x);e.dot.setAttribute('cy',p.y);
+  e.dot.setAttribute('visibility',(t>0&&d<e.len)?'visible':'hidden');
+  if(t>=arr(s)){e.rect.setAttribute('fill','#ffe3d3');e.rect.setAttribute('stroke','#e63');
+   e.st.textContent='edge @ '+Math.round(e.len*PS)+' ps';e.st.setAttribute('fill','#c40');}
+ });
+ els.q.textContent='Q = '+(t>=tA?1:0);
+ const u=(t-tA)/DD;
+ if(u>0&&u<1){const p=els.dp.getPointAtLength(u*els.dl);els.dd.setAttribute('cx',p.x);els.dd.setAttribute('cy',p.y);els.dd.setAttribute('visibility','visible')}else els.dd.setAttribute('visibility','hidden');
+ if(t>=tB){const bad=(tA+DD<=tB);
+  els.verdict.textContent=bad?'captured 1 ✗ (should be old 0)':'captured 0 ✓ (old value)';
+  els.verdict.setAttribute('fill',bad?'#c00':'#168a3a');}
+ else els.verdict.textContent='';
+ info(t>=Math.max(tA,tB));
+ if(t<8)requestAnimationFrame(frame);
+}
+function info(done){
+ const ar=sinks.map(s=>els[s.id].len*PS),sk=Math.max(...ar)-Math.min(...ar);
+ const bad=arr(sinks[0])+DD<=arr(sinks[2]);
+ document.getElementById('info').innerHTML=
+ (mode=='N'?'<b>Naive wiring:</b> each block is wired straight to the clock, so near blocks get the edge early and far blocks late. ':'<b>Clock tree:</b> the edge goes through buffers that split it into equal-length branches, so every block gets it together. ')+
+ '<br>Skew (latest − earliest arrival) = <span class=\"sk\" style=\"color:'+(sk?'#c00':'#168a3a')+'\">'+sk+' ps</span>.'+
+ (done?(bad?'<br>The register file fired early, its new output raced down the data wire, and the ALU register — whose clock was still late — copied the <b>new</b> value instead of the old one. Wrong state.':'<br>Both registers switched at the same instant, so the ALU register captured the old value, as intended. Everyone arrives later than the source, but at the same moment — only the <i>difference</i> matters.'):'');
+}
+function replay(){t=0;last=null;build();requestAnimationFrame(frame)}
+function setMode(m){mode=m;bN.className=m=='N'?'on':'';bT.className=m=='T'?'on':'';replay()}
+bN.onclick=()=>setMode('N');bT.onclick=()=>setMode('T');bR.onclick=replay;
+build();info(false);requestAnimationFrame(frame);
+</script></body></html>
+"
+ :AT "2026-11-14T10:11:40" :VERSION 2)
+(:PINNED T :ID "von-neumann-vs-harvard" :MAP "computers" :NODE "code-and-data-alike" :TYPE "svg"
+ :TITLE "Von Neumann vs Harvard" :LANGUAGE NIL :CONTENT
+ "<svg viewBox=\"0 0 900 420\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"sans-serif\">
+<rect width=\"900\" height=\"420\" fill=\"#fff\"/>
+<text x=\"225\" y=\"30\" text-anchor=\"middle\" font-size=\"18\" font-weight=\"bold\">Harvard</text>
+<text x=\"675\" y=\"30\" text-anchor=\"middle\" font-size=\"18\" font-weight=\"bold\">Von Neumann</text>
+<line x1=\"450\" y1=\"45\" x2=\"450\" y2=\"400\" stroke=\"#ccc\" stroke-dasharray=\"6 6\"/>
+
+<rect x=\"150\" y=\"170\" width=\"150\" height=\"70\" rx=\"8\" fill=\"#dbe9ff\" stroke=\"#2b5fb3\" stroke-width=\"2\"/>
+<text x=\"225\" y=\"212\" text-anchor=\"middle\" font-size=\"16\">CPU</text>
+<rect x=\"30\" y=\"60\" width=\"150\" height=\"70\" rx=\"8\" fill=\"#ffe3c2\" stroke=\"#c46a00\" stroke-width=\"2\"/>
+<text x=\"105\" y=\"90\" text-anchor=\"middle\" font-size=\"14\">Instruction</text>
+<text x=\"105\" y=\"110\" text-anchor=\"middle\" font-size=\"14\">memory</text>
+<rect x=\"270\" y=\"60\" width=\"150\" height=\"70\" rx=\"8\" fill=\"#d6f2dc\" stroke=\"#2c8a45\" stroke-width=\"2\"/>
+<text x=\"345\" y=\"90\" text-anchor=\"middle\" font-size=\"14\">Data</text>
+<text x=\"345\" y=\"110\" text-anchor=\"middle\" font-size=\"14\">memory</text>
+<line x1=\"125\" y1=\"130\" x2=\"185\" y2=\"170\" stroke=\"#c46a00\" stroke-width=\"3\"/>
+<line x1=\"325\" y1=\"130\" x2=\"265\" y2=\"170\" stroke=\"#2c8a45\" stroke-width=\"3\"/>
+<text x=\"225\" y=\"285\" text-anchor=\"middle\" font-size=\"14\">Two memories, two buses:</text>
+<text x=\"225\" y=\"305\" text-anchor=\"middle\" font-size=\"14\">fetch and data access in the same cycle.</text>
+<text x=\"225\" y=\"330\" text-anchor=\"middle\" font-size=\"14\" fill=\"#a22\">Program can't be written by the program.</text>
+<text x=\"225\" y=\"350\" text-anchor=\"middle\" font-size=\"14\" fill=\"#a22\">No loader, compiler output or JIT in RAM.</text>
+
+<rect x=\"600\" y=\"170\" width=\"150\" height=\"70\" rx=\"8\" fill=\"#dbe9ff\" stroke=\"#2b5fb3\" stroke-width=\"2\"/>
+<text x=\"675\" y=\"212\" text-anchor=\"middle\" font-size=\"16\">CPU</text>
+<rect x=\"540\" y=\"60\" width=\"270\" height=\"70\" rx=\"8\" fill=\"#f0e0f7\" stroke=\"#7a3b99\" stroke-width=\"2\"/>
+<text x=\"675\" y=\"88\" text-anchor=\"middle\" font-size=\"14\">One memory</text>
+<text x=\"675\" y=\"108\" text-anchor=\"middle\" font-size=\"13\">[code][data][code][data]…</text>
+<line x1=\"675\" y1=\"130\" x2=\"675\" y2=\"170\" stroke=\"#7a3b99\" stroke-width=\"3\"/>
+<text x=\"675\" y=\"285\" text-anchor=\"middle\" font-size=\"14\">One memory, one bus:</text>
+<text x=\"675\" y=\"305\" text-anchor=\"middle\" font-size=\"14\">instructions are numbers like any other.</text>
+<text x=\"675\" y=\"330\" text-anchor=\"middle\" font-size=\"14\" fill=\"#2c6b3a\">Programs can write programs.</text>
+<text x=\"675\" y=\"350\" text-anchor=\"middle\" font-size=\"14\" fill=\"#2c6b3a\">Compilers, loaders, OSes, JITs.</text>
+<text x=\"675\" y=\"375\" text-anchor=\"middle\" font-size=\"13\" fill=\"#a22\">Cost: data can be run as code (exploits).</text>
+</svg>"
+ :AT "2026-11-14T14:00:40" :VERSION 1)
+(:PINNED T :ID "wiring-to-stored-programs-to-assembly" :MAP "computers" :NODE
+ "machine-code-assembly" :TYPE "quiz" :TITLE "Wiring to stored programs to assembly" :LANGUAGE NIL
+ :CONTENT
+ ((:NODE "machine-code-assembly" :EXPLANATION
+   "ENIAC's program lived in its physical wiring and switch settings, not in memory." :ANSWER 1
+   :OPTIONS
+   ("Loading a program from punched cards into memory" "Rewiring cables and setting switches"
+    "Typing mnemonics like LDA on a keyboard" "Running an assembler from paper tape")
+   :QUESTION "How was ENIAC (1945) given a new program?")
+  (:NODE "machine-code-assembly" :EXPLANATION
+   "Binary electronic logic already existed; the shift was instructions sharing memory with data."
+   :ANSWER 2 :OPTIONS
+   ("It uses binary logic" "It is built from electronic switches"
+    "Instructions are numbers held in the same memory as data"
+    "It reads programs only from punched cards")
+   :QUESTION "What is the defining property of a stored-program computer?")
+  (:NODE "machine-code-assembly" :EXPLANATION
+   "An assembler outputs instructions; ENIAC's instructions weren't numbers in memory, so there was nowhere to write them."
+   :ANSWER 1 :OPTIONS
+   ("It was too slow"
+    "It had no way to write instructions as numbers into memory, since its program was wiring"
+    "It did not use binary" "It had no input device")
+   :QUESTION "Why couldn't ENIAC have run an assembler?")
+  (:NODE "machine-code-assembly" :EXPLANATION
+   "Assembly is mostly a one-to-one rename: lookup table inside a loop. Labels add address bookkeeping."
+   :ANSWER 0 :OPTIONS
+   ("A loop that reads each line, looks up the name in a table, and emits the number"
+    "A program that turns one high-level line into many optimised instructions"
+    "A circuit that translates voltages into letters" "A table that rewires the machine")
+   :QUESTION "What is the core mechanism of an assembler?")
+  (:NODE "machine-code-assembly" :EXPLANATION
+   "Wheeler's Initial Orders for EDSAC at Cambridge read letter mnemonics and stored binary instructions."
+   :ANSWER 1 :OPTIONS
+   ("Grace Hopper, UNIVAC" "David Wheeler, EDSAC" "John Backus, IBM 704" "Konrad Zuse, Z3")
+   :QUESTION "Who wrote the first assembler-like 'Initial Orders' (1949), and for which machine?")
+  (:NODE "machine-code-assembly" :EXPLANATION
+   "Assembly is roughly one-to-one; compilers make one line become many instructions. Both rely on programs that write programs."
+   :ANSWER 1 :OPTIONS
+   ("Instructions became electronic" "One source line expands into many machine instructions"
+    "Programs could be stored in memory for the first time"
+    "Programs no longer needed binary at all")
+   :QUESTION "What is the real jump in power that came after assembly, with FORTRAN (1957)?")
+  (:NODE "machine-code-assembly" :EXPLANATION
+   "Logic was already electronic; memory capable of holding programs (Baby 1948, EDSAC 1949) was the enabler."
+   :ANSWER 1 :OPTIONS
+   ("Electronic logic made assembly possible"
+    "Large enough, fast memory let programs be stored, so a program could produce instructions"
+    "Punched cards made assembly necessary" "Faster clocks made assembly possible")
+   :QUESTION "Which statement about the cause of assembly is most accurate?"))
+ :AT "2026-11-14T14:10:04" :VERSION 1)
+(:PINNED T :ID "three-kinds-of-bootstrapping" :MAP "computers" :NODE "reset-vector-bootstrap" :TYPE
+ "html" :TITLE "Three kinds of bootstrapping" :LANGUAGE NIL :CONTENT "<!DOCTYPE html>
+<html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:0;padding:12px;background:#fafafa;color:#222}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+button{border:1px solid #888;background:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:14px}
+button.on{background:#2b5fd9;color:#fff;border-color:#2b5fd9}
+svg{width:100%;background:#fff;border:1px solid #ddd;border-radius:8px}
+#cap{min-height:3.2em;margin:8px 2px;font-size:15px}
+</style></head><body>
+<div class=\"tabs\">
+<button id=\"b0\" onclick=\"sel(0)\">1. The boots</button>
+<button id=\"b1\" onclick=\"sel(1)\">2. Computer boot</button>
+<button id=\"b2\" onclick=\"sel(2)\">3. Startup</button>
+<button onclick=\"replay()\">↻ Replay</button>
+<button id=\"pp\" onclick=\"pause()\">⏸ Pause</button>
+</div>
+<svg id=\"s\" viewBox=\"0 0 640 420\"></svg>
+<div id=\"cap\"></div>
+<script>
+// Single source of truth: elapsed seconds `el`, advanced by real frame deltas while not paused.
+// No absolute timestamps are compared, so a button click can never produce a negative time.
+let cur=0,el=0,paused=false,last=null;
+const S=document.getElementById('s'),C=document.getElementById('cap');
+function sel(i){cur=i;el=0;last=null;for(let k=0;k<3;k++)document.getElementById('b'+k).className=k==i?'on':'';draw()}
+function replay(){el=0;last=null;draw()}
+function pause(){paused=!paused;last=null;document.getElementById('pp').textContent=paused?'▶ Play':'⏸ Pause'}
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const txt=(x,y,s,o='')=>`<text x=\"${x}\" y=\"${y}\" font-size=\"14\" ${o}>${s}</text>`;
+
+function scene0(t){ // loop 10s
+  const pull=clamp(t/3)*(t<6?1:clamp(1-(t-6)/1));
+  const sh=Math.sin(t*35)*pull*2.5, cx=200+sh;
+  const hy=270-pull*40; // hands rise
+  let g=`<line x1=\"20\" y1=\"380\" x2=\"620\" y2=\"380\" stroke=\"#555\" stroke-width=\"3\"/>`;
+  g+=`<g stroke=\"#222\" stroke-width=\"5\" stroke-linecap=\"round\" fill=\"none\">
+  <line x1=\"${cx}\" y1=\"250\" x2=\"${cx-22}\" y2=\"365\"/><line x1=\"${cx}\" y1=\"250\" x2=\"${cx+22}\" y2=\"365\"/>
+  <line x1=\"${cx}\" y1=\"165\" x2=\"${cx}\" y2=\"250\"/>
+  <line x1=\"${cx}\" y1=\"180\" x2=\"${cx-45}\" y2=\"${hy}\"/><line x1=\"${cx}\" y1=\"180\" x2=\"${cx+45}\" y2=\"${hy}\"/></g>
+  <circle cx=\"${cx}\" cy=\"140\" r=\"24\" fill=\"#fff\" stroke=\"#222\" stroke-width=\"5\"/>
+  <rect x=\"${cx-42}\" y=\"364\" width=\"38\" height=\"16\" rx=\"5\" fill=\"#8b5a2b\"/><rect x=\"${cx+4}\" y=\"364\" width=\"38\" height=\"16\" rx=\"5\" fill=\"#8b5a2b\"/>
+  <g stroke=\"#c0392b\" stroke-width=\"3\"><line x1=\"${cx-30}\" y1=\"364\" x2=\"${cx-45}\" y2=\"${hy}\"/><line x1=\"${cx+30}\" y1=\"364\" x2=\"${cx+45}\" y2=\"${hy}\"/></g>`;
+  if(t>2){const a=clamp((t-2)/1.5), L=70*a;
+    g+=`<g stroke=\"#2b5fd9\" stroke-width=\"4\" fill=\"#2b5fd9\" opacity=\"${a}\"><line x1=\"${cx+70}\" y1=\"${hy}\" x2=\"${cx+70}\" y2=\"${hy-L}\"/><polygon points=\"${cx+62},${hy-L} ${cx+78},${hy-L} ${cx+70},${hy-L-12}\"/></g>
+    <g stroke=\"#d9302b\" stroke-width=\"4\" fill=\"#d9302b\" opacity=\"${a}\"><line x1=\"${cx+90}\" y1=\"350\" x2=\"${cx+90}\" y2=\"${350+L*0.4}\"/><polygon points=\"${cx+82},${350+L*.4} ${cx+98},${350+L*.4} ${cx+90},${350+L*.4+12}\"/></g>`;
+    g+=txt(cx+82,hy-30,'pull up on hands',`fill=\"#2b5fd9\" opacity=\"${a}\"`)+txt(cx+104,372,'push down on boots',`fill=\"#d9302b\" opacity=\"${a}\"`);}
+  let c;
+  if(t<2)c=\"He tugs on his own bootstraps…\";
+  else if(t<6.5){c=\"Pull on the hands is matched by push on the boots. Both forces are <b>internal</b>, so they cancel. Net force 0, and he stays on the ground.\";}
+  else {c=\"Literally impossible — so the phrase came to mean <b>getting going with no outside help</b>. A computer cheats the same way: not one giant leap, but a tiny first step that makes the next one possible.\";}
+  if(t>6.5)g+=txt(330,90,'“Pull yourself up by your bootstraps”','font-size=\"18\" font-weight=\"bold\"')+txt(330,115,'→ start small, use each step to reach the next','fill=\"#555\"');
+  return [g,c];
+}
+
+function scene1(t){ // 12.5s
+  const st=[[\"Reset vector → ROM\",\"~0.5 KB\",12,\"#c0392b\",\"Reset forces PC to a fixed ROM address. The tiny code there can do just one job: find the next stage.\"],
+   [\"Bootloader\",\"~16 KB\",40,\"#e67e22\",\"ROM code starts RAM and a disk or flash, then copies the bootloader into RAM and jumps to it.\"],
+   [\"Kernel\",\"~10 MB\",150,\"#d4ac0d\",\"The bootloader is smart enough to read a filesystem. It loads the kernel and passes control.\"],
+   [\"OS services\",\"~500 MB\",300,\"#27ae60\",\"The kernel starts drivers, networking and a login screen.\"],
+   [\"Your programs\",\"GBs\",440,\"#2b5fd9\",\"Now the machine can load anything you ask it to.\"]];
+  const idx=clamp(Math.floor(t/2.5),0,4), f=clamp((t-idx*2.5)/1.6);
+  let g=txt(20,26,'RAM (grows as each stage loads the next)','font-weight=\"bold\"');
+  st.forEach((s,i)=>{
+    const y=50+i*68, w=i<idx?s[2]:i==idx?s[2]*(i==0?1:f):0;
+    g+=`<rect x=\"20\" y=\"${y}\" width=\"450\" height=\"46\" fill=\"#f3f3f3\" stroke=\"#ccc\"/>`;
+    if(w>0)g+=`<rect x=\"20\" y=\"${y}\" width=\"${Math.max(w,4)}\" height=\"46\" fill=\"${s[3]}\"/>`;
+    g+=txt(w>0&&w>150?28:Math.max(w,4)+28,y+28,s[0]+'  ('+s[1]+')',`fill=\"${w>150?'#fff':'#222'}\"`);
+    if(i==idx)g+=`<polygon points=\"490,${y+23} 515,${y+11} 515,${y+35}\" fill=\"#222\"/>`+txt(522,y+28,'PC','font-weight=\"bold\"');
+    if(i>0&&i<=idx)g+=`<path d=\"M${480},${y-22} L480,${y-2}\" stroke=\"#555\" stroke-width=\"2\"/>`;
+  });
+  g+=txt(540,200,'each stage',`font-size=\"12\" fill=\"#666\"`)+txt(540,216,'loads a bigger',`font-size=\"12\" fill=\"#666\"`)+txt(540,232,'one, then jumps',`font-size=\"12\" fill=\"#666\"`);
+  return [g,`<b>Stage ${idx+1}: ${st[idx][0]}.</b> ${st[idx][4]}`];
+}
+
+function scene2(t){ // 7 laps x 2.2s
+  const lap=clamp(Math.floor(t/2.2),0,6), p=clamp((t-lap*2.2)/2.0);
+  const cash=n=>10*Math.pow(1.6,n), nodes=[\"Build product\",\"Win customers\",\"Collect revenue\",\"Reinvest (hire, market)\"];
+  const cx=170,cy=215,R=105;
+  let g=txt(20,26,'The loop','font-weight=\"bold\"')+txt(380,26,'Revenue per lap ($k)','font-weight=\"bold\"');
+  g+=`<circle cx=\"${cx}\" cy=\"${cy}\" r=\"${R}\" fill=\"none\" stroke=\"#bbb\" stroke-width=\"3\" stroke-dasharray=\"6 5\"/>`;
+  nodes.forEach((n,i)=>{const a=-Math.PI/2+i*Math.PI/2,x=cx+R*Math.cos(a),y=cy+R*Math.sin(a);
+    g+=`<circle cx=\"${x}\" cy=\"${y}\" r=\"9\" fill=\"#2b5fd9\"/>`+txt(x+(i==3?-14:14),y+(i==0?-14:i==2?26:4),n,`font-size=\"12\" text-anchor=\"${i==3?'end':'start'}\"`);});
+  const a=-Math.PI/2+p*2*Math.PI, cr=6+Math.min(cash(lap)/10,14)*1.2;
+  g+=`<circle cx=\"${cx+R*Math.cos(a)}\" cy=\"${cy+R*Math.sin(a)}\" r=\"${cr}\" fill=\"#f1c40f\" stroke=\"#b7950b\" stroke-width=\"2\"/>`;
+  g+=txt(cx,cy-4,'Cash',`text-anchor=\"middle\" font-size=\"13\"`)+txt(cx,cy+16,'$'+Math.round(cash(lap+(p>.75?clamp((p-.75)*4):0)))+'k',`text-anchor=\"middle\" font-weight=\"bold\" font-size=\"16\"`);
+  const bx=380,base=380;
+  for(let i=0;i<=lap;i++){const h=(i<lap?1:clamp(p*1.3))*cash(i+1)*3.4*0.95;
+    g+=`<rect x=\"${bx+i*34}\" y=\"${base-h}\" width=\"26\" height=\"${h}\" fill=\"#27ae60\"/>`+txt(bx+i*34+13,base+16,i+1,`text-anchor=\"middle\" font-size=\"12\"`);}
+  g+=`<line x1=\"370\" y1=\"${base}\" x2=\"625\" y2=\"${base}\" stroke=\"#555\"/>`+txt(450,404,'lap',`font-size=\"12\"`);
+  const c=lap==0?\"<b>Seed money</b> pays for a first rough product — the “tiny ROM”.\":lap<3?\"Revenue is reinvested, so the <b>next lap starts from a bigger base</b>.\":\"Each lap’s output funds a larger next lap: compounding. No outside push needed once the loop turns.\";
+  return [g,c];
+}
+const sc=[scene0,scene1,scene2],dur=[10,13,15.4],HOLD=2;
+function draw(){
+  const d=dur[cur];
+  if(el>d+HOLD)el=0;            // restart after holding the final state
+  const t=clamp(el,0,d);        // never negative, never past the end
+  try{const [g,c]=sc[cur](t);S.innerHTML=g;C.innerHTML=c}catch(e){console.error(e)}
+}
+function frame(now){
+  if(last!==null&&!paused)el+=Math.min((now-last)/1000,0.1); // delta time; capped so tab-switches don't jump
+  last=now;
+  draw();
+  requestAnimationFrame(frame);  // always reschedules
+}
+sel(0);requestAnimationFrame(frame);
+</script></body></html>
+"
+ :AT "2026-11-14T22:18:20" :VERSION 2)
+(:PINNED T :ID "primitives-that-build-everything" :MAP "computers" :NODE "instruction-set" :TYPE
+ "html" :TITLE "Primitives that build everything" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:0;padding:16px;background:#fafafa;color:#222}
+h2{margin:0 0 4px;font-size:18px}p.s{margin:0 0 12px;color:#555;font-size:13px}
+.tabs{display:flex;gap:8px;margin-bottom:12px}.tabs button{padding:6px 12px;border:1px solid #bbb;background:#fff;border-radius:8px;cursor:pointer}
+.tabs button.on{background:#2b6cb0;color:#fff;border-color:#2b6cb0}
+.box{background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:14px}
+table{border-collapse:collapse;font-family:monospace}td,th{border:1px solid #ddd;padding:3px 10px;text-align:center}
+.ok{color:#1a7f37;font-weight:600}.no{color:#c00;font-weight:600}
+.prim{display:inline-flex;align-items:center;gap:6px;margin:4px 12px 4px 0;padding:6px 10px;border:2px solid #ccc;border-radius:8px;cursor:pointer;background:#fff;user-select:none}
+.prim.on{border-color:#2b6cb0;background:#e6f0fb}
+.task{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}
+.small{font-size:12px;color:#666}code{background:#eee;padding:1px 5px;border-radius:4px}
+.hide{display:none}
+</style></head><body>
+<h2>The primitives: what is the minimum?</h2>
+<p class=\"s\">Two different \"completeness\" ideas. Gates need NAND to make any Boolean function. A computer needs four kinds of instruction to run any program.</p>
+<div class=\"tabs\"><button id=\"t1\" class=\"on\">1 · Logic: everything from NAND</button><button id=\"t2\">2 · Instructions: what can you compute?</button></div>
+
+<div id=\"p1\">
+<div class=\"box\">Pick a gate. It is built <b>only</b> from NAND gates, and checked against the real thing.
+<div style=\"margin:8px 0\"><select id=\"g\"><option>NOT</option><option>AND</option><option>OR</option><option>XOR</option></select></div>
+<div id=\"recipe\"></div><div id=\"tt\" style=\"margin-top:8px\"></div></div>
+<div class=\"box small\">NAND is <i>functionally complete</i> for Boolean logic. That alone gives you a calculator-like circuit, but with no memory of its own and no way to run a program that loops.</div>
+</div>
+
+<div id=\"p2\" class=\"hide\">
+<div class=\"box\">Click to switch primitives on or off. Which programs can the machine still run?
+<div id=\"prims\" style=\"margin-top:8px\"></div></div>
+<div class=\"box\" id=\"tasks\"></div>
+<div class=\"box small\" id=\"verdict\"></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+$('t1').onclick=()=>{$('p1').classList.remove('hide');$('p2').classList.add('hide');$('t1').classList.add('on');$('t2').classList.remove('on')};
+$('t2').onclick=()=>{$('p2').classList.remove('hide');$('p1').classList.add('hide');$('t2').classList.add('on');$('t1').classList.remove('on')};
+// ---- NAND
+const nand=(a,b)=>+!(a&&b),NOT=a=>nand(a,a),AND=(a,b)=>NOT(nand(a,b)),OR=(a,b)=>nand(NOT(a),NOT(b));
+const XOR=(a,b)=>{const n=nand(a,b);return nand(nand(a,n),nand(b,n))};
+const G={NOT:{f:a=>NOT(a),ref:a=>+!a,n:1,r:'NOT a = NAND(a, a)  — tie both inputs together',u:1},
+AND:{f:AND,ref:(a,b)=>a&b,n:2,r:'AND = NOT(NAND(a,b))  — NAND, then invert'},
+OR:{f:OR,ref:(a,b)=>a|b,n:3,r:'OR = NAND(NOT a, NOT b)  — invert both inputs, then NAND'},
+XOR:{f:XOR,ref:(a,b)=>a^b,n:4,r:'n = NAND(a,b); XOR = NAND( NAND(a,n), NAND(b,n) )'}};
+function gate(){const k=$('g').value,g=G[k];$('recipe').innerHTML=`<code>${g.r}</code><br><span class=\"small\">${g.n} NAND gate${g.n>1?'s':''}</span>`;
+ let rows='';const ins=g.u?[[0],[1]]:[[0,0],[0,1],[1,0],[1,1]];
+ for(const i of ins){const o=g.f(...i),r=g.ref(...i);rows+=`<tr><td>${i.join('</td><td>')}</td><td>${o}</td><td>${r}</td><td class=\"${o==r?'ok':'no'}\">${o==r?'✓':'✗'}</td></tr>`}
+ $('tt').innerHTML=`<table><tr>${g.u?'<th>a</th>':'<th>a</th><th>b</th>'}<th>from NANDs</th><th>real ${k}</th><th></th></tr>${rows}</table>`}
+$('g').onchange=gate;gate();
+// ---- instruction primitives
+const P=[{k:'alu',n:'Arithmetic / logic (ADD, AND…)'},{k:'imm',n:'Constants (LOADI)'},{k:'mem',n:'Memory (LOAD / STORE)'},{k:'br',n:'Conditional branch (BEQZ)'}];
+const on={alu:1,imm:1,mem:1,br:1};
+const T=[{n:'Add two numbers already in registers',need:['alu']},
+{n:'Put the number 5 into a register',need:['imm']},
+{n:'Remember a value and read it back later',need:['mem']},
+{n:'Do something only if x = 0 (if / else)',need:['br','alu']},
+{n:'Compute 6 × 7 by repeated addition (loop)',need:['alu','imm','br']},
+{n:'Sum an array of numbers',need:['alu','imm','mem','br']}];
+function draw(){
+ $('prims').innerHTML=P.map(p=>`<span class=\"prim ${on[p.k]?'on':''}\" data-k=\"${p.k}\">${on[p.k]?'☑':'☐'} ${p.n}</span>`).join('');
+ document.querySelectorAll('.prim').forEach(e=>e.onclick=()=>{on[e.dataset.k]=!on[e.dataset.k];draw()});
+ $('tasks').innerHTML=T.map(t=>{const miss=t.need.filter(k=>!on[k]).map(k=>P.find(p=>p.k==k).n.split(' (')[0]);
+  return `<div class=\"task\"><span>${t.n}</span><span class=\"${miss.length?'no':'ok'}\">${miss.length?'✗ needs '+miss.join(', '):'✓ possible'}</span></div>`}).join('');
+ const all=P.every(p=>on[p.k]);
+ $('verdict').innerHTML=all?'With all four, you can express any computation (given enough memory): <b>Turing complete</b>. Compilers then turn languages into sequences of these. Real ISAs add many more instructions, but only for speed and convenience. The extreme: <b>SUBLEQ</b> is a single instruction (subtract, branch if ≤ 0) and is still Turing complete.':
+ 'Remove or add primitives and watch what breaks. The key one is the <b>conditional branch</b>: without it, a program runs straight through once and cannot loop or decide.'}
+draw();
+</script></body></html>"
+ :AT "2026-11-14T22:48:07" :VERSION 1)
+(:PINNED T :ID "abstraction-layers-parts-merge-into-wholes" :MAP "computers" :NODE
+ "instruction-set" :TYPE "html" :TITLE "Abstraction layers: parts merge into wholes" :LANGUAGE NIL
+ :CONTENT "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:0;padding:16px;background:#fafafa;color:#222}
+h2{margin:0 0 4px;font-size:18px}p.s{margin:0 0 10px;color:#555;font-size:13px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center}
+button{padding:6px 12px;border:1px solid #bbb;background:#fff;border-radius:8px;cursor:pointer;font-size:13px}
+button.on{background:#2b6cb0;color:#fff;border-color:#2b6cb0}
+svg{width:100%;background:#fff;border:1px solid #ddd;border-radius:10px;display:block}
+.crumbs{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0;font-size:12px}
+.crumbs span{padding:3px 8px;border-radius:12px;border:1px solid #ccc;cursor:pointer;background:#fff}
+.crumbs span.cur{font-weight:700;border-width:2px}
+.note{background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px 14px;font-size:14px;margin-top:8px}
+</style></head><body>
+<h2>Abstraction: group the parts, forget the insides</h2>
+<p class=\"s\">Each level takes the block from the level below, uses many copies of it, and wraps them into one new block. Then you stop thinking about the insides.</p>
+<div class=\"bar\"><button id=\"hw\" class=\"on\">Hardware track</button><button id=\"sw\">Instruction track</button>
+<span style=\"width:12px\"></span><button id=\"play\">⏸ Pause</button><button id=\"step\">Next level ▶</button><button id=\"reset\">⟲ Restart</button></div>
+<div class=\"crumbs\" id=\"crumbs\"></div>
+<svg id=\"svg\" viewBox=\"0 0 800 380\"></svg>
+<div class=\"note\" id=\"note\"></div>
+<script>
+const TR={
+hw:[
+ {items:Array(4).fill('MOSFET'),cols:4,out:'NAND gate',c:'#4a90d9',note:'4 transistors (switches) wired together make a NAND gate. From here on you think in 1s and 0s, not voltages.'},
+ {items:Array(9).fill('NAND'),cols:3,out:'Full adder',c:'#4caf50',note:'9 NAND gates add three bits (a, b, carry-in) and give a sum and carry-out. You no longer think about individual gates.'},
+ {items:Array(4).fill('Full adder'),cols:4,out:'4-bit adder IC',c:'#d9a400',note:'Chain the carry through 4 full adders and put it in a package: a real chip (like the 74283). Now it is one part with pins.'},
+ {items:['Adder / ALU','Registers','Control logic','Clock'],cols:4,out:'CPU',c:'#e05555',note:'Arithmetic, a few fast memory cells, and control logic that decodes opcodes. The CPU is the thing that implements the ISA.'},
+ {items:['CPU','RAM','I/O','Storage'],cols:4,out:'Computer',c:'#8e44ad',note:'The CPU, memory and devices. Software now sees only the ISA and memory, not the circuitry.'}],
+sw:[
+ {items:['LOAD r1,a','LOAD r2,b','ADD r3,r1,r2','STORE c,r3'],cols:4,out:'c = a + b',c:'#4a90d9',note:'Four instructions (each an opcode + operands) become one line of code. A compiler writes them for you.'},
+ {items:['c = a + b','i = i + 1','if i < n: loop'],cols:3,out:'for-loop',c:'#4caf50',note:'Repeating a statement with a conditional branch: the loop. Branching is what makes the machine more than a calculator.'},
+ {items:['sum = 0','for-loop','return sum'],cols:3,out:'sum(array)',c:'#d9a400',note:'Setup, loop and result become a function. Others can call it without knowing how it works.'},
+ {items:['sum(array)','sort(array)','print(text)'],cols:3,out:'Application',c:'#e05555',note:'Functions combine into a program. You are many layers above the opcodes, and all of it still ends as ISA bit patterns.'}]};
+let track='hw',lvl=0,t=0,playing=true,last=performance.now(),hold=0;
+const $=id=>document.getElementById(id),svg=$('svg'),DUR=3.2;
+const ease=x=>x<0?0:x>1?1:x*x*(3-2*x),cl=x=>Math.max(0,Math.min(1,x));
+function crumbs(){const L=TR[track];let h='';
+ L.forEach((l,i)=>{h+=`<span data-i=\"${i}\" class=\"${i==lvl?'cur':''}\" style=\"border-color:${l.c};${i<lvl?'background:'+l.c+'22':''}\">${i+1}. ${l.out}</span>`});
+ $('crumbs').innerHTML=h;document.querySelectorAll('.crumbs span').forEach(e=>e.onclick=()=>{lvl=+e.dataset.i;t=0;hold=0;crumbs();note()})}
+function note(){const l=TR[track][lvl];$('note').innerHTML=`<b>${l.items.length} × ${[...new Set(l.items)].join(' + ')} → ${l.out}</b><br>${l.note}`}
+function draw(){
+ const l=TR[track][lvl],n=l.items.length,cols=l.cols,rows=Math.ceil(n/cols),W=132,H=46,gx=12,gy=22;
+ const gw=cols*W+(cols-1)*gx,gh=rows*H+(rows-1)*gy,cx=400,cy=170,x0=cx-gw/2,y0=cy-gh/2;
+ const mv=ease((t-0.3)/0.4),fade=1-ease((t-0.65)/0.15),outp=ease((t-0.72)/0.25);
+ let s=`<text x=\"400\" y=\"30\" text-anchor=\"middle\" font-size=\"15\" fill=\"#666\">Level ${lvl+1}: ${l.items.length} blocks join together</text>`;
+ const pad=14,bx=x0-pad,by=y0-pad,bw=gw+2*pad,bh=gh+2*pad;
+ s+=`<rect x=\"${bx}\" y=\"${by}\" width=\"${bw}\" height=\"${bh}\" rx=\"14\" fill=\"${l.c}\" fill-opacity=\"${0.10*ease((t-0.15)/0.3)*fade}\" stroke=\"${l.c}\" stroke-dasharray=\"6 4\" stroke-opacity=\"${ease((t-0.15)/0.3)*fade}\"/>`;
+ l.items.forEach((it,i)=>{const r=Math.floor(i/cols),c=i%cols,rowN=Math.min(cols,n-r*cols),off=(cols-rowN)*(W+gx)/2;
+  const ix=x0+off+c*(W+gx),iy=y0+r*(H+gy);
+  const tx=cx-W/2+(c-(rowN-1)/2)*8*(1-mv)*0,ty=cy-H/2;
+  const x=ix+(cx-W/2-ix)*mv,y=iy+(ty-iy)*mv;
+  s+=`<g opacity=\"${fade}\"><rect x=\"${x}\" y=\"${y}\" width=\"${W}\" height=\"${H}\" rx=\"8\" fill=\"#fff\" stroke=\"${l.c}\" stroke-width=\"2\"/><text x=\"${x+W/2}\" y=\"${y+H/2+5}\" text-anchor=\"middle\" font-size=\"13\" fill=\"#222\">${it}</text></g>`});
+ if(outp>0){const sc=0.6+0.4*outp,w=240*sc,h=90*sc;
+  s+=`<g opacity=\"${outp}\"><rect x=\"${cx-w/2}\" y=\"${cy-h/2}\" width=\"${w}\" height=\"${h}\" rx=\"16\" fill=\"${l.c}\" /><text x=\"${cx}\" y=\"${cy+6}\" text-anchor=\"middle\" font-size=\"${22*sc}\" font-weight=\"700\" fill=\"#fff\">${l.out}</text></g>`}
+ // stack below
+ const L=TR[track];let sx=20;
+ s+=`<text x=\"20\" y=\"318\" font-size=\"12\" fill=\"#888\">Built so far (each is now a single block you can reuse):</text>`;
+ L.forEach((q,i)=>{if(i<lvl||(i==lvl&&outp>0.9)){const w=q.out.length*8+24;s+=`<rect x=\"${sx}\" y=\"328\" width=\"${w}\" height=\"30\" rx=\"8\" fill=\"${q.c}\"/><text x=\"${sx+w/2}\" y=\"348\" text-anchor=\"middle\" font-size=\"12\" fill=\"#fff\">${q.out}</text>`;sx+=w+6}});
+ svg.innerHTML=s}
+function tick(now){const dt=Math.min(0.05,(now-last)/1000);last=now;
+ if(playing){if(t<1){t+=dt/DUR;if(t>=1){t=1;hold=0}}else{hold+=dt;if(hold>1.2){if(lvl<TR[track].length-1){lvl++;t=0;crumbs();note()}else{hold=-99}}}}
+ draw();requestAnimationFrame(tick)}
+function setTrack(k){track=k;lvl=0;t=0;hold=0;$('hw').classList.toggle('on',k=='hw');$('sw').classList.toggle('on',k=='sw');crumbs();note()}
+$('hw').onclick=()=>setTrack('hw');$('sw').onclick=()=>setTrack('sw');
+$('play').onclick=()=>{playing=!playing;$('play').textContent=playing?'⏸ Pause':'▶ Play'};
+$('step').onclick=()=>{if(t<1){t=1}else if(lvl<TR[track].length-1){lvl++;t=0;hold=0;crumbs();note()}};
+$('reset').onclick=()=>setTrack(track);
+setTrack('hw');requestAnimationFrame(tick);
+</script></body></html>"
+ :AT "2026-11-14T22:48:27" :VERSION 1)
+(:PINNED T :ID "isa-opcode-and-operand-fields" :MAP "computers" :NODE "instruction-set" :TYPE
+ "html" :TITLE "ISA: opcode and operand fields" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:0;padding:16px;background:#fafafa;color:#222;max-width:860px}
+h2{margin:0 0 4px;font-size:19px}h3{margin:0 0 6px;font-size:14px}
+p.s{margin:0 0 12px;color:#444;font-size:14px;line-height:1.45}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin-bottom:12px}
+label{font-size:12px;color:#555;display:flex;flex-direction:column;gap:2px}
+select,input{font-size:14px;padding:4px 6px;border:1px solid #bbb;border-radius:6px;font-family:monospace}
+input[type=number]{width:70px}
+.box{background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:14px;line-height:1.45}
+code{font-family:monospace;background:#eee;padding:1px 5px;border-radius:4px}
+table{border-collapse:collapse;font-family:monospace;font-size:13px}td,th{border:1px solid #ddd;padding:2px 8px}
+.ch{background:#ffe9a8}.bad{color:#c00}
+.grid{display:grid;grid-template-columns:repeat(16,1fr);gap:0;text-align:center;font-family:monospace}
+.num{font-size:11px;color:#888;padding-bottom:2px}
+.bit{font-size:20px;padding:8px 0;border-top:2px solid;border-bottom:2px solid;border-left:1px solid rgba(0,0,0,.08)}
+.bit.first{border-left:2px solid;border-radius:8px 0 0 8px}.bit.last{border-right:2px solid;border-radius:0 8px 8px 0}
+.lab{font-family:system-ui,sans-serif;font-size:12px;font-weight:600;padding:4px 2px;border-bottom:3px solid;margin-top:4px;line-height:1.3}
+.lab small{display:block;font-weight:400;color:#444;font-size:11px}
+.hexrow .h{grid-column:span 4;font-size:15px;color:#555;border-left:1px dashed #bbb;padding:2px 0}
+.op{background:#fde2e2;border-color:#e05555}.rd{background:#dff0ff;border-color:#4a90d9}.rs{background:#e1f5e1;border-color:#4caf50}
+.imm{background:#fff2cc;border-color:#d9a400}.un{background:#eee;border-color:#bbb;color:#888}
+.key{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;margin:4px 0 10px}
+.key span{padding:2px 8px;border-radius:10px;border:2px solid}
+ol{margin:4px 0 0 18px;padding:0}li{margin:3px 0}
+</style></head><body>
+<h2>One instruction = one 16-bit word</h2>
+<p class=\"s\">A 16-bit word is 16 switches, each 0 or 1. The hardware has no idea what they \"mean\" until we agree to <b>cut the 16 bits into fields</b>: the leftmost 4 bits name the operation, and the rest say which registers (or which constant) to use. Pick an instruction below and watch the same 16 bits get colored into fields.</p>
+<div class=\"row\">
+<label>Operation<select id=\"op\"></select></label>
+<label id=\"Lrd\">rd (destination register, 0–7)<input type=\"number\" id=\"rd\" min=\"0\" max=\"7\" value=\"3\"></label>
+<label id=\"Lrs1\">rs1 (first source register)<input type=\"number\" id=\"rs1\" min=\"0\" max=\"7\" value=\"1\"></label>
+<label id=\"Lrs2\">rs2 (second source register)<input type=\"number\" id=\"rs2\" min=\"0\" max=\"7\" value=\"2\"></label>
+<label id=\"Limm\">constant (0–511)<input type=\"number\" id=\"imm\" min=\"0\" max=\"511\" value=\"42\"></label>
+<label>…or type the word in hex<input id=\"hex\" size=\"7\" value=\"0x1650\"></label>
+</div>
+
+<div class=\"box\">
+<h3>The 16 bits (bit 15 is leftmost, bit 0 rightmost)</h3>
+<div class=\"grid\" id=\"nums\"></div>
+<div class=\"grid\" id=\"bits\"></div>
+<div class=\"grid\" id=\"labs\"></div>
+<div class=\"grid hexrow\" id=\"hexrow\" style=\"margin-top:8px\"></div>
+<div style=\"font-size:11px;color:#888;margin-top:2px\">Each group of 4 bits is one hex digit, so the whole word is written as 4 hex digits.</div>
+</div>
+
+<div class=\"box\" id=\"why\"></div>
+<div class=\"box\" id=\"asm\"></div>
+<div class=\"box\"><b>Execute</b> on a sample machine: r0…r7 = 0, 5, 7, 3, 0, 0, 0, 0 and memory address a holds a×10. Changed registers are highlighted.<div id=\"exe\"></div></div>
+<div class=\"box\" style=\"font-size:13px;color:#555\">Fetch: the 16-bit word is read from memory (to memory it is just data). Decode: the top 4 bits pick the operation, the other fields pick registers or a constant. Execute: the ALU or memory does it. Try <code>0xFFFF</code>: no operation numbered 15 exists, so the hardware has no meaning for it. The ISA is exactly the list of patterns that <i>do</i> have a meaning.</div>
+<script>
+const OPS=[{n:'ADD',c:1,f:'R',d:'rd ← rs1 + rs2'},{n:'SUB',c:2,f:'R',d:'rd ← rs1 − rs2'},{n:'AND',c:3,f:'R',d:'rd ← rs1 AND rs2'},
+{n:'LOADI',c:4,f:'I',d:'rd ← constant'},{n:'LOAD',c:5,f:'L',d:'rd ← mem[rs1]'},{n:'STORE',c:6,f:'S',d:'mem[rs1] ← rs2'}];
+const $=id=>document.getElementById(id);
+OPS.forEach((o,i)=>$('op').add(new Option(o.n,i)));$('op').value=0;
+// [name,length,class,plain role]
+const LAY={R:[['op',4,'op','operation'],['rd',3,'rd','result goes here'],['rs1',3,'rs','first input'],['rs2',3,'rs','second input'],['unused',3,'un','ignored']],
+I:[['op',4,'op','operation'],['rd',3,'rd','result goes here'],['constant',9,'imm','the number itself']],
+L:[['op',4,'op','operation'],['rd',3,'rd','result goes here'],['rs1',3,'rs','holds the address'],['unused',6,'un','ignored']],
+S:[['op',4,'op','operation'],['unused',3,'un','ignored'],['rs1',3,'rs','holds the address'],['rs2',3,'rs','value to store'],['unused',3,'un','ignored']]};
+const USES={R:['rd','rs1','rs2'],I:['rd','imm'],L:['rd','rs1'],S:['rs1','rs2']};
+function val(id){return Math.max(0,Math.min(id=='imm'?511:7,parseInt($(id).value)||0))}
+function encode(){const o=OPS[$('op').value],r=val('rd'),a=val('rs1'),b=val('rs2'),m=val('imm');
+ if(o.f=='R')return o.c<<12|r<<9|a<<6|b<<3; if(o.f=='I')return o.c<<12|r<<9|m;
+ if(o.f=='L')return o.c<<12|r<<9|a<<6; return o.c<<12|a<<6|b<<3}
+function render(w){
+ const code=w>>12,o=OPS.find(x=>x.c==code),bin=w.toString(2).padStart(16,'0'),hx=w.toString(16).padStart(4,'0').toUpperCase();
+ $('nums').innerHTML=[...Array(16)].map((_,i)=>'<div class=\"num\">'+(15-i)+'</div>').join('');
+ $('hexrow').innerHTML=[...hx].map(c=>'<div class=\"h\">'+c+'</div>').join('');
+ $('labs').innerHTML='';$('why').innerHTML='';
+ if(!o){$('bits').innerHTML=[...bin].map((b,i)=>'<div class=\"bit un'+(i==0?' first':'')+(i==15?' last':'')+'\">'+b+'</div>').join('');
+  $('labs').innerHTML='<div class=\"lab bad\" style=\"grid-column:span 16;border-color:#c00\">top 4 bits = '+bin.slice(0,4)+' = operation '+code+': not in the ISA, so this is an illegal instruction</div>';
+  $('asm').innerHTML='Hex <code>0x'+hx+'</code> → <span class=\"bad\">no defined meaning</span>';$('exe').innerHTML='';return}
+ const L=LAY[o.f];let pos=0,bh='',lh='',steps=[];
+ const rd=(w>>9)&7,a=(w>>6)&7,b=(w>>3)&7,m=w&511;
+ L.forEach(([n,len,cl,role])=>{
+  const hi=15-pos,lo=hi-len+1,v=(w>>lo)&((1<<len)-1);
+  for(let i=0;i<len;i++)bh+='<div class=\"bit '+cl+(i==0?' first':'')+(i==len-1?' last':'')+'\">'+bin[pos+i]+'</div>';
+  const range=len==1?'bit '+hi:'bits '+hi+' to '+lo;
+  lh+='<div class=\"lab '+cl+'\" style=\"grid-column:span '+len+';background:none\">'+n+(cl=='un'?'':' = '+v)+'<small>'+range+'<br>'+role+'</small></div>';
+  if(cl!='un'){let t;
+   if(n=='op')t=`<b>${range}</b> are <code>${bin.slice(pos,pos+len)}</code> = ${v}. The ISA says operation ${v} is <b>${o.n}</b>.`;
+   else if(n=='constant')t=`<b>${range}</b> are <code>${bin.slice(pos,pos+len)}</code> = ${v}: the constant ${v}, stored directly in the instruction.`;
+   else t=`<b>${range}</b> are <code>${bin.slice(pos,pos+len)}</code> = ${v}: register <b>r${v}</b> (${role}).`;
+   steps.push(t)}
+  pos+=len});
+ $('bits').innerHTML=bh;$('labs').innerHTML=lh;
+ const un=L.some(x=>x[2]=='un');
+ $('why').innerHTML='<h3>How the hardware reads this word, field by field</h3><ol>'+steps.map(s=>'<li>'+s+'</li>').join('')+'</ol>'+(un?'<div style=\"font-size:12px;color:#666;margin-top:6px\">Grey bits are unused by this operation: the hardware never looks at them, and the assembler just writes 0s. Fields are narrow because each only has to count to what it names: 3 bits = 8 registers (0–7), 4 bits = up to 16 operations, 9 bits = constants up to 511.</div>':'<div style=\"font-size:12px;color:#666;margin-top:6px\">Fields are narrow because each only has to count to what it names: 3 bits = 8 registers (0–7), 4 bits = up to 16 operations, 9 bits = constants up to 511.</div>');
+ let t;if(o.f=='R')t=`${o.n} r${rd}, r${a}, r${b}`;else if(o.f=='I')t=`LOADI r${rd}, ${m}`;else if(o.f=='L')t=`LOAD r${rd}, [r${a}]`;else t=`STORE [r${a}], r${b}`;
+ $('asm').innerHTML=`Hex <code>0x${hx}</code> = assembly <code>${t}</code> &nbsp;·&nbsp; meaning: <b>${o.d}</b>`;
+ const R=[0,5,7,3,0,0,0,0],R2=R.slice(),mem=x=>(x&511)*10;let s='';
+ if(o.n=='ADD'){R2[rd]=(R[a]+R[b])&0xFFFF;s=`r${rd} ← r${a} + r${b} = ${R[a]} + ${R[b]} = ${R2[rd]}`}
+ if(o.n=='SUB'){R2[rd]=(R[a]-R[b])&0xFFFF;s=`r${rd} ← r${a} − r${b} = ${R[a]} − ${R[b]} = ${R2[rd]} (negatives wrap around in 16 bits)`}
+ if(o.n=='AND'){R2[rd]=R[a]&R[b];s=`r${rd} ← r${a} AND r${b} = ${R[a]} AND ${R[b]} = ${R2[rd]}`}
+ if(o.n=='LOADI'){R2[rd]=m;s=`r${rd} ← ${m}`}
+ if(o.n=='LOAD'){R2[rd]=mem(R[a]);s=`r${a} holds ${R[a]}, so r${rd} ← mem[${R[a]}] = ${R2[rd]}`}
+ if(o.n=='STORE'){s=`r${a} holds ${R[a]}, r${b} holds ${R[b]}, so mem[${R[a]}] ← ${R[b]} (memory changes, registers do not)`}
+ $('exe').innerHTML=`<p>${s}</p><table><tr>${R.map((_,i)=>'<th>r'+i+'</th>').join('')}</tr><tr>${R2.map((v,i)=>'<td class=\"'+(v!=R[i]?'ch':'')+'\">'+v+'</td>').join('')}</tr></table>`;
+}
+function sync(w){const o=OPS.find(x=>x.c==(w>>12));if(!o)return;$('op').value=OPS.indexOf(o);$('rd').value=(w>>9)&7;$('rs1').value=(w>>6)&7;$('rs2').value=(w>>3)&7;$('imm').value=w&511}
+function vis(){const o=OPS[$('op').value];['rd','rs1','rs2','imm'].forEach(k=>$('L'+k).style.display=USES[o.f].includes(k)?'flex':'none')}
+function fromControls(){vis();const w=encode();$('hex').value='0x'+w.toString(16).padStart(4,'0');render(w)}
+['op','rd','rs1','rs2','imm'].forEach(i=>$(i).addEventListener('input',fromControls));
+$('hex').addEventListener('input',()=>{const w=parseInt($('hex').value,16);if(isNaN(w))return;const x=w&0xFFFF;sync(x);vis();render(x)});
+fromControls();
+</script></body></html>
+"
+ :AT "2026-11-14T22:51:15" :VERSION 2)
+(:PINNED T :ID "register-vs-sram-cache-vs-dram" :MAP "computers" :NODE "caches" :TYPE "svg" :TITLE
+ "Register vs SRAM cache vs DRAM" :LANGUAGE NIL :CONTENT
+ "<svg viewBox=\"0 0 1200 760\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"system-ui, sans-serif\">
+<rect width=\"1200\" height=\"760\" fill=\"#fafafa\"/>
+<text x=\"600\" y=\"38\" font-size=\"22\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#222\">Same job, three designs: register, cache, RAM</text>
+
+<!-- panel titles -->
+<g font-size=\"18\" font-weight=\"700\" text-anchor=\"middle\">
+<text x=\"200\" y=\"85\" fill=\"#1d4ed8\">Register file</text>
+<text x=\"600\" y=\"85\" fill=\"#047857\">Cache (SRAM + tags)</text>
+<text x=\"1000\" y=\"85\" fill=\"#b45309\">Main RAM (DRAM)</text>
+</g>
+<g stroke=\"#ccc\" stroke-dasharray=\"4 4\"><line x1=\"400\" y1=\"60\" x2=\"400\" y2=\"730\"/><line x1=\"800\" y1=\"60\" x2=\"800\" y2=\"730\"/></g>
+
+<!-- ===== REGISTER ===== -->
+<g>
+<text x=\"200\" y=\"115\" font-size=\"13\" text-anchor=\"middle\" fill=\"#444\">Cell: latch/flip-flop, many ports (6–10+ T)</text>
+<rect x=\"110\" y=\"130\" width=\"180\" height=\"90\" rx=\"6\" fill=\"#dbeafe\" stroke=\"#1d4ed8\" stroke-width=\"2\"/>
+<text x=\"200\" y=\"152\" font-size=\"12\" text-anchor=\"middle\" fill=\"#1d4ed8\">one bit cell</text>
+<circle cx=\"170\" cy=\"190\" r=\"14\" fill=\"#fff\" stroke=\"#1d4ed8\"/><circle cx=\"230\" cy=\"190\" r=\"14\" fill=\"#fff\" stroke=\"#1d4ed8\"/>
+<path d=\"M184 190h32\" stroke=\"#1d4ed8\" stroke-width=\"2\"/>
+<text x=\"200\" y=\"168\" font-size=\"12\" text-anchor=\"middle\" fill=\"#1d4ed8\">latch loop</text>
+<!-- ports -->
+<g stroke=\"#1d4ed8\" stroke-width=\"2\"><line x1=\"60\" y1=\"150\" x2=\"110\" y2=\"150\"/><line x1=\"60\" y1=\"175\" x2=\"110\" y2=\"175\"/><line x1=\"290\" y1=\"150\" x2=\"340\" y2=\"150\"/><line x1=\"290\" y1=\"175\" x2=\"340\" y2=\"175\"/></g>
+<text x=\"60\" y=\"144\" font-size=\"11\" fill=\"#444\">read A</text><text x=\"60\" y=\"193\" font-size=\"11\" fill=\"#444\">read B</text>
+<text x=\"300\" y=\"144\" font-size=\"11\" fill=\"#444\">write</text>
+
+<!-- datapath -->
+<text x=\"200\" y=\"260\" font-size=\"13\" text-anchor=\"middle\" fill=\"#444\">Instruction bits pick the register directly</text>
+<rect x=\"60\" y=\"275\" width=\"120\" height=\"40\" rx=\"5\" fill=\"#fff\" stroke=\"#1d4ed8\"/><text x=\"120\" y=\"300\" font-size=\"13\" text-anchor=\"middle\">instr: rs, rt</text>
+<rect x=\"220\" y=\"275\" width=\"120\" height=\"40\" rx=\"5\" fill=\"#fff\" stroke=\"#1d4ed8\"/><text x=\"280\" y=\"300\" font-size=\"13\" text-anchor=\"middle\">small mux</text>
+<path d=\"M180 295h40\" stroke=\"#1d4ed8\" stroke-width=\"2\"/>
+<path d=\"M280 315v40\" stroke=\"#1d4ed8\" stroke-width=\"2\"/>
+<path d=\"M240 355h80l-20 50h-40z\" fill=\"#1d4ed8\"/><text x=\"280\" y=\"385\" font-size=\"14\" text-anchor=\"middle\" fill=\"#fff\">ALU</text>
+<text x=\"200\" y=\"440\" font-size=\"13\" text-anchor=\"middle\" fill=\"#444\">No tags, no search. Wired into the ALU.</text>
+</g>
+
+<!-- ===== CACHE ===== -->
+<g>
+<text x=\"600\" y=\"115\" font-size=\"13\" text-anchor=\"middle\" fill=\"#444\">Cell: 6T SRAM (two cross-coupled inverters)</text>
+<rect x=\"520\" y=\"130\" width=\"160\" height=\"90\" rx=\"6\" fill=\"#d1fae5\" stroke=\"#047857\" stroke-width=\"2\"/>
+<circle cx=\"565\" cy=\"175\" r=\"14\" fill=\"#fff\" stroke=\"#047857\"/><circle cx=\"635\" cy=\"175\" r=\"14\" fill=\"#fff\" stroke=\"#047857\"/>
+<path d=\"M579 168h42M621 182h-42\" stroke=\"#047857\" stroke-width=\"2\"/>
+<text x=\"600\" y=\"150\" font-size=\"12\" text-anchor=\"middle\" fill=\"#047857\">bistable loop</text>
+<text x=\"600\" y=\"212\" font-size=\"11\" text-anchor=\"middle\" fill=\"#047857\">+2 access T, bit lines</text>
+
+<text x=\"600\" y=\"255\" font-size=\"13\" text-anchor=\"middle\" fill=\"#444\">Array plus \"do I hold this address?\" logic</text>
+<rect x=\"430\" y=\"270\" width=\"340\" height=\"36\" rx=\"4\" fill=\"#fff\" stroke=\"#047857\"/>
+<text x=\"470\" y=\"293\" font-size=\"13\" text-anchor=\"middle\">tag</text><text x=\"590\" y=\"293\" font-size=\"13\" text-anchor=\"middle\">index</text><text x=\"720\" y=\"293\" font-size=\"13\" text-anchor=\"middle\">offset</text>
+<line x1=\"510\" y1=\"270\" x2=\"510\" y2=\"306\" stroke=\"#047857\"/><line x1=\"670\" y1=\"270\" x2=\"670\" y2=\"306\" stroke=\"#047857\"/>
+<!-- sets -->
+<g font-size=\"11\" text-anchor=\"middle\">
+<rect x=\"430\" y=\"330\" width=\"40\" height=\"26\" fill=\"#fde68a\" stroke=\"#047857\"/><text x=\"450\" y=\"347\">V D</text>
+<rect x=\"470\" y=\"330\" width=\"80\" height=\"26\" fill=\"#a7f3d0\" stroke=\"#047857\"/><text x=\"510\" y=\"347\">tag</text>
+<rect x=\"550\" y=\"330\" width=\"220\" height=\"26\" fill=\"#d1fae5\" stroke=\"#047857\"/><text x=\"660\" y=\"347\">data block (SRAM)</text>
+<rect x=\"430\" y=\"356\" width=\"40\" height=\"26\" fill=\"#fde68a\" stroke=\"#047857\"/><text x=\"450\" y=\"373\">V D</text>
+<rect x=\"470\" y=\"356\" width=\"80\" height=\"26\" fill=\"#a7f3d0\" stroke=\"#047857\"/><text x=\"510\" y=\"373\">tag</text>
+<rect x=\"550\" y=\"356\" width=\"220\" height=\"26\" fill=\"#d1fae5\" stroke=\"#047857\"/><text x=\"660\" y=\"373\">data block (SRAM)</text>
+</g>
+<circle cx=\"500\" cy=\"410\" r=\"14\" fill=\"#fff\" stroke=\"#047857\" stroke-width=\"2\"/><text x=\"500\" y=\"415\" font-size=\"14\" text-anchor=\"middle\">=</text>
+<text x=\"545\" y=\"415\" font-size=\"12\" fill=\"#444\">tag compare → hit/miss</text>
+<path d=\"M510 382v14\" stroke=\"#047857\" stroke-width=\"2\"/>
+<text x=\"600\" y=\"450\" font-size=\"13\" text-anchor=\"middle\" fill=\"#444\">Plus mux, LRU, dirty bits, coherence</text>
+</g>
+
+<!-- ===== DRAM ===== -->
+<g>
+<text x=\"1000\" y=\"115\" font-size=\"13\" text-anchor=\"middle\" fill=\"#444\">Cell: 1 transistor + 1 capacitor</text>
+<rect x=\"920\" y=\"130\" width=\"160\" height=\"90\" rx=\"6\" fill=\"#fef3c7\" stroke=\"#b45309\" stroke-width=\"2\"/>
+<line x1=\"940\" y1=\"145\" x2=\"940\" y2=\"210\" stroke=\"#b45309\" stroke-width=\"3\"/>
+<text x=\"936\" y=\"140\" font-size=\"11\" text-anchor=\"end\" fill=\"#b45309\">bit line</text>
+<rect x=\"940\" y=\"165\" width=\"40\" height=\"22\" fill=\"#fff\" stroke=\"#b45309\"/><text x=\"960\" y=\"180\" font-size=\"11\" text-anchor=\"middle\">T</text>
+<line x1=\"980\" y1=\"176\" x2=\"1010\" y2=\"176\" stroke=\"#b45309\" stroke-width=\"2\"/>
+<line x1=\"1010\" y1=\"160\" x2=\"1010\" y2=\"192\" stroke=\"#b45309\" stroke-width=\"3\"/><line x1=\"1022\" y1=\"160\" x2=\"1022\" y2=\"192\" stroke=\"#b45309\" stroke-width=\"3\"/>
+<text x=\"1050\" y=\"180\" font-size=\"11\" fill=\"#b45309\">C</text>
+<text x=\"1000\" y=\"210\" font-size=\"11\" text-anchor=\"middle\" fill=\"#b45309\">charge leaks → refresh</text>
+
+<text x=\"1000\" y=\"255\" font-size=\"13\" text-anchor=\"middle\" fill=\"#444\">Pure address → data grid, no tags</text>
+<g fill=\"#fde68a\" stroke=\"#b45309\">
+<rect x=\"860\" y=\"270\" width=\"280\" height=\"14\"/><rect x=\"860\" y=\"288\" width=\"280\" height=\"14\"/><rect x=\"860\" y=\"306\" width=\"280\" height=\"14\"/><rect x=\"860\" y=\"324\" width=\"280\" height=\"14\"/>
+</g>
+<text x=\"850\" y=\"298\" font-size=\"11\" text-anchor=\"end\" fill=\"#444\">row decoder</text>
+<rect x=\"860\" y=\"350\" width=\"280\" height=\"22\" fill=\"#b45309\"/><text x=\"1000\" y=\"366\" font-size=\"12\" text-anchor=\"middle\" fill=\"#fff\">sense amps = row buffer</text>
+<path d=\"M1000 338v12\" stroke=\"#b45309\" stroke-width=\"2\"/>
+<text x=\"1000\" y=\"395\" font-size=\"12\" text-anchor=\"middle\" fill=\"#444\">column decoder picks bits</text>
+<text x=\"1000\" y=\"425\" font-size=\"12\" text-anchor=\"middle\" fill=\"#444\">Read is destructive: sense, then restore</text>
+<text x=\"1000\" y=\"450\" font-size=\"13\" text-anchor=\"middle\" fill=\"#444\">Off-chip, via memory controller + bus</text>
+</g>
+
+<!-- comparison table -->
+<g font-size=\"14\" text-anchor=\"middle\">
+<rect x=\"40\" y=\"490\" width=\"1120\" height=\"240\" rx=\"8\" fill=\"#fff\" stroke=\"#bbb\"/>
+<g font-weight=\"700\"><text x=\"110\" y=\"518\" text-anchor=\"start\">Property</text><text x=\"400\" y=\"518\" fill=\"#1d4ed8\">Register</text><text x=\"680\" y=\"518\" fill=\"#047857\">Cache</text><text x=\"960\" y=\"518\" fill=\"#b45309\">RAM</text></g>
+<line x1=\"60\" y1=\"528\" x2=\"1140\" y2=\"528\" stroke=\"#ddd\"/>
+<text x=\"60\" y=\"556\" text-anchor=\"start\">Transistors / bit</text><text x=\"400\" y=\"556\">6–10+</text><text x=\"680\" y=\"556\">6</text><text x=\"960\" y=\"556\">1 + capacitor</text>
+<text x=\"60\" y=\"590\" text-anchor=\"start\">Addressing</text><text x=\"400\" y=\"590\">instr bits → mux</text><text x=\"680\" y=\"590\">tag compare</text><text x=\"960\" y=\"590\">row/column decode</text>
+<text x=\"60\" y=\"624\" text-anchor=\"start\">Refresh needed</text><text x=\"400\" y=\"624\">no</text><text x=\"680\" y=\"624\">no</text><text x=\"960\" y=\"624\">yes</text>
+<text x=\"60\" y=\"658\" text-anchor=\"start\">Typical size</text><text x=\"400\" y=\"658\">hundreds of bits–KB</text><text x=\"680\" y=\"658\">KB–tens of MB</text><text x=\"960\" y=\"658\">GB</text>
+<text x=\"60\" y=\"692\" text-anchor=\"start\">Latency</text><text x=\"400\" y=\"692\">under 1 ns</text><text x=\"680\" y=\"692\">1–20 ns</text><text x=\"960\" y=\"692\">60–100 ns</text>
+<text x=\"60\" y=\"720\" text-anchor=\"start\">Location</text><text x=\"400\" y=\"720\">in the datapath</text><text x=\"680\" y=\"720\">on the CPU die</text><text x=\"960\" y=\"720\">separate chips</text>
+</g>
+</svg>"
+ :AT "2026-11-14T23:07:33" :VERSION 1)

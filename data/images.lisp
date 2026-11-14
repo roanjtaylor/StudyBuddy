@@ -27,3 +27,34 @@
  "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1b/Integrated_circuit_on_microchip.jpg/500px-Integrated_circuit_on_microchip.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
  :PAGE "https://commons.wikimedia.org/wiki/File:Integrated_circuit_on_microchip.jpg" :AT
  "2026-11-13T19:44:31")
+(:ID "computers/ram/E1O09LCKCOB5" :MAP "computers" :NODE "ram" :KEY "E1O09LCKCOB5" :TITLE
+ "KVR400X64C3AK2 - 2G" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/43/KVR400X64C3AK2_-_2G.jpg/500px-KVR400X64C3AK2_-_2G.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE "https://commons.wikimedia.org/wiki/File:KVR400X64C3AK2_-_2G.jpg" :AT "2026-11-14T09:50:59")
+(:ID "computers/ram/BM7DO1GG7XE3" :MAP "computers" :NODE "ram" :KEY "BM7DO1GG7XE3" :TITLE
+ "A pile of RAM (6173837649)" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1e/A_pile_of_RAM_%286173837649%29.jpg/500px-A_pile_of_RAM_%286173837649%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE "https://commons.wikimedia.org/wiki/File:A_pile_of_RAM_(6173837649).jpg" :AT
+ "2026-11-14T09:51:03")
+(:ID "computers/machine-code-assembly/JG1PROTMF4LE" :MAP "computers" :NODE "machine-code-assembly"
+ :KEY "JG1PROTMF4LE" :TITLE "W65C816S Machine Code Monitor" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c0/W65C816S_Machine_Code_Monitor.jpeg/500px-W65C816S_Machine_Code_Monitor.jpeg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE "https://commons.wikimedia.org/wiki/File:W65C816S_Machine_Code_Monitor.jpeg" :AT
+ "2026-11-14T14:18:00")
+(:ID "computers/machine-code-assembly/UXJ057BDCL36" :MAP "computers" :NODE "machine-code-assembly"
+ :KEY "UXJ057BDCL36" :TITLE
+ "IBM keypunch deck for Assembly language student program at New York University 1979" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ee/IBM_keypunch_deck_for_Assembly_language_student_program_at_New_York_University_1979.jpg/500px-IBM_keypunch_deck_for_Assembly_language_student_program_at_New_York_University_1979.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE
+ "https://commons.wikimedia.org/wiki/File:IBM_keypunch_deck_for_Assembly_language_student_program_at_New_York_University_1979.jpg"
+ :AT "2026-11-14T14:18:16")
+(:ID "computers/machine-code-assembly/G1KXGG5W9DXW" :MAP "computers" :NODE "machine-code-assembly"
+ :KEY "G1KXGG5W9DXW" :TITLE "Two women operating ENIAC" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/Two_women_operating_ENIAC.gif/500px-Two_women_operating_ENIAC.gif?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE "https://commons.wikimedia.org/wiki/File:Two_women_operating_ENIAC.gif" :AT
+ "2026-11-14T14:24:45")
+(:ID "computers/instruction-set/E4GZV6IFHKU2" :MAP "computers" :NODE "instruction-set" :KEY
+ "E4GZV6IFHKU2" :TITLE "RISC-II Blue die shot" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a0/RISC-II_Blue_die_shot.jpg/500px-RISC-II_Blue_die_shot.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE "https://commons.wikimedia.org/wiki/File:RISC-II_Blue_die_shot.jpg" :AT
+ "2026-11-14T22:55:34")

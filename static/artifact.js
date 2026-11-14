@@ -75,8 +75,14 @@
       var it = questions[at]; picked = null;
       count.textContent = 'Question ' + (at + 1) + ' of ' + questions.length + ' · ' + score + ' right';
       rich(q, it.question); opts.innerHTML = ''; why.hidden = true; next.hidden = true;
-      it.options.forEach(function (o, i) {
-        var b = el('button', 'option'); rich(b, o);
+      // The model tends to put the right answer in the same slot, so the order shown is
+      // shuffled on every draw; each button remembers its index in the stored options.
+      var order = it.options.map(function (_, i) { return i; });
+      for (var k = order.length - 1; k > 0; k--) {
+        var r = Math.floor(Math.random() * (k + 1)); var t = order[k]; order[k] = order[r]; order[r] = t;
+      }
+      order.forEach(function (i) {
+        var b = el('button', 'option'); rich(b, it.options[i]); b.dataset.i = i;
         b.addEventListener('click', function () { pick(i); });
         opts.appendChild(b);
       });
@@ -86,7 +92,8 @@
       picked = i;
       var it = questions[at];
       if (i === it.answer) score++;
-      Array.prototype.forEach.call(opts.children, function (b, j) {
+      Array.prototype.forEach.call(opts.children, function (b) {
+        var j = Number(b.dataset.i);
         b.classList.toggle('right', j === it.answer);
         b.classList.toggle('wrong', j === i && i !== it.answer);
         b.disabled = true;

@@ -46,10 +46,14 @@ window.followFrom = function (log, msg) {
 window.addEventListener('message', function (e) {
   var h = e.data && e.data.artifactHeight;
   if (!h) return;
-  var frames = document.querySelectorAll('.artifact-inline-html .artifact-preview');
+  var frames = document.querySelectorAll('iframe.artifact-preview');
   for (var i = 0; i < frames.length; i++) {
-    if (frames[i].closest('.artifact-tile, .pin-art, .msg-artifacts')) continue;   // thumbnails keep their fixed size
-    if (frames[i].contentWindow === e.source) frames[i].style.height = Math.min(h, 4000) + 'px';
+    if (frames[i].contentWindow !== e.source) continue;
+    // A thumbnail, or a diagram in its fixed frame, keeps its size and shows the whole artifact
+    // fitted to it, with no scrollbar (static/canvas.js).
+    if (frames[i].closest('.artifact-tile, .pin-art, .msg-artifacts') || !frames[i].closest('.artifact-inline-html'))
+      e.source.postMessage({ artifactView: 'thumb' }, '*');
+    else frames[i].style.height = Math.min(h, 4000) + 'px';
   }
 });
 
@@ -108,7 +112,36 @@ window.addEventListener('message', function (e) {
   var sandboxed = { html: 1, svg: 1, mermaid: 1 };
   var artifactField = form.elements.artifact, stageFocus = document.getElementById('stage-focus');
   var openId = '', openType = '';
-  function openArtifact(id, type, name, full) {
+  // The two chats never mix. The stage belongs to the chat its artifact was opened from: the
+  // field's chat here ('breadth'), or the open idea's study chat ('depth'). A depth artifact is
+  // always full screen, and the study pane itself stands beside it in place of this chat, so
+  // what is asked there stays in the study chat.
+  var owner = 'breadth', lent = null, chatCol = dock.querySelector('.dock-chat');
+  function lend() {
+    if (lent) return;
+    var pane = document.querySelector('#idea .study');
+    lent = { pane: pane, parent: pane.parentNode, next: pane.nextSibling };
+    chatCol.appendChild(pane); chatCol.classList.add('lent');
+    var l = pane.querySelector('.study-log'); l.scrollTop = l.scrollHeight;
+  }
+  function unlend() {
+    if (!lent) return;
+    var l = lent, sf = l.pane.querySelector('form'); lent = null;
+    if (sf && sf.elements.artifact) sf.elements.artifact.value = '';
+    setContext(sf, null);
+    chatCol.classList.remove('lent');
+    // Back where it was; if its idea has been swapped away meanwhile, it goes with it.
+    if (l.parent.isConnected) {
+      l.parent.insertBefore(l.pane, l.next && l.next.parentNode === l.parent ? l.next : null);
+      var sl = l.pane.querySelector('.study-log'); sl.scrollTop = sl.scrollHeight;
+    } else l.pane.remove();
+  }
+  document.addEventListener('idea-swapped', function () { if (lent) closeStage(); });
+  function openArtifact(id, type, name, full, from) {
+    // No `from`: a new version of what is open keeps its owner; anything else is this chat's.
+    if (from) owner = from; else if (stage.hidden) owner = 'breadth';
+    if (owner === 'depth' && !lent && !document.querySelector('#idea .study')) owner = 'breadth';
+    if (owner === 'depth') { lend(); full = true; } else unlend();
     stageTitle.textContent = name || id;
     // The model's own documents run cut off from the app; the app's viewers run as the app.
     if (sandboxed[type]) frame.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals allow-downloads');
@@ -117,11 +150,19 @@ window.addEventListener('message', function (e) {
     dock.classList.add('staged');
     if (full) setFocus(true);   // before the frame loads: moving the dock reloads it
     // Always load afresh: the artifact may have been edited since it was last opened.
-    frame.src = '/artifact/' + id + '/view?t=' + Date.now();
+    // stage=1: a page or diagram is fitted to the frame and can be zoomed and panned (static/canvas.js).
+    if (zoomBtn) zoomBtn.hidden = true;
+    frame.src = '/artifact/' + id + '/view?stage=1&t=' + Date.now();
     openId = id; openType = type;
-    if (artifactField) artifactField.value = id;
-    setContext(name || id);
-    keep('sessionStorage', 'dock-stage', JSON.stringify({ id: id, type: type, title: name }));
+    // Only the chat that owns the stage is told about the artifact.
+    if (artifactField) artifactField.value = owner === 'breadth' ? id : '';
+    setContext(form, owner === 'breadth' ? name || id : null);
+    if (lent) {
+      var sf = lent.pane.querySelector('form');
+      if (sf.elements.artifact) sf.elements.artifact.value = id;
+      setContext(sf, name || id);
+    }
+    keep('sessionStorage', 'dock-stage', owner === 'breadth' ? JSON.stringify({ id: id, type: type, title: name }) : '');
   }
   function closeStage() {
     // All at once: blank the frame first (moving the dock would reload it), then drop the
@@ -131,17 +172,36 @@ window.addEventListener('message', function (e) {
     setFocus(false);
     scrim.hidden = true; document.body.classList.remove('dock-focus');
     openId = ''; if (artifactField) artifactField.value = '';
-    setContext(null);
+    setContext(form, null);
+    unlend(); owner = 'breadth';
     keep('sessionStorage', 'dock-stage', '');
   }
-  // The "looking at" pill names the open artifact while there is one, so it is plain what Claude is given.
-  var pill = dock.querySelector('.pill-text'), pillBase = pill ? pill.textContent : '';
-  function setContext(name) {
+  window.closeDockStage = closeStage;
+  window.dockStageId = function () { return openId; };
+  // The "looking at" pill of a chat's form names the open artifact while that chat has one, so it is plain what Claude is given.
+  function setContext(f, name) {
+    var pill = f && f.querySelector('.pill-text');
     if (!pill) return;
-    if (name) { pill.textContent = 'Artifact: ' + name; pill.parentNode.title = 'Claude is given this artifact'; }
-    else { pill.textContent = pillBase; pill.parentNode.title = 'What Claude is looking at'; }
+    if (name) {
+      if (pill.dataset.base == null) pill.dataset.base = pill.textContent;
+      pill.textContent = 'Artifact: ' + name; pill.parentNode.title = 'Claude is given this artifact';
+    } else if (pill.dataset.base != null) {
+      pill.textContent = pill.dataset.base; delete pill.dataset.base;
+      pill.parentNode.title = 'What Claude is looking at';
+    }
   }
   document.getElementById('stage-close').addEventListener('click', closeStage);
+
+  // The open artifact reports its zoom; the button shows it, and a click fits it all again.
+  var zoomBtn = document.getElementById('stage-zoom');
+  window.addEventListener('message', function (e) {
+    if (!zoomBtn || e.source !== frame.contentWindow || !e.data || !e.data.artifactZoom) return;
+    zoomBtn.textContent = Math.round(e.data.artifactZoom * 100) + '%';
+    zoomBtn.hidden = false;
+  });
+  if (zoomBtn) zoomBtn.addEventListener('click', function () {
+    if (frame.contentWindow) frame.contentWindow.postMessage({ artifactView: 'fit' }, '*');
+  });
 
   // ---- Full screen: the artifact large on the left, the chat on the right, the page greyed behind ----
   // The dock may sit in a hidden part of the page (the idea's own section), so full screen
@@ -165,7 +225,7 @@ window.addEventListener('message', function (e) {
     document.body.classList.toggle('dock-focus', on);
     stageFocus.title = on ? 'Exit full screen' : 'Full screen';
     stageFocus.setAttribute('aria-label', stageFocus.title);
-    if (on) { log.scrollTop = log.scrollHeight; input.focus(); }
+    if (on) { log.scrollTop = log.scrollHeight; (lent ? lent.pane.querySelector('textarea') : input).focus(); }
   }
   stageFocus.addEventListener('click', function () { setFocus(true); });
   // X, Esc or a click on the greyed page closes the artifact and leaves you where you were.
@@ -185,10 +245,12 @@ window.addEventListener('message', function (e) {
     var card = t.classList.contains('artifact-card') ? t : t.closest('.artifact-inline').querySelector('.artifact-card');
     if (!card || !card.dataset.artifact) return;
     e.preventDefault(); e.stopPropagation();
-    window.openInDock(card.dataset.artifact, card.dataset.type, card.dataset.title, true);
+    // From this chat's log it is this chat's; from anywhere else (the idea, its pins, the study chat) it is the idea's.
+    window.openInDock(card.dataset.artifact, card.dataset.type, card.dataset.title, true,
+                      card.closest('#dock-log') ? 'breadth' : 'depth');
   }, true);
-  // The idea study pane opens its artifacts here too.
-  window.openInDock = function (id, type, name, full) { show(true); openArtifact(id, type, name, full); };
+  // The idea study pane opens its artifacts here too (from: 'depth').
+  window.openInDock = function (id, type, name, full, from) { show(true); openArtifact(id, type, name, full, from); };
 
   // ---- The composer ----
   // Enter sends, Shift+Enter is a new line; the box grows with its text.
@@ -282,7 +344,8 @@ window.addEventListener('message', function (e) {
         follow();
         // A visual shows itself in the chat; anything else opens on the stage. A click on a card opens either.
         // In full screen, whatever it makes or changes appears on the stage at once.
-        if (block === card || dock.classList.contains('focus') || card.dataset.artifact === openId)
+        // Never while the stage is the study chat's: that would take it over.
+        if (!lent && (block === card || dock.classList.contains('focus') || card.dataset.artifact === openId))
           openArtifact(card.dataset.artifact, card.dataset.type, card.dataset.title);
       },
       finish: function (html) {
@@ -359,7 +422,7 @@ window.addEventListener('message', function (e) {
       if (!form.classList.contains('busy')) return;
       form.classList.remove('busy'); sendBtn.hidden = false; stopBtn.hidden = true;
       if (clearBtn) clearBtn.hidden = false;
-      input.focus();
+      if (!lent) input.focus();
     }
 
     fetch(form.action, { method: 'POST', body: body, signal: ctl.signal })
@@ -369,7 +432,10 @@ window.addEventListener('message', function (e) {
           if (name === 'delta') live.delta(data.text || '');
           else if (name === 'thinking') live.thinking(data.text || '');
           else if (name === 'status') live.status(data.text || '');
-          else if (name === 'artifact') live.artifact(data.html || '');
+          else if (name === 'artifact') {
+            live.artifact(data.html || '');
+            if (data.pin && window.pinToTray) window.pinToTray(data.pin, data.node);
+          }
           else if (name === 'draft') live.draft(data);
           else if (name === 'proposal') proposals.push(data);
           else if (name === 'message') {

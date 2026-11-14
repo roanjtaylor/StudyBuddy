@@ -23,3 +23,18 @@
 (:ID "computers/integrated-circuit/rAYw43BqN6M" :MAP "computers" :NODE "integrated-circuit" :VIDEO
  "rAYw43BqN6M" :TITLE "Integrated Circuits in 100 Seconds" :CHANNEL "V Electronics" :AT
  "2026-11-13T19:46:44")
+(:ID "computers/ram/ooL9nVQA6qU" :MAP "computers" :NODE "ram" :VIDEO "ooL9nVQA6qU" :TITLE
+ "Every Redstone Component in Minecraft EXPLAINED!" :CHANNEL "Mumbo Jumbo" :AT
+ "2026-11-14T09:56:06")
+(:ID "computers/clock-tree/1kLgjw6Lc64" :MAP "computers" :NODE "clock-tree" :VIDEO "1kLgjw6Lc64"
+ :TITLE "Clock Skew Explained: Types, Causes, and How to Minimize It" :CHANNEL "ElectroVerse" :AT
+ "2026-11-14T10:09:06")
+(:ID "computers/computability/RPQD7-AOjMI" :MAP "computers" :NODE "computability" :VIDEO
+ "RPQD7-AOjMI" :TITLE "Turing Complete - Computerphile" :CHANNEL "Computerphile" :AT
+ "2026-11-14T13:57:07")
+(:ID "computers/machine-code-assembly/4gwYkEK0gOk" :MAP "computers" :NODE "machine-code-assembly"
+ :VIDEO "4gwYkEK0gOk" :TITLE "Assembly Language in 100 Seconds" :CHANNEL "Fireship" :AT
+ "2026-11-14T14:21:13")
+(:ID "computers/reset-vector-bootstrap/nslY1s0U9_c" :MAP "computers" :NODE "reset-vector-bootstrap"
+ :VIDEO "nslY1s0U9_c" :TITLE "What is Bootstrapping? - Computerphile" :CHANNEL "Computerphile" :AT
+ "2026-11-14T22:41:01")

@@ -177,8 +177,11 @@
 
   // Put the proposal `p` up for review; `where` is the reply it came with, in the chat log.
   function review(p, form, pane, where) {
-    var src = document.querySelector('.idea-main .node'), side = pane.parentNode, changes = p.changes || [];
+    var src = document.querySelector('.idea-main .node'), changes = p.changes || [];
     if (!src || !changes.length) return;
+    // The diff is drawn on the idea: a pane standing beside a full-screen artifact goes back to it first.
+    if (pane.closest('#dock') && window.closeDockStage) window.closeDockStage();
+    var side = pane.parentNode;
     restore();
     // The right column: the idea as it would read.
     var fresh = src.cloneNode(true), saved = [];
@@ -237,7 +240,9 @@
     body.set('history', JSON.stringify(history));
 
     // The first question opens the pane to the height of the window, to give the answer room.
-    if (!pane.classList.contains('grown')) {
+    // Beside a full-screen artifact (dock.js) it already fills its column.
+    if (pane.closest('#dock')) pane.classList.add('grown');
+    else if (!pane.classList.contains('grown')) {
       window.growPane(pane);
       pane.scrollIntoView({ block: 'start', behavior: 'smooth' });
     }
@@ -306,7 +311,11 @@
             cards.hidden = false;
             if (old) old.replaceWith(block); else cards.appendChild(block);
             scroll();
-            if (block === card && window.openInDock) window.openInDock(card.dataset.artifact, card.dataset.type, card.dataset.title);
+            if (data.pin && window.pinToTray) window.pinToTray(data.pin, data.node);
+            // The stage is this chat's own: full screen, with this pane (not the field's chat) beside it.
+            // A new version of the artifact already open there is shown at once.
+            if (window.openInDock && (block === card || (window.dockStageId && window.dockStageId() === card.dataset.artifact)))
+              window.openInDock(card.dataset.artifact, card.dataset.type, card.dataset.title, true, 'depth');
           } else if (name === 'draft') {
             draft(data);
           } else if (name === 'proposal') {

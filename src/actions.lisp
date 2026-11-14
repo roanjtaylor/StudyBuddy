@@ -112,6 +112,13 @@
   (let ((f (getf *run* :emit)))
     (when f (funcall f name (apply #'obj kvs)))))
 
+;; An artifact made or changed in a chat: its block for the chat, and, when it is pinned to an
+;; idea, its item for that idea's "Made:" tray, so it is listed there at once (static/videos.js).
+(defun emit-artifact (a)
+  (if (and (getf a :pinned) (getf a :node))
+      (emit-event "artifact" "html" (artifact-block a) "pin" (artifact-item a) "node" (getf a :node))
+      (emit-event "artifact" "html" (artifact-block a))))
+
 (defun note-change! (text) (push text (getf *run* :changes)))
 
 (defun run-changes () (when (getf *run* :changes) (join ", " (reverse (getf *run* :changes)))))
@@ -315,7 +322,7 @@
                           :content (getf input :content) :language (getf input :language)
                           :node (getf *run* :node))))
     (push (getf a :id) (getf *run* :artifacts))
-    (emit-event "artifact" "html" (artifact-block a))
+    (emit-artifact a)
     (str "Created artifact " (getf a :id) " (" (getf a :type) "): " (getf a :title))))
 
 (deftool update-artifact
@@ -324,7 +331,7 @@
   (input)
   (let ((a (update-artifact! (getf input :id) :content (getf input :content) :title (getf input :title))))
     (cond (a (pushnew (getf a :id) (getf *run* :artifacts) :test #'equal)
-             (emit-event "artifact" "html" (artifact-block a))
+             (emit-artifact a)
              (str "Updated artifact " (getf a :id) " to version " (getf a :version) "."))
           (t (str "No artifact with id " (getf input :id) ".")))))
 
@@ -346,7 +353,7 @@
   (let ((a (add-artifact! :title (getf input :title) :type "flashcards"
                           :content (getf input :cards) :node (getf *run* :node))))
     (push (getf a :id) (getf *run* :artifacts))
-    (emit-event "artifact" "html" (artifact-block a))
+    (emit-artifact a)
     (str "Created flashcards " (getf a :id) " with " (length (getf input :cards)) " cards.")))
 
 (deftool create-quiz
@@ -361,7 +368,7 @@
   (let ((a (add-artifact! :title (getf input :title) :type "quiz"
                           :content (getf input :questions) :node (getf *run* :node))))
     (push (getf a :id) (getf *run* :artifacts))
-    (emit-event "artifact" "html" (artifact-block a))
+    (emit-artifact a)
     (str "Created quiz " (getf a :id) " with " (length (getf input :questions)) " questions.")))
 
 (defparameter *buddy-tools*
@@ -398,11 +405,15 @@
         ((equal scope "topics")
          "The learner is working on the TOPIC LIST of this field: the groups and the ideas inside each. Requests here are about adding, renaming, regrouping, removing and reordering topics. Propose the changes with your tools.")))
 
+;; Each chat is told only about the artifact open beside it (the stage belongs to one chat at a time).
+(defun open-artifact-note (id)
+  (let ((a (and id (not (blankp id)) (find-artifact id))))
+    (when a (str "The learner has the artifact \"" (getf a :title) "\" (id " (getf a :id) ") open full screen beside this chat; \"this\", \"it\" and \"the diagram\" mean that artifact. To change it, read_artifact if needed, then update_artifact." #\Newline #\Newline))))
+
 (defun ask-turn (text node group &optional scope open-artifact)
   (str (map-context) #\Newline #\Newline
        (artifacts-context) #\Newline #\Newline
-       (let ((a (and open-artifact (find-artifact open-artifact))))
-         (when a (str "The learner has the artifact \"" (getf a :title) "\" (id " (getf a :id) ") open full screen beside this chat; \"this\", \"it\" and \"the diagram\" mean that artifact. To change it, read_artifact if needed, then update_artifact." #\Newline #\Newline)))
+       (open-artifact-note open-artifact)
        (when scope (str (scope-note scope) #\Newline #\Newline))
        (when group (str "The learner is looking at group: " group #\Newline #\Newline))
        (when node (str (node-context node) #\Newline (attempts-context node) #\Newline #\Newline))
@@ -553,7 +564,7 @@
           when (and (member role '("user" "assistant") :test #'equal) (stringp content))
             collect (list :role role :content content))))
 
-(defaction study "/action/study" (map-name here text history model effort)
+(defaction study "/action/study" (map-name here text history model effort artifact)
   (unless (select-map map-name) (return-from study (not-found "field")))
   (let ((node (and (not (blankp here)) (find-node here) here)))
     (cond ((or (blankp text) (null node)) "")
@@ -568,6 +579,7 @@
                                                                                       (node-context node) #\Newline #\Newline
                                                                                       (artifacts-context) #\Newline #\Newline
                                                                                       (pinned-context node)
+                                                                                      (open-artifact-note artifact)
                                                                                       "Learner says:" #\Newline (trim text)))))
                                                     :system (getf (prompt 'study) :system)
                                                     :tools *study-tools*

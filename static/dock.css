@@ -191,6 +191,8 @@ body.field { --gutter: calc(200px + 1rem); }
 .dock-stage header { display: flex; align-items: center; gap: .3rem; height: 2.75rem; padding: 0 .5rem; border-bottom: 1px solid var(--cl-line); }
 .stage-title { flex: 1; min-width: 0; padding-left: .35rem; font-size: .85rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dock-stage a.dock-btn { text-decoration: none; }
+.dock-btn.stage-zoom { width: auto; padding: 0 .5rem; font-size: .75rem; font-variant-numeric: tabular-nums; }
+.dock-btn.stage-zoom[hidden] { display: none; }
 .stage-frame { flex: 1; width: 100%; border: 0; background: var(--bg); }
 
 /* ---- Built in: the chat sits in the page ---- */
@@ -224,6 +226,12 @@ body.dock-focus { overflow: hidden; }
 .dock.focus .composer-tools { flex: 1; }
 .dock.focus .composer-row { flex-wrap: wrap; }
 .dock.focus .pill { max-width: 100%; }
+/* An artifact opened from an idea: the idea's own study pane stands in the chat column, and the field's chat is put away. */
+.dock .dock-chat.lent > .dock-log, .dock .dock-chat.lent > .dock-form { display: none; }
+.dock.focus .dock-chat.lent > .dock.inline.pane.study {
+  position: static; flex: 1 1 auto; min-height: 0; width: auto; height: auto; justify-content: flex-end;
+  border: 0; border-radius: 0; box-shadow: none; transition: none;
+}
 .stage-x { display: none; }
 .dock.focus .stage-x { display: grid; }
 .dock.focus #stage-close, .dock.focus #stage-focus { display: none; }

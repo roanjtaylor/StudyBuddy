@@ -210,7 +210,15 @@ Because any address is reached in about the same time, the memory is called *ran
 (:NODE :ID "instruction-set" :TITLE "The instruction set" :COMPRESSION
  "The fixed menu of operations the hardware understands, each a bit pattern with fields naming the operation and its operands."
  :BODY
- "The ISA is the contract between the hardware and every program ever written for it; change it and all software breaks."
+ "The ISA (instruction set architecture) is the contract between the hardware and every program ever written for it; change it and all software breaks.
+
+ISA stands for **Instruction Set Architecture**: the \"instruction set\" is the menu of operations, and the \"architecture\" is everything a programmer can see and rely on, as distinct from how a particular chip implements it.
+
+An instruction is a bit pattern split into fields: an opcode naming the operation (add, load, branch) and operand fields naming registers, memory addresses or constants. Because instructions are stored in memory as data, the processor fetches a pattern, decodes the fields, and executes it.
+
+The ISA fixes the instructions, the registers, the data types, and how memory is addressed. It does not fix the circuitry, so many different chips (slow or fast, small or large) can implement the same ISA and run the same software.
+
+**RISC vs CISC** are two styles of ISA. RISC (MIPS, ARM, RISC-V) has few simple instructions of fixed width, and only load/store touch memory, so decoding and pipelining are easy. CISC (VAX, x86) has many instructions of varying length, some doing a lot, with operands straight from memory. Modern x86 chips decode CISC instructions into RISC-like internal micro-operations, which shows the contract at work: the same ISA can run on very different circuitry."
  :GROUP "stored-program" :PREREQS ("fetch-decode-execute" "registers-pc") :ERA 1964)
 (:NODE :ID "machine-code-assembly" :TITLE "Machine code and assembly" :COMPRESSION
  "Assembly is machine code with names instead of numbers; an assembler is a lookup table inside a loop."
@@ -223,7 +231,15 @@ Because any address is reached in about the same time, the memory is called *ran
 (:NODE :ID "code-and-data-alike" :TITLE "Code and data in one memory" :COMPRESSION
  "Instructions are just numbers in RAM, so a program can read, write and generate other programs."
  :BODY
- "This one decision makes compilers, loaders and interpreters possible, and also every buffer-overflow exploit."
+ "Treating instructions as ordinary numbers in memory is what lets software build software: compilers, loaders, operating systems and interpreters all exist because a program can write bytes and then run them. The same openness is behind every buffer-overflow exploit.
+
+**The mechanism.** In a stored-program (von Neumann) machine, instructions and data share one memory and one address space. The CPU fetches an instruction the same way it loads a number. So a program can read another program, modify it, or generate a new one, and then jump to it.
+
+**The contrast: Harvard.** Early machines kept the program apart from the data. The Harvard Mark I (1944) read its instructions from punched paper tape, and ENIAC was programmed by rewiring cables and switches. In a Harvard design, instructions and data have separate memories, each with its own address space and usually its own bus. The CPU can fetch an instruction and access data in the same cycle, which is fast and predictable. But the running program cannot write new code, and changing the program means changing the physical medium.
+
+**Why von Neumann won.** Von Neumann's *First Draft of a Report on the EDVAC* (1945) put the program into the same memory as the data. Programs then became something a computer could manipulate, so one machine could translate, load and run other programs, and could be reprogrammed in seconds. That is far more powerful than any fixed program tape. The price is that data can be executed as code, which is the root of code-injection attacks.
+
+**Today's machines are hybrids.** A modern CPU has separate L1 instruction and data caches, which is Harvard-like for speed. Below that is one RAM, which is von Neumann. Memory protection (NX / W^X) takes back some of the openness: a page can be writable or executable, but not both. Microcontrollers such as AVR and PIC, and many DSPs, remain true Harvard designs."
  :GROUP "stored-program" :PREREQS ("fetch-decode-execute" "ram") :ERA 1945)
 (:NODE :ID "firmware-uefi" :TITLE "Firmware (BIOS/UEFI)" :COMPRESSION
  "The program in ROM at the reset vector: it checks the hardware, finds a disk, copies the next program into RAM and jumps to it."

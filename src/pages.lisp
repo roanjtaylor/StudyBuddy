@@ -223,6 +223,8 @@
                   ;; Full screen only: the X at the top left puts the topic back in view.
                   (:button :type "button" :id "stage-x" :class "dock-btn stage-x" :title "Close (Esc)" :aria-label "Close" (icon "x"))
                   (:span :id "stage-title" :class "stage-title")
+                  ;; The zoom of a page or diagram on the stage; a click puts all of it back in view.
+                  (:button :type "button" :id "stage-zoom" :class "dock-btn stage-zoom" :hidden t :title "Fit to view" :aria-label "Fit to view")
                   (:button :type "button" :id "stage-focus" :class "dock-btn" :title "Full screen" :aria-label "Full screen" (icon "expand"))
                   (:button :type "button" :id "stage-close" :class "dock-btn" :title "Close" (icon "x")))
                 (:iframe :id "stage-frame" :class "stage-frame" :title "Artifact")))))))
@@ -392,6 +394,8 @@
             (:div :class "dock-log study-log")
             (:form :class "dock-form study-form" :method "post" :action "/action/study"
               (hidden "map-name" (map-id)) (hidden "here" id)
+              ;; The artifact open full screen beside this pane (static/dock.js), so the model knows what "this" is.
+              (hidden "artifact" "")
               (composer (str "Explain " (getf n :title) " in your own words, or ask about it…")
                         (getf n :title) t))))))
 
@@ -549,16 +553,20 @@
                            (str c "<script>(function(){var l=0;function s(){var d=document,h=Math.ceil(Math.max(d.documentElement.scrollHeight,d.body?d.body.scrollHeight:0));"
                                 "if(h&&h!==l){l=h;parent.postMessage({artifactHeight:h},'*')}}"
                                 "addEventListener('load',s);addEventListener('resize',s);"
-                                "if(window.ResizeObserver)new ResizeObserver(s).observe(document.documentElement);setInterval(s,500);s()})()</script>")))
+                                "if(window.ResizeObserver)new ResizeObserver(s).observe(document.documentElement);setInterval(s,500);s()})()</script>"
+                                ;; On the stage it never scrolls: it is fitted to the frame, then zoomed and panned (static/canvas.js).
+                                "<script src=\"" (static-url "canvas.js") "\"></script>")))
             ((equal type "svg")
-             (artifact-frame a (html (:div :class "svg-wrap" (:raw c)))))
+             (artifact-frame a (html (:div :class "svg-wrap" (:raw c))
+                                     (:script :src (static-url "canvas.js")))))
             ((equal type "mermaid")
              (artifact-frame a (html (:pre :class "mermaid" c)
                                      (:script :type "module"
                                        ;; A lone ~ in a label pairs up as markdown strikethrough ("Unsupported markdown: del"), so show it as ≈.
                                        (:raw "import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';"
                                              "for(const p of document.querySelectorAll('pre.mermaid'))p.textContent=p.textContent.replace(/(?<!~)~(?!~)/g,'\\u2248');"
-                                             "mermaid.initialize({startOnLoad:true,theme:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'neutral'});")))))
+                                             "mermaid.initialize({startOnLoad:true,theme:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'neutral'});"))
+                                     (:script :src (static-url "canvas.js")))))
             ((equal type "markdown")
              (artifact-frame a (html (:div :class "md doc" (:raw (markdown->html c))))))
             ((equal type "code")

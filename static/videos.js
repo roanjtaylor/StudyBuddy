@@ -143,6 +143,16 @@
     syncTray();
   }
 
+  // Something made (or changed) in a chat is pinned to its idea from the start: list it in
+  // that idea's tray at once, in place of any older copy. Called by dock.js and study.js.
+  window.pinToTray = function (html, node) {
+    var t = tray(); if (!t || !html || t.dataset.node !== node) return;
+    var w = document.createElement('ul'); w.innerHTML = html;
+    var item = w.firstElementChild; if (!item) return;
+    var old = t.querySelector('.pin-artifacts [data-artifact="' + item.dataset.artifact + '"]');
+    if (old) { old.replaceWith(item); syncTray(); } else addToTray(html);
+  };
+
   // Pin or unpin an artifact (its pin button, wherever it is shown) to the open idea.
   function markPinned(id, on) {
     document.querySelectorAll('.artifact-pin[data-artifact="' + id + '"]').forEach(function (b) {
