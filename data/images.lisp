@@ -58,3 +58,13 @@
  "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a0/RISC-II_Blue_die_shot.jpg/500px-RISC-II_Blue_die_shot.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
  :PAGE "https://commons.wikimedia.org/wiki/File:RISC-II_Blue_die_shot.jpg" :AT
  "2026-11-14T22:55:34")
+(:ID "computers/os-as-referee/PUEGGZHF09NF" :MAP "computers" :NODE "os-as-referee" :KEY
+ "PUEGGZHF09NF" :TITLE "Horizon desktop" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6f/Horizon_desktop.png/500px-Horizon_desktop.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE "https://commons.wikimedia.org/wiki/File:Horizon_desktop.png" :AT "2026-11-16T17:59:08")
+(:ID "computers/databases/5L71JWCR6M50" :MAP "computers" :NODE "databases" :KEY "5L71JWCR6M50"
+ :TITLE "A schematic of WackoWiki r6.0 database structure" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f8/A_schematic_of_WackoWiki_r6.0_database_structure.png/500px-A_schematic_of_WackoWiki_r6.0_database_structure.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE
+ "https://commons.wikimedia.org/wiki/File:A_schematic_of_WackoWiki_r6.0_database_structure.png" :AT
+ "2026-11-17T11:13:01")

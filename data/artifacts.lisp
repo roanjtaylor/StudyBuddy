@@ -2672,3 +2672,1611 @@ fromControls();
 </g>
 </svg>"
  :AT "2026-11-14T23:07:33" :VERSION 1)
+(:PINNED T :ID "symbolic-search-vs-neural-network" :MAP "computers" :NODE "symbolic-reasoning"
+ :TYPE "html" :TITLE "Symbolic search vs neural network" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">
+<style>
+body{font-family:system-ui,sans-serif;margin:0;padding:14px;background:#fafaf7;color:#222;max-width:820px;margin:auto}
+h2{font-size:18px;margin:4px 0 8px}
+.tabs button,.ctl button{padding:7px 12px;border:1px solid #888;background:#fff;border-radius:6px;cursor:pointer;font-size:14px;margin:2px}
+.tabs button.on{background:#222;color:#fff}
+.box{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px;margin:10px 0}
+canvas{max-width:100%;border:1px solid #eee;border-radius:6px;background:#fff}
+.stat{font-family:monospace;font-size:14px;margin:6px 0}
+.ok{color:#127a3a;font-weight:600}.bad{color:#b3261e;font-weight:600}
+.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.cap{font-size:13px;text-align:center;color:#555}
+small{color:#555}
+pre{background:#f3f1ea;padding:8px;border-radius:6px;font-size:13px;white-space:pre-wrap;margin:6px 0}
+</style></head><body>
+<h2>Axioms and search vs. learned probabilities</h2>
+<div class=\"tabs\"><button id=\"t1\" class=\"on\" onclick=\"tab(1)\">1. Symbolic reasoning</button><button id=\"t2\" onclick=\"tab(2)\">2. Neural network</button></div>
+
+<div id=\"p1\">
+<div class=\"box\">
+<b>Task:</b> given axioms (hand-written rules) and a start fact, <i>prove the goal</i> by searching chains of rule applications. Each node is a fact; each branch is a rule that could fire next.
+<div class=\"ctl\"><button onclick=\"runTree('small')\">▶ Small, tidy domain</button><button onclick=\"runTree('big')\">▶ Bigger domain</button></div>
+<canvas id=\"tree\" width=\"560\" height=\"560\"></canvas>
+<div class=\"stat\" id=\"tstat\">Press a button.</div>
+<div id=\"tmsg\"></div>
+</div>
+<div class=\"box\">
+<b>Second wall: brittleness.</b> Real input has exceptions the author didn't foresee.
+<div class=\"ctl\"><button onclick=\"exc()\">Add real-world input</button></div>
+<pre id=\"excp\">Rule 1: bird(x) → flies(x)
+Fact:   penguin(Tweety), penguin(x) → bird(x)</pre>
+<div id=\"excm\" class=\"stat\"></div>
+</div>
+</div>
+
+<div id=\"p2\" style=\"display:none\">
+<div class=\"box\">
+<b>Task:</b> label points as A (orange) or B (blue). The truth is a circle in the middle, but the labels are never written as a rule. The network only sees example points.
+<div class=\"ctl\">Training examples: <button onclick=\"setN(10)\">10</button><button onclick=\"setN(60)\">60</button><button onclick=\"setN(400)\">400</button><button onclick=\"setN(3000)\">3000</button> <button onclick=\"train()\">▶ Train</button></div>
+<div class=\"row\">
+<div><canvas id=\"rule\" width=\"260\" height=\"260\"></canvas><div class=\"cap\">Hand-written axiom:<br>\"if x &gt; 0.5 then A\"<br><span id=\"racc\"></span></div></div>
+<div><canvas id=\"nn\" width=\"260\" height=\"260\"></canvas><div class=\"cap\">Neural net: probability of A<br><span id=\"nacc\">untrained</span></div></div>
+</div>
+<div class=\"stat\" id=\"nstat\"></div>
+<small>Click the right map to read the network's probability at that point. Colour strength = confidence; white = unsure.</small>
+</div>
+</div>
+
+<div class=\"box\"><b>The contrast</b>
+<table style=\"font-size:14px;border-collapse:collapse;width:100%\">
+<tr><td></td><td><b>Symbolic</b></td><td><b>Neural</b></td></tr>
+<tr><td>Knowledge comes from</td><td>people writing axioms</td><td>examples (data)</td></tr>
+<tr><td>Answer</td><td>proved, or nothing</td><td>probability, can be wrong</td></tr>
+<tr><td>Fails when</td><td>search explodes, exceptions appear</td><td>too little or biased data</td></tr>
+</table></div>
+
+<script>
+function tab(n){for(let i=1;i<=2;i++){document.getElementById('p'+i).style.display=i==n?'':'none';document.getElementById('t'+i).className=i==n?'on':''}if(n==2)drawNN()}
+
+/* ---------- symbolic tree ---------- */
+const tc=document.getElementById('tree'),tx=tc.getContext('2d');
+let anim=null;
+function runTree(kind){
+ if(anim)cancelAnimationFrame(anim);
+ const cfg=kind=='small'?{b:2,d:3,goal:5,budget:1e9,rate:0.07,rules:6}:{b:4,d:6,goal:3000,budget:1200,rate:6,rules:'thousands'};
+ const {b,d}=cfg;
+ // BFS-ordered nodes
+ const nodes=[];let off=[0];
+ for(let l=0;l<=d;l++){const n=Math.pow(b,l);for(let i=0;i<n;i++)nodes.push({l,i});off[l+1]=off[l]+n}
+ const R=255,step=R/d,cx=280,cy=280;
+ nodes.forEach(n=>{const cnt=Math.pow(b,n.l);const a=2*Math.PI*(n.i+.5)/cnt;n.x=cx+Math.cos(a)*n.l*step;n.y=cy+Math.sin(a)*n.l*step;if(n.l==0){n.x=cx;n.y=cy}});
+ const par=k=>{const n=nodes[k];return n.l==0?-1:off[n.l-1]+Math.floor(n.i/b)};
+ const goalK=off[d]+cfg.goal%Math.pow(b,d);
+ let shown=0,done=false,found=false,fail=false;
+ const total=nodes.length;
+ document.getElementById('tmsg').innerHTML='';
+ function draw(){
+  tx.clearRect(0,0,560,560);
+  const dot=kind=='small'?6:2;
+  for(let k=1;k<shown;k++){const p=nodes[par(k)],n=nodes[k];tx.strokeStyle='rgba(120,120,140,'+(kind=='small'?.6:.25)+')';tx.beginPath();tx.moveTo(p.x,p.y);tx.lineTo(n.x,n.y);tx.stroke()}
+  for(let k=0;k<shown;k++){const n=nodes[k];tx.fillStyle=k==0?'#222':'#4a6fd6';tx.beginPath();tx.arc(n.x,n.y,k==0?7:dot,0,7);tx.fill()}
+  // goal marker
+  const g=nodes[goalK];tx.strokeStyle='#127a3a';tx.lineWidth=2;tx.beginPath();tx.arc(g.x,g.y,10,0,7);tx.stroke();tx.fillStyle='#127a3a';tx.font='13px sans-serif';tx.fillText('GOAL',Math.min(g.x+12,520),g.y+4);tx.lineWidth=1;
+  tx.fillStyle='#222';tx.fillText('start fact',cx-24,cy-12);
+  if(found){let k=goalK;tx.strokeStyle='#127a3a';tx.lineWidth=4;while(par(k)>=0){const p=nodes[par(k)],n=nodes[k];tx.beginPath();tx.moveTo(p.x,p.y);tx.lineTo(n.x,n.y);tx.stroke();k=par(k)}tx.lineWidth=1}
+ }
+ function tick(){
+  if(!done){
+   shown=Math.min(total,shown+(kind=='small'?cfg.rate*1:cfg.rate*(1+shown/120)));
+   shown=Math.floor(shown)||shown;
+   if(kind=='small'){window._f=(window._f||0)+cfg.rate;shown=Math.min(total,Math.floor(window._f)+1)}
+   if(shown>goalK&&kind=='small'){shown=goalK+1;found=true;done=true}
+   if(shown>=cfg.budget){shown=cfg.budget;fail=true;done=true}
+  }
+  draw();
+  document.getElementById('tstat').innerHTML='Nodes searched: '+Math.floor(shown).toLocaleString()+' &nbsp;|&nbsp; branching '+b+', depth '+d+' → '+total.toLocaleString()+' nodes in full tree &nbsp;|&nbsp; rules hand-written: '+cfg.rules;
+  if(found)document.getElementById('tmsg').innerHTML='<span class=\"ok\">Proof found after '+Math.floor(shown)+' nodes.</span> Small domain: the chain of rules from start to goal is the green path, and the result is certain given the axioms.';
+  if(fail)document.getElementById('tmsg').innerHTML='<span class=\"bad\">Budget exhausted before reaching the goal.</span> Each extra level multiplies the work by '+b+'. Real domains have far more rules per step (say 30 at depth 20 ≈ 10<sup>29</sup> nodes), and someone would have had to write all those rules. Heuristics prune, but only where a person knew what to prune.';
+  if(!done)anim=requestAnimationFrame(tick);else draw();
+ }
+ window._f=0;
+ tick();
+}
+tx.fillStyle='#888';tx.font='15px sans-serif';tx.fillText('Pick a domain size to see the search',150,285);
+
+let ne=0;
+const steps=[
+ ['Rule 1: bird(x) → flies(x)\\nFact:   penguin(Tweety), penguin(x) → bird(x)\\n⇒ flies(Tweety)   ✗ wrong, with full logical certainty','Fix needed: add \"unless penguin\".'],
+ ['Rule 1: bird(x) ∧ ¬penguin(x) → flies(x)\\nFact:   ostrich(Sam), ostrich(x) → bird(x)\\n⇒ flies(Sam)   ✗ wrong again','Fix needed: add \"unless ostrich\".'],
+ ['Rule 1: bird(x) ∧ ¬penguin ∧ ¬ostrich → flies(x)\\nFact:   bird(Polly), wing_broken(Polly)\\n⇒ flies(Polly)   ✗ wrong again','Fix needed: broken wing, dead, caged, chick, painted on a wall...'],
+ ['Rule 1: bird(x) ∧ ¬penguin ∧ ¬ostrich ∧ ¬broken ∧ ¬dead ∧ ¬caged ...\\nInput: \"the bird in the picture\"\\n⇒ no symbol bird(x) was produced from pixels. No answer.','Rules cannot read ambiguous input. Exceptions never end.']];
+function exc(){const s=steps[Math.min(ne,steps.length-1)];ne++;document.getElementById('excp').textContent=s[0];document.getElementById('excm').innerHTML='<span class=\"bad\">'+s[1]+'</span> Exceptions patched by hand: '+(ne-1)}
+
+/* ---------- neural net ---------- */
+const truth=(x,y)=>(x-.5)**2+(y-.5)**2<0.09?1:0;
+const H=12;let N=60,net,data=[],timer=null,epoch=0;
+const rule=document.getElementById('rule').getContext('2d'),nnc=document.getElementById('nn'),nx=nnc.getContext('2d');
+function rnd(){return Math.random()*2-1}
+function init(){net={W1:Array.from({length:H},()=>[rnd(),rnd()]),b1:Array(H).fill(0),W2:Array.from({length:H},()=>Array.from({length:H},()=>rnd()*.5)),b2:Array(H).fill(0),W3:Array.from({length:H},()=>rnd()*.5),b3:0}}
+function fwd(x,y){const i=[(x-.5)*3,(y-.5)*3];const h1=net.W1.map((w,j)=>Math.tanh(w[0]*i[0]+w[1]*i[1]+net.b1[j]));const h2=net.W2.map((w,j)=>Math.tanh(w.reduce((s,v,k)=>s+v*h1[k],0)+net.b2[j]));const o=1/(1+Math.exp(-(net.W3.reduce((s,v,k)=>s+v*h2[k],0)+net.b3)));return{i,h1,h2,o}}
+function sgd(x,y,t,lr){const f=fwd(x,y);const d3=f.o-t;const d2=f.h2.map((h,k)=>d3*net.W3[k]*(1-h*h));const d1=f.h1.map((h,k)=>{let s=0;for(let j=0;j<H;j++)s+=d2[j]*net.W2[j][k];return s*(1-h*h)});
+ for(let k=0;k<H;k++)net.W3[k]-=lr*d3*f.h2[k];net.b3-=lr*d3;
+ for(let j=0;j<H;j++){for(let k=0;k<H;k++)net.W2[j][k]-=lr*d2[j]*f.h1[k];net.b2[j]-=lr*d2[j]}
+ for(let j=0;j<H;j++){net.W1[j][0]-=lr*d1[j]*f.i[0];net.W1[j][1]-=lr*d1[j]*f.i[1];net.b1[j]-=lr*d1[j]}}
+function setN(n){N=n;if(timer)clearInterval(timer);init();epoch=0;data=[];for(let i=0;i<N;i++){const x=Math.random(),y=Math.random();let t=truth(x,y);if(Math.random()<.08)t=1-t;data.push([x,y,t])}drawNN();document.getElementById('nstat').textContent=N+' labelled examples ready (8% of labels are noisy). Press Train.'}
+function acc(fn){let c=0,n=1500;const r=mulberry(7);for(let i=0;i<n;i++){const x=r(),y=r();if((fn(x,y)>.5?1:0)==truth(x,y))c++}return Math.round(100*c/n)}
+function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function paint(ctx,fn,pts){const g=52,s=260/g;for(let a=0;a<g;a++)for(let b=0;b<g;b++){const p=fn((a+.5)/g,(b+.5)/g);const c=Math.abs(p-.5)*2;ctx.fillStyle=p>.5?`rgba(235,130,20,${.15+c*.7})`:`rgba(40,90,220,${.15+c*.7})`;ctx.fillRect(a*s,b*s,s+1,s+1)}
+ if(pts)pts.forEach(p=>{ctx.fillStyle=p[2]?'#a04800':'#0f2f8f';ctx.strokeStyle='#fff';ctx.beginPath();ctx.arc(p[0]*260,p[1]*260,3.5,0,7);ctx.fill();ctx.stroke()});
+ ctx.strokeStyle='#127a3a';ctx.setLineDash([4,3]);ctx.beginPath();ctx.arc(130,130,.3*260,0,7);ctx.stroke();ctx.setLineDash([])}
+function drawNN(){const rf=(x,y)=>x>.5?.95:.05;paint(rule,rf,null);document.getElementById('racc').textContent='accuracy on new points: '+acc(rf)+'%';
+ paint(nx,(x,y)=>fwd(x,y).o,data);if(epoch>0)document.getElementById('nacc').textContent='epoch '+epoch+' — accuracy on new points: '+acc((x,y)=>fwd(x,y).o)+'%'}
+function train(){if(timer)clearInterval(timer);if(!data.length)setN(N);const total=N<100?400:N<1000?120:40;timer=setInterval(()=>{for(let e=0;e<4;e++){epoch++;for(const i of data.map((_,i)=>i).sort(()=>Math.random()-.5)){const p=data[i];sgd(p[0],p[1],p[2],.05)}}drawNN();if(epoch>=total){clearInterval(timer);const a=acc((x,y)=>fwd(x,y).o);document.getElementById('nstat').innerHTML=(a>=90?'<span class=\"ok\">':'<span class=\"bad\">')+'Final accuracy on new points: '+a+'%</span> with '+N+' examples. '+(N<=60?'Too little data: it memorises the noisy points and the boundary is lumpy.':N<1000?'Better: the circle starts to emerge.':'Plenty of data: the noise averages out and the boundary is a smooth circle. It was never told \"circle\".')}},30)}
+nnc.addEventListener('click',e=>{const r=nnc.getBoundingClientRect();const x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;document.getElementById('nstat').textContent='P(A) at ('+x.toFixed(2)+', '+y.toFixed(2)+') = '+fwd(x,y).o.toFixed(2)+'  (a probability, not a proof)'});
+init();setN(60);
+</script></body></html>"
+ :AT "2026-11-15T12:31:31" :VERSION 1)
+(:PINNED T :ID "keyboard-interrupt-1-vs-4-cores" :MAP "computers" :NODE "interrupts" :TYPE "html"
+ :TITLE "Keyboard interrupt: 1 vs 4 cores" :LANGUAGE NIL :CONTENT "<!DOCTYPE html>
+<html><head><meta charset=\"utf-8\"><title>Keyboard interrupt</title>
+<style>
+:root{--ink:#2b2d42;--blue:#4ea8de;--red:#ef476f;--yel:#ffd166;--grn:#06d6a0}
+*{box-sizing:border-box}
+body{margin:0;padding:12px;background:#fdf6e3;font-family:\"Comic Sans MS\",\"Chalkboard SE\",\"Segoe UI\",sans-serif;color:var(--ink);font-size:14px}
+h1{font-size:20px;margin:0 0 8px}
+.panel{background:#fff;border:3px solid var(--ink);border-radius:14px;padding:10px;margin-bottom:12px;box-shadow:3px 3px 0 var(--ink)}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;border:3px solid var(--ink);border-radius:10px;background:var(--yel);padding:3px 10px;cursor:pointer;box-shadow:2px 2px 0 var(--ink)}
+button.on{background:var(--grn)}
+button:active{transform:translate(2px,2px);box-shadow:none}
+label{display:inline-flex;gap:4px;align-items:center}
+.legend{font-size:12px;margin-top:6px}
+.sw{display:inline-block;width:12px;height:12px;border:2px solid var(--ink);vertical-align:middle;border-radius:3px}
+.scene{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+.person{text-align:center;width:120px}
+.face{font-size:56px;line-height:1}
+.bubble{background:#fff9d6;border:3px solid var(--ink);border-radius:14px;padding:3px 8px;font-size:12px;margin-top:4px;min-height:26px}
+.kbwrap{flex:1;min-width:300px}
+.hands{display:flex;justify-content:space-around;font-size:34px;height:42px}
+.hands span{display:inline-block;transition:transform .08s}
+.hands span.tap{transform:translateY(14px) rotate(8deg)}
+#kb{background:#8d99ae;border:3px solid var(--ink);border-radius:12px;padding:6px;display:flex;flex-direction:column;gap:4px;align-items:center}
+#kb.other{background:#f4a261}
+.row{display:flex;gap:4px}
+.key{min-width:26px;height:26px;background:#edf2f4;border:2px solid var(--ink);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;box-shadow:0 3px 0 var(--ink);transition:all .08s}
+.key.down{transform:translateY(3px);box-shadow:0 0 0 var(--ink);background:var(--yel)}
+.key.space{min-width:180px}
+#inp{width:100%;margin-top:8px;font:inherit;font-size:15px;padding:6px 10px;border:3px solid var(--ink);border-radius:10px}
+.wire{width:8px;height:26px;margin:0 auto;background:#bbb;border:2px solid var(--ink);border-radius:4px;position:relative;overflow:hidden}
+.wire.hot{background:var(--red)}
+.wire.svc{background:#f4a261}
+.wire.hot::after,.drop.hot .stub::after{content:\"\";position:absolute;left:1px;width:6px;height:6px;border-radius:50%;background:#fff;animation:fall .5s linear infinite}
+@keyframes fall{from{top:-6px}to{top:100%}}
+.ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center}
+.chip{display:inline-block;border:2px solid var(--ink);background:var(--yel);border-radius:8px;padding:0 6px;font-family:monospace;font-size:12px;margin:0 2px}
+.linestate{font-weight:bold}
+.coreswrap{overflow-x:auto;padding-bottom:4px}
+.grid{display:grid;gap:0}
+.col{padding:0 5px}
+.drop{height:26px;position:relative;border-top:8px solid #bbb;border-top-color:#bbb}
+.drop .stub{position:absolute;left:50%;top:-2px;width:8px;height:28px;margin-left:-4px;background:#bbb;border:2px solid var(--ink);border-radius:4px;overflow:hidden}
+.drop.hot .stub{background:var(--red)}
+.drop.hot{border-top-color:var(--red)}
+.irqtag{position:absolute;left:calc(50% + 8px);top:4px;font-size:10px}
+.card{background:#eaf6ff;border:3px solid var(--ink);border-radius:14px;padding:8px;box-shadow:3px 3px 0 var(--ink);font-size:12px;min-width:150px}
+.card.int{background:#ffe3ea}
+.ch{display:flex;justify-content:space-between;gap:4px;margin-bottom:4px}
+.task{font-size:10px;opacity:.7}
+.status{font-weight:bold;min-height:32px;font-size:12px}
+.pills{display:flex;gap:3px;margin:4px 0}
+.pill{flex:1;text-align:center;border:2px solid var(--ink);border-radius:8px;padding:1px 0;font-size:11px;background:#fff;opacity:.5}
+.pill.a{background:var(--blue);opacity:1;color:#fff;font-weight:bold}
+.pill.h{background:var(--red);opacity:1;color:#fff;font-weight:bold}
+.pill.p{background:#ccc;opacity:.8;text-decoration:line-through}
+.regs{display:grid;grid-template-columns:1fr 1fr;gap:2px 6px;font-family:monospace;font-size:11px;background:#fff;border:2px solid var(--ink);border-radius:8px;padding:4px}
+.bad{color:#fff;background:var(--red);border-radius:4px;padding:0 3px}
+.code{font-family:monospace;font-size:10.5px;margin-top:4px;background:#fff;border:2px solid var(--ink);border-radius:8px;padding:3px;white-space:pre}
+.ln{padding:0 2px;border-radius:3px}
+.ln.cur{background:var(--blue);color:#fff}
+.ln.curh{background:var(--red);color:#fff}
+.ln.skip{text-decoration:line-through;opacity:.4}
+.sep{border-top:1px dashed #888;margin:2px 0}
+.stk{font-family:monospace;font-size:10.5px;margin-top:4px;background:#fffbe6;border:2px solid var(--ink);border-radius:8px;padding:3px;min-height:20px}
+.tl{display:flex;height:12px;margin-top:5px;border:2px solid var(--ink);border-radius:4px;overflow:hidden;background:#fff}
+.tl span{flex:1}
+.stat{font-size:11px;margin-top:3px}
+.ram{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.ram h3{margin:0 0 4px;font-size:13px}
+.mono{font-family:monospace;font-size:12px}
+.slots{display:grid;grid-template-columns:repeat(8,1fr);gap:3px}
+.slot{border:2px solid var(--ink);border-radius:6px;height:34px;text-align:center;font-family:monospace;font-size:13px;background:#fff;position:relative;padding-top:2px}
+.slot.new{background:var(--grn)}
+.slot.done{opacity:.4}
+.slot small{position:absolute;bottom:-1px;left:0;right:0;font-size:9px;line-height:9px;color:var(--red)}
+.ivt div{border:2px solid var(--ink);border-radius:6px;margin-bottom:3px;padding:1px 6px;background:#fff;font-family:monospace;font-size:12px}
+.ivt div.hot{background:var(--yel)}
+#screen{border:2px solid var(--ink);border-radius:8px;min-height:50px;background:#1d2d44;color:#9ef;font-family:monospace;padding:6px;white-space:pre-wrap;word-break:break-all}
+#log{font-size:12px;line-height:1.5}
+#log div:first-child{font-weight:bold}
+.foot{font-size:11px;opacity:.75}
+</style></head><body>
+<h1>⌨️ → ⚡ → 🧠 What a keypress does to the CPU</h1>
+
+<div class=\"panel\">
+ <div class=\"controls\">
+  <button id=\"b1\" class=\"on\">1 core</button><button id=\"b4\">4 cores</button>
+  <label id=\"routeL\" style=\"display:none\">IRQ routed to
+   <select id=\"route\"><option value=\"c0\">core 0 only</option><option value=\"rr\">round-robin</option></select></label>
+  <label>Speed <input type=\"range\" id=\"spd\" min=\"1\" max=\"20\" value=\"4\"></label>
+  <button id=\"bp\">⏸ Pause</button><button id=\"bs\">⏭ Step</button>
+  <button id=\"bb\">⌨ Burst “hello”</button><button id=\"br\">↺ Reset</button>
+  <label><input type=\"checkbox\" id=\"bug\"> 😈 handler forgets to save R0/R1</label>
+ </div>
+ <div class=\"legend\"><span class=\"sw\" style=\"background:var(--blue)\"></span> background work &nbsp; <span class=\"sw\" style=\"background:var(--red)\"></span> interrupt sequence (timeline strip at the bottom of each core). Each tick = one Fetch, Decode or Execute step.</div>
+</div>
+
+<div class=\"panel\">
+ <div class=\"scene\">
+  <div class=\"person\"><div class=\"face\">🧑‍💻</div><div class=\"bubble\" id=\"bubble\">Type in the box →</div></div>
+  <div class=\"kbwrap\"><div class=\"hands\"><span id=\"hL\">✋</span><span id=\"hR\">✋</span></div><div id=\"kb\"></div></div>
+ </div>
+ <input id=\"inp\" placeholder=\"Type here: every keystroke becomes an interrupt…\" autocomplete=\"off\">
+</div>
+
+<div class=\"wire\" id=\"w0\"></div>
+<div class=\"panel ctl\">
+ <b>🔔 Keyboard controller + interrupt controller</b>
+ <span>FIFO of unread scancodes: <span id=\"fifo\"></span></span>
+ <span class=\"linestate\" id=\"lineState\"></span>
+</div>
+
+<div class=\"coreswrap\"><div class=\"grid\" id=\"cores\"></div></div>
+
+<div class=\"panel\" style=\"margin-top:12px\">
+ <b>🗄️ Shared RAM</b>
+ <div class=\"ram\" style=\"margin-top:6px\">
+  <div><h3>Interrupt vector table</h3><div class=\"ivt\" id=\"ivt\"></div></div>
+  <div style=\"grid-column:span 2\"><h3>Keyboard buffer (ring of 8)</h3><div class=\"slots\" id=\"slots\"></div>
+   <h3 style=\"margin-top:8px\">Text editor window (gets chars later)</h3><div id=\"screen\"></div></div>
+ </div>
+</div>
+
+<div class=\"panel\"><b>📜 What just happened</b><div id=\"log\"></div></div>
+<div class=\"foot\">Not to scale: a real handler takes microseconds (thousands of cycles) and keystrokes arrive about 100 ms apart, so the CPU spends over 99.99% of its time on background work. Here the handler is shown as 1 tick per instruction, and keys come as fast as you type.</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const hx=(n,w=2)=>'0x'+n.toString(16).toUpperCase().padStart(w,'0');
+const TASKS=['OS background work','Web browser','Music player','Compiler'];
+const PROG=[
+ {t:'ADD R1,R0',f:c=>{c.r1=(c.r1+c.r0)&0xFFFF;c.pc=1}},
+ {t:'INC R0',f:c=>{c.r0=(c.r0+1)&0xFF;c.pc=2}},
+ {t:'JMP 0x00',f:c=>{c.pc=0;c.iters++}}];
+const HL=['PUSH R0','PUSH R1','IN   R0,0x60','XLAT R1,R0','STORE [kbbuf],R1','OUT  0x20,EOI','POP  R1','POP  R0','IRET'];
+const SKIPL=[0,1,6,7];
+const SCAN={};
+'1234567890'.split('').forEach((k,i)=>SCAN[k]=2+i);
+'QWERTYUIOP'.split('').forEach((k,i)=>SCAN[k]=0x10+i);
+'ASDFGHJKL'.split('').forEach((k,i)=>SCAN[k]=0x1E+i);
+'ZXCVBNM'.split('').forEach((k,i)=>SCAN[k]=0x2C+i);
+SCAN[' ']=0x39;SCAN.Enter=0x1C;SCAN.Backspace=0x0E;
+
+let N=1,routing='c0',tick=0,paused=false,cores=[],kbdQueue=[],claimed=-1,rr=0;
+let buf,head,tail,screen,deliveries,logL,ivtHot,lastWrite,lastWriteTick;
+
+function resetAll(){
+ tick=0;kbdQueue=[];claimed=-1;rr=0;buf=new Array(8).fill(null);head=0;tail=0;screen='';
+ deliveries=[];logL=[];ivtHot=-9;lastWrite=-1;lastWriteTick=-9;
+ buildCores();say('Ready. Type something and watch the red interrupt line.');render();
+}
+function say(m){logL.unshift(m);if(logL.length>7)logL.pop()}
+function makeCore(i){return{id:i,pc:0,phase:0,insIdx:0,ir:'—',r0:3+i*40,r1:0,IF:1,mode:'run',steps:[],step:0,stack:[],base:0x7F00-i*0x100,hist:[],iters:0,grace:0,shadow:null,cur:null,lastPhase:-1,curLine:-1,handled:0,flash:0,flashTxt:''}}
+function buildCores(){
+ cores=[];const g=$('cores');
+ g.style.gridTemplateColumns=`repeat(${N},minmax(${N==1?260:165}px,${N==1?'430px':'1fr'}))`;
+ let h='';
+ for(let i=0;i<N;i++){cores.push(makeCore(i));
+  h+=`<div class=\"col\"><div class=\"drop\" id=\"drop${i}\"><div class=\"stub\"></div><span class=\"irqtag\">IRQ1</span></div>
+  <div class=\"card\" id=\"card${i}\"><div class=\"ch\"><b>🧠 Core ${i}</b><span class=\"task\">${TASKS[i]}</span></div>
+  <div class=\"status\" id=\"st${i}\"></div><div class=\"pills\" id=\"pl${i}\"></div><div class=\"regs\" id=\"rg${i}\"></div>
+  <div class=\"code\" id=\"cd${i}\"></div><div class=\"stk\" id=\"sk${i}\"></div><div class=\"tl\" id=\"tl${i}\"></div><div class=\"stat\" id=\"ss${i}\"></div></div></div>`}
+ g.innerHTML=h;
+}
+function buildKb(){
+ const rows=['1234567890','QWERTYUIOP','ASDFGHJKL','ZXCVBNM'];let h='';
+ rows.forEach(r=>{h+='<div class=\"row\">'+r.split('').map(k=>`<div class=\"key\" data-k=\"${k}\">${k}</div>`).join('')+'</div>'});
+ h+='<div class=\"row\"><div class=\"key space\" data-k=\" \">SPACE</div></div>';$('kb').innerHTML=h;
+}
+function target(){return(routing==='rr'&&N>1)?rr%N:0}
+function lineHigh(){return kbdQueue.length>0&&claimed===-1}
+
+/* ---- key input ---- */
+let hand=0;
+function press(key){
+ let disp,out,code,sc;
+ if(key==='Backspace'){disp='⌫';out='⌫';code=8;sc=SCAN.Backspace}
+ else if(key==='Enter'){disp='↵';out='↵';code=13;sc=SCAN.Enter}
+ else if(key.length===1){out=key;disp=key===' '?'␣':key;code=key.charCodeAt(0);sc=SCAN[key.toUpperCase()]??0x56}
+ else return;
+ if(kbdQueue.length>=16)return;
+ kbdQueue.push({sc,disp,out,code});
+ const el=document.querySelector(`.key[data-k=\"${key.toUpperCase()}\"]`);
+ $('kb').classList.toggle('other',!el);
+ if(el){el.classList.add('down');setTimeout(()=>el.classList.remove('down'),160)}
+ const h=$(hand++%2?'hL':'hR');h.classList.add('tap');setTimeout(()=>h.classList.remove('tap'),130);
+ $('bubble').textContent=`clack! “${disp}” (scancode ${hx(sc)})`;
+ say(`Key “${disp}” pressed: keyboard controller latches scancode ${hx(sc)} and raises the IRQ line.`);
+ render();
+}
+$('inp').addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;press(e.key)});
+$('bb').onclick=()=>{[...'hello'].forEach((c,i)=>setTimeout(()=>{press(c);$('inp').value+=c},i*160))};
+
+/* ---- cores ---- */
+function push(c,label,val){c.stack.push({label,val})}
+function buildSteps(skip){
+ const S=[];
+ S.push({line:-1,t:'Instruction finished. Hardware PUSHes the return PC onto this core’s stack.',f:c=>push(c,'PC',c.pc)});
+ S.push({line:-1,t:'Hardware PUSHes FLAGS, then clears IF so no other IRQ barges in.',f:c=>{push(c,'FLAGS',c.IF);c.IF=0}});
+ S.push({line:-1,t:'Hardware reads IVT[1] → handler at 0x80 and loads it into PC.',f:c=>{c.pc=0x80;ivtHot=tick}});
+ if(!skip){
+  S.push({line:0,t:'PUSH R0: save the program’s register.',f:c=>push(c,'R0',c.r0)});
+  S.push({line:1,t:'PUSH R1: save the program’s register.',f:c=>push(c,'R1',c.r1)});}
+ S.push({line:2,t:'IN R0,0x60: read the scancode from the keyboard (R0 is overwritten!).',f:c=>{c.cur=kbdQueue.shift();c.r0=c.cur.sc}});
+ S.push({line:3,t:'XLAT: translate scancode to a character code in R1.',f:c=>{c.r1=c.cur.code}});
+ S.push({line:4,t:'STORE: put the character into the keyboard buffer in RAM.',f:c=>{buf[head]={ch:c.cur.disp,out:c.cur.out,done:false};lastWrite=head;lastWriteTick=tick;head=(head+1)%8}});
+ S.push({line:5,t:'OUT EOI: tell the controller “done”. The IRQ line is free again.',f:c=>{claimed=-1;if(N>1&&routing==='rr')rr=(rr+1)%N}});
+ if(!skip){
+  S.push({line:6,t:'POP R1: restore the program’s register.',f:c=>{c.r1=c.stack.pop().val}});
+  S.push({line:7,t:'POP R0: restore the program’s register.',f:c=>{c.r0=c.stack.pop().val}});}
+ S.push({line:8,t:'IRET (1/2): POP FLAGS, so IF=1 again.',f:c=>{c.IF=c.stack.pop().val}});
+ S.push({line:8,t:'IRET (2/2): POP PC. Back to the interrupted program.',f:c=>{
+  c.pc=c.stack.pop().val;c.mode='run';c.phase=0;c.grace=1;c.handled++;c.lastPhase=-1;c.curLine=-1;
+  const s=c.shadow;
+  if(c.r0!==s.r0||c.r1!==s.r1){c.flash=14;c.flashTxt=`💥 R0 was ${hx(s.r0)}, now ${hx(c.r0)}. The program’s data is corrupted!`;
+   say(`Core ${c.id}: 💥 Registers were not restored. R0 ${hx(s.r0)} → ${hx(c.r0)}. The program computes garbage from here on.`)}
+  else say(`Core ${c.id}: registers identical to before the interrupt. The program never noticed.`);
+  deliveries.push(tick+6)}});
+ return S;
+}
+function coreTick(c){
+ if(c.flash>0)c.flash--;
+ if(c.mode==='run'){
+  if(c.phase===0&&lineHigh()&&target()===c.id&&c.IF&&c.grace===0){
+   claimed=c.id;c.mode='int';c.step=0;c.shadow={r0:c.r0,r1:c.r1,pc:c.pc};c.steps=buildSteps($('bug').checked);
+   say(`Core ${c.id}: IRQ accepted at an instruction boundary. The FDE loop stops fetching program code.`);
+  } else {
+   if(c.phase===0){c.insIdx=c.pc;c.ir=PROG[c.pc].t}
+   c.lastPhase=c.phase;
+   if(c.phase===2){PROG[c.insIdx].f(c);if(c.grace>0)c.grace--}
+   c.phase=(c.phase+1)%3;c.hist.push(0);if(c.hist.length>48)c.hist.shift();return}
+ }
+ const s=c.steps[c.step++];
+ if(s.line>=0)c.pc=0x80+s.line;
+ c.curLine=s.line;c.lastPhase=-1;
+ s.f(c);c.lastStep=s;
+ if(c.mode==='int')c.ir=s.line>=0?HL[s.line]:'(hardware)';
+ else c.ir='—';
+ say(`Core ${c.id}: ${s.t}`);
+ c.hist.push(1);if(c.hist.length>48)c.hist.shift();
+}
+function consume(){
+ const e=buf[tail];
+ if(e&&!e.done){e.done=true;
+  if(e.out==='⌫')screen=screen.slice(0,-1);else if(e.out==='↵')screen+='\\n';else screen+=e.out;
+  tail=(tail+1)%8;say(`OS bottom half: character “${e.disp}” taken from the buffer and delivered to the text editor.`)}
+}
+function step(){
+ tick++;cores.forEach(coreTick);
+ while(deliveries.length&&deliveries[0]<=tick){deliveries.shift();consume()}
+ render();
+}
+
+/* ---- render ---- */
+function statusText(c){
+ if(c.mode==='int')return '⚡ '+c.lastStep.t;
+ if(lineHigh()&&target()===c.id){
+  return c.grace>0?'🔔 IRQ pending: the one instruction after an IRET must finish first…':'🔔 IRQ pending: finishing the current instruction first…'}
+ if(c.flash>0)return c.flashTxt;
+ return '▶ Running background work'+(N>1&&claimed!==-1?' (undisturbed)':'');
+}
+function render(){
+ const high=lineHigh();
+ $('w0').className='wire'+(high?' hot':claimed!==-1?' svc':'');
+ $('fifo').innerHTML=kbdQueue.map(k=>`<span class=\"chip\">${k.disp} ${hx(k.sc)}</span>`).join('')||'<i>empty</i>';
+ $('lineState').textContent=high?`🔴 INT line HIGH → core ${target()}`:claimed!==-1?`🟠 core ${claimed} is servicing (masked until EOI)`:'⚪ INT line low (idle)';
+ cores.forEach(c=>{
+  const i=c.id,int=c.mode==='int';
+  $('card'+i).className='card'+(int?' int':'');
+  $('drop'+i).className='drop'+((high&&target()===i)||claimed===i?' hot':'');
+  $('st'+i).textContent=statusText(c);
+  const L=['Fetch','Decode','Execute'];
+  $('pl'+i).innerHTML=L.map((n,k)=>{
+   let cl='';
+   if(int){cl=c.curLine<0?'p':'h'} else if(c.lastPhase===k)cl='a';
+   return `<div class=\"pill ${cl}\">${n[0]}</div>`}).join('')+
+   `<div style=\"font-size:10px;align-self:center\">${int?(c.curLine<0?'paused':'handler'):''}</div>`;
+  const bad=c.flash>0?'bad':'';
+  $('rg'+i).innerHTML=`<span>PC ${hx(c.pc)}</span><span>IF=${c.IF}</span><span class=\"${bad}\">R0 ${hx(c.r0)}</span><span class=\"${bad}\">R1 ${hx(c.r1,4)}</span><span style=\"grid-column:span 2\">IR: ${c.ir}</span>`;
+  let code='<div style=\"opacity:.6\">background program</div>';
+  PROG.forEach((p,k)=>{const cur=c.pc===k&&!(int&&c.pc>=0x80);
+   code+=`<div class=\"ln ${cur?(int?'curh':'cur'):''}\">${cur?'▶':' '} ${hx(k)} ${p.t}</div>`});
+  code+='<div class=\"sep\"></div><div style=\"opacity:.6\">keyboard handler</div>';
+  const skip=$('bug').checked;
+  HL.forEach((t,k)=>{const cur=int&&c.pc===0x80+k;
+   code+=`<div class=\"ln ${cur?'curh':''} ${skip&&SKIPL.includes(k)?'skip':''}\">${cur?'▶':' '} ${hx(0x80+k)} ${t}</div>`});
+  $('cd'+i).innerHTML=code;
+  let sp=c.base-2*c.stack.length;
+  let sk=`<div style=\"opacity:.6\">stack, SP=${hx(sp,4)}</div>`;
+  if(!c.stack.length)sk+='<div>(empty)</div>';
+  for(let k=c.stack.length-1;k>=0;k--){const e=c.stack[k];sk+=`<div>${hx(c.base-2*(k+1),4)}: ${e.label}=${hx(e.val)}</div>`}
+  $('sk'+i).innerHTML=sk;
+  $('tl'+i).innerHTML=c.hist.map(v=>`<span style=\"background:${v?'#ef476f':'#4ea8de'}\"></span>`).join('');
+  $('ss'+i).textContent=`Loop iterations: ${c.iters} · interrupts handled: ${c.handled}`;
+ });
+ $('ivt').innerHTML=`<div>[0] timer → 0x70</div><div class=\"${tick-ivtHot<=1?'hot':''}\">[1] keyboard → 0x80</div><div>[2] disk → 0x90</div>`;
+ $('slots').innerHTML=buf.map((e,k)=>{
+  let m=(k===head?'H':'')+(k===tail?'T':'');
+  return `<div class=\"slot ${e?(e.done?'done':''):''} ${k===lastWrite&&tick-lastWriteTick<3?'new':''}\">${e?e.disp:''}<small>${m}</small></div>`}).join('');
+ $('screen').textContent=screen+'▌';
+ $('log').innerHTML=logL.map(l=>`<div>${l}</div>`).join('');
+}
+
+/* ---- controls ---- */
+function setN(n){N=n;$('b1').className=n===1?'on':'';$('b4').className=n===4?'on':'';$('routeL').style.display=n>1?'inline-flex':'none';resetAll()}
+$('b1').onclick=()=>setN(1);$('b4').onclick=()=>setN(4);
+$('route').onchange=e=>{routing=e.target.value;render()};
+$('bp').onclick=()=>{paused=!paused;$('bp').textContent=paused?'▶ Play':'⏸ Pause'};
+$('bs').onclick=()=>{if(paused)step()};
+$('br').onclick=()=>{$('inp').value='';resetAll()};
+$('bug').onchange=render;
+function loop(){if(!paused)step();setTimeout(loop,2000/$('spd').value)}
+buildKb();resetAll();loop();
+</script></body></html>
+"
+ :AT "2026-11-15T13:30:50" :VERSION 1)
+(:PINNED T :ID "interrupt-wire-to-handler-and-back" :MAP "computers" :NODE "interrupts" :TYPE
+ "html" :TITLE "Interrupt: wire to handler and back" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{margin:0;padding:12px;font-family:system-ui,sans-serif;background:#fdf6e3;color:#2b2d42;font-size:14px}
+button{font:inherit;border:2px solid #2b2d42;border-radius:8px;background:#ffd166;padding:4px 12px;cursor:pointer;margin-right:6px}
+.row{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+.box{background:#fff;border:2px solid #2b2d42;border-radius:10px;padding:8px;flex:1;min-width:190px}
+.box h3{margin:0 0 6px;font-size:13px}
+.ln{font-family:monospace;font-size:13px;padding:2px 6px;border-radius:4px;margin:2px 0}
+.cur{background:#4ea8de;color:#fff}.curh{background:#ef476f;color:#fff}
+.pill{display:inline-block;border:2px solid #2b2d42;border-radius:8px;padding:1px 8px;margin-right:4px;opacity:.4}
+.pill.on{opacity:1;background:#4ea8de;color:#fff}
+.flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.node{border:2px solid #2b2d42;border-radius:8px;padding:4px 8px;background:#fff}
+.wire{height:8px;width:60px;background:#bbb;border:2px solid #2b2d42;border-radius:4px}
+.wire.hot{background:#ef476f}
+.sig{font-family:monospace;padding:1px 6px;border-radius:4px;background:#eee;margin-right:4px}
+.sig.t{background:#06d6a0}
+#msg{margin-top:10px;background:#fff9d6;border:2px solid #2b2d42;border-radius:10px;padding:8px;min-height:44px;font-weight:600}
+.stk div{font-family:monospace;background:#ffe3ea;border:2px solid #2b2d42;border-radius:6px;padding:1px 6px;margin:2px 0}
+.vt div{font-family:monospace;padding:1px 6px;border:2px solid #2b2d42;border-radius:6px;margin:2px 0;background:#fff}
+.vt .hot{background:#ffd166}
+</style></head><body>
+<b>How hardware forces the CPU to handle an interrupt</b>
+<div style=\"margin:8px 0\"><button id=\"key\">⌨ Press a key (raise IRQ)</button><button id=\"play\">⏸ Pause</button><button id=\"step\">⏭ Step</button><button id=\"reset\">↺ Reset</button></div>
+<div class=\"flow\">
+ <span class=\"node\">⌨ Keyboard</span><span class=\"wire\" id=\"w1\"></span>
+ <span class=\"node\">Interrupt controller<br><small>latch · mask · priority</small></span><span class=\"wire\" id=\"w2\"></span>
+ <span class=\"node\">CPU pin <b>INT</b></span>
+</div>
+<div class=\"row\">
+ <div class=\"box\"><h3>Program (running)</h3><div id=\"prog\"></div></div>
+ <div class=\"box\"><h3>CPU control unit</h3>
+  <div id=\"ph\"><span class=\"pill\">Fetch</span><span class=\"pill\">Decode</span><span class=\"pill\">Execute</span></div>
+  <div style=\"margin:8px 0\">PC = <b id=\"pc\"></b> &nbsp; mode: <b id=\"mode\"></b></div>
+  <div><small>At each instruction boundary the gate computes:</small></div>
+  <div style=\"margin-top:4px\"><span class=\"sig\" id=\"s1\">IRQ pending</span>AND<span class=\"sig\" id=\"s2\" style=\"margin-left:4px\">enabled</span>= <span class=\"sig\" id=\"s3\">take</span></div>
+ </div>
+ <div class=\"box\"><h3>Handler (OS code)</h3><div id=\"hand\"></div></div>
+ <div class=\"box\"><h3>RAM</h3><b style=\"font-size:12px\">Stack</b><div class=\"stk\" id=\"stk\" style=\"min-height:26px\"></div>
+  <b style=\"font-size:12px\">Vector table</b><div class=\"vt\" id=\"vt\"><div>0: …</div><div id=\"v1\">1 (keyboard): → handler</div><div>2: …</div></div></div>
+</div>
+<div id=\"msg\"></div>
+<script>
+const P=[\"ADD R0,R1\",\"LOAD R2,[x]\",\"MUL R2,R0\",\"STORE [x],R2\",\"JMP loop\"];
+const H=[\"IN  R0,keyboard\",\"STORE buf,R0\",\"IRET\"];
+let pc,ph,mode,hs,en,irq,stack,es,msg,t,playing=true,timer;
+const $=i=>document.getElementById(i);
+function reset(){pc=0;ph=0;mode=\"main\";hs=0;en=true;irq=false;stack=[];es=0;msg=\"Program running: one instruction = fetch, decode, execute. Press a key at any moment.\";render()}
+const E=[\"① Push PC and flags onto the stack (PC = next unstarted instruction).\",\"② Switch to privileged mode and disable further interrupts.\",\"③ Ask the interrupt controller for the vector number (1 = keyboard).\",\"④ Read handler address from vector table and load it into PC. Handler starts.\"];
+function tick(){
+ if(mode==\"main\"){
+  if(ph<2){ph++;msg=irq?\"IRQ is pending but the CPU ignores it mid-instruction: finishing \"+P[pc]+\".\":\"Executing \"+P[pc]+\"…\";}
+  else{ // boundary
+   if(irq&&en){mode=\"entry\";es=0;msg=\"Boundary: pending AND enabled = TRUE. Control unit skips the next fetch and starts the fixed entry sequence. \"+E[0];stack.push(\"flags\");stack.push(\"PC=\"+((pc+1)%5));es=1;}
+   else{pc=(pc+1)%5;ph=0;msg=\"Boundary: gate = FALSE. Fetch next instruction.\"}
+  }
+ }else if(mode==\"entry\"){
+  msg=E[es];if(es==1){en=false}
+  if(es==3){pc=(pc+1)%5;mode=\"hand\";hs=0}
+  es++;
+ }else{
+  if(hs<2){msg=\"Handler runs: \"+H[hs];hs++;}
+  else{pc=parseInt(stack.pop().slice(3));stack.pop();en=true;irq=false;mode=\"main\";ph=0;msg=\"IRET: pop PC and flags, re-enable interrupts, clear request. Program resumes at instruction \"+(pc+1)+\" as if nothing happened.\";}
+ }
+ render()}
+function render(){
+ $(\"prog\").innerHTML=P.map((p,i)=>`<div class=\"ln ${mode==\"main\"&&i==pc?\"cur\":\"\"}\">${i+1}. ${p}</div>`).join(\"\");
+ $(\"hand\").innerHTML=H.map((p,i)=>`<div class=\"ln ${mode==\"hand\"&&i==hs-1?\"curh\":\"\"}\">${p}</div>`).join(\"\");
+ [...$(\"ph\").children].forEach((e,i)=>e.className=\"pill\"+(mode==\"main\"&&i==ph?\" on\":\"\"));
+ $(\"pc\").textContent=mode==\"hand\"?\"handler\":(pc+1);
+ $(\"mode\").textContent=mode==\"main\"?\"user\":\"privileged\";
+ $(\"w1\").className=\"wire\"+(irq?\" hot\":\"\");$(\"w2\").className=\"wire\"+(irq?\" hot\":\"\");
+ $(\"s1\").className=\"sig\"+(irq?\" t\":\"\");$(\"s2\").className=\"sig\"+(en?\" t\":\"\");$(\"s3\").className=\"sig\"+(irq&&en&&mode==\"main\"&&ph==2?\" t\":\"\");
+ $(\"stk\").innerHTML=stack.slice().reverse().map(s=>`<div>${s}</div>`).join(\"\");
+ $(\"v1\").className=(mode==\"entry\"&&es>=3)||mode==\"hand\"?\"hot\":\"\";
+ $(\"msg\").textContent=msg}
+function loop(){clearInterval(timer);if(playing)timer=setInterval(tick,900)}
+$(\"key\").onclick=()=>{irq=true;msg=\"Keyboard raises its line. Controller latches it and drives INT high. The CPU does not stop mid-instruction.\";render()};
+$(\"play\").onclick=()=>{playing=!playing;$(\"play\").textContent=playing?\"⏸ Pause\":\"▶ Play\";loop()};
+$(\"step\").onclick=tick;$(\"reset\").onclick=reset;
+reset();loop();
+</script></body></html>"
+ :AT "2026-11-15T13:50:40" :VERSION 1)
+(:PINNED T :ID "scheduling-algorithms-on-one-cpu" :MAP "computers" :NODE "scheduler" :TYPE "html"
+ :TITLE "Scheduling algorithms on one CPU" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:0;padding:14px;background:#fafafa;color:#222}
+h2{margin:0 0 6px;font-size:18px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+button{padding:6px 12px;border:1px solid #888;border-radius:6px;background:#fff;cursor:pointer;font-size:14px}
+button.on{background:#222;color:#fff}
+#desc{font-size:14px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:8px;margin:8px 0;min-height:60px}
+canvas{width:100%;background:#fff;border:1px solid #ddd;border-radius:6px}
+table{border-collapse:collapse;font-size:13px;margin-top:8px;width:100%}
+td,th{border:1px solid #ddd;padding:4px 6px;text-align:center}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:middle}
+</style></head><body>
+<h2>One CPU, four programs: how the kernel picks who runs</h2>
+<div class=\"row\" id=\"algos\"></div>
+<div id=\"desc\"></div>
+<div class=\"row\">
+<button id=\"play\">Pause</button><button id=\"reset\">Restart</button>
+<label>Speed <input type=\"range\" id=\"spd\" min=\"1\" max=\"10\" value=\"4\"></label>
+<label>Quantum <input type=\"range\" id=\"q\" min=\"1\" max=\"6\" value=\"2\"></label><span id=\"qv\"></span>
+</div>
+<canvas id=\"c\" width=\"800\" height=\"330\"></canvas>
+<table id=\"tbl\"></table>
+<p style=\"font-size:12px;color:#555\">Each tick = one timer interrupt. Jobs: A needs 8 ticks (arrives 0), B 3 (arrives 1), C 5 (arrives 2), D 2 (arrives 3). Each coloured block is a program owning the CPU; at each change the kernel saves one set of registers and loads another (a context switch).</p>
+<script>
+const jobs=[{n:'A',arr:0,len:8,col:'#4e79a7',pri:3},{n:'B',arr:1,len:3,col:'#f28e2b',pri:1},{n:'C',arr:2,len:5,col:'#59a14f',pri:4},{n:'D',arr:3,len:2,col:'#e15759',pri:2}];
+const algos={
+fcfs:['First come, first served','No preemption: run each program to completion in arrival order. Simple, but short jobs wait behind long ones (the \"convoy effect\"). No timer needed.'],
+rr:['Round robin (equal time each)','The timer fires every <b>quantum</b> ticks; the running program goes to the back of the queue. Everyone gets equal turns, so all make steady progress. Tiny quantum = many context switches (overhead); huge quantum = becomes FCFS.'],
+sjf:['Shortest job first','Always run the ready job with least work remaining (preemptive version = SRTF). Minimises average waiting time but needs to know job length in advance, and can starve long jobs.'],
+pri:['Priority (preemptive)','Each program has a priority (A=3, B=1, C=4, D=2; lower number = more important). A newly arrived higher-priority job preempts at once. Low priority can starve; real kernels \"age\" waiting jobs.']
+};
+let cur='rr',tl=[],sw=0,t=0,acc=0,playing=true;
+function sim(){
+ const Q=+document.getElementById('q').value;
+ let rem=jobs.map(j=>j.len),fin={},first={},tl=[],queue=[],run=-1,qleft=0,added=new Set();
+ for(let time=0;time<40;time++){
+  jobs.forEach((j,i)=>{if(j.arr<=time&&!added.has(i)){added.add(i);queue.push(i)}});
+  if(rem.every(r=>r==0))break;
+  const ready=jobs.map((j,i)=>i).filter(i=>j(i).arr<=time&&rem[i]>0);
+  function j(i){return jobs[i]}
+  let pick=run;
+  if(cur=='fcfs'){ if(run<0||rem[run]==0) pick=ready.sort((a,b)=>jobs[a].arr-jobs[b].arr)[0]; }
+  else if(cur=='sjf'){ pick=ready.sort((a,b)=>rem[a]-rem[b]||a-b)[0]; }
+  else if(cur=='pri'){ pick=ready.sort((a,b)=>jobs[a].pri-jobs[b].pri)[0]; }
+  else { queue=queue.filter(i=>rem[i]>0);
+   if(run<0||rem[run]==0||qleft==0){
+     if(run>=0&&rem[run]>0&&!queue.includes(run))queue.push(run);
+     pick=queue.shift();qleft=Q;
+   }}
+  if(pick===undefined){tl.push(-1);run=-1;continue}
+  run=pick;rem[run]--;qleft--;tl.push(run);
+  if(first[run]===undefined)first[run]=time;
+  if(rem[run]==0)fin[run]=time+1;
+ }
+ return {tl,fin,first};
+}
+let R;
+function setAlgo(a){cur=a;document.querySelectorAll('#algos button').forEach(b=>b.classList.toggle('on',b.dataset.a==a));
+ document.getElementById('desc').innerHTML='<b>'+algos[a][0]+'</b><br>'+algos[a][1];restart()}
+function restart(){document.getElementById('qv').textContent=cur=='rr'?document.getElementById('q').value+' ticks':'(unused)';R=sim();t=0;acc=0;draw()}
+const ab=document.getElementById('algos');
+for(const k in algos){const b=document.createElement('button');b.textContent=algos[k][0].split(' (')[0];b.dataset.a=k;b.onclick=()=>setAlgo(k);ab.appendChild(b)}
+const cv=document.getElementById('c'),g=cv.getContext('2d');
+function draw(){
+ g.clearRect(0,0,800,330);g.font='13px system-ui';
+ const W=700/Math.max(R.tl.length,1)>40?40:700/R.tl.length, x0=60;
+ // job lanes
+ jobs.forEach((j,i)=>{const y=50+i*36;g.fillStyle='#000';g.fillText(j.n,30,y+18);
+  g.strokeStyle='#eee';g.strokeRect(x0,y,W*R.tl.length,28);
+  g.fillStyle='#888';g.fillText('▼',x0+j.arr*W+W/2-6,y-3);
+  for(let k=0;k<t&&k<R.tl.length;k++)if(R.tl[k]==i){g.fillStyle=j.col;g.fillRect(x0+k*W,y,W,28)}
+  else if(k>=j.arr&&(R.fin[i]===undefined||k<R.fin[i])){g.fillStyle='#f3f3f3';g.fillRect(x0+k*W+1,y+10,W-2,8)}
+ });
+ // CPU lane
+ g.fillStyle='#000';g.fillText('CPU',20,222);
+ let sws=0;
+ for(let k=0;k<t&&k<R.tl.length;k++){const v=R.tl[k];
+  if(v>=0){g.fillStyle=jobs[v].col;g.fillRect(x0+k*W,205,W,28);g.fillStyle='#fff';g.fillText(jobs[v].n,x0+k*W+W/2-4,224)}
+  if(k>0&&v!=R.tl[k-1]&&v>=0){sws++;g.fillStyle='#000';g.fillRect(x0+k*W-1,198,2,42)}}
+ for(let k=0;k<=R.tl.length;k+=2){g.fillStyle='#777';g.fillText(k,x0+k*W-3,255)}
+ if(t<R.tl.length){g.strokeStyle='#d00';g.beginPath();g.moveTo(x0+t*W,35);g.lineTo(x0+t*W,245);g.stroke()}
+ const cur2=t>0&&t<=R.tl.length?R.tl[t-1]:-1;
+ g.fillStyle='#000';g.fillText(cur2>=0?'Now running: '+jobs[cur2].n+'   (black bars = context switches: '+sws+')':'',x0,285);
+ g.fillStyle='#888';g.fillText('▼ = arrival of program. Pale bar = ready but waiting.',x0,310);
+ // table
+ let h='<tr><th>Job</th><th>Arrives</th><th>Needs</th><th>Finished</th><th>Turnaround</th><th>Waiting</th></tr>',sw2=0,n=0;
+ jobs.forEach((j,i)=>{const f=R.fin[i],done=f!==undefined&&f<=t;
+  h+=`<tr><td><span class=sw style=\"background:${j.col}\"></span> ${j.n}</td><td>${j.arr}</td><td>${j.len}</td><td>${done?f:'-'}</td><td>${done?f-j.arr:'-'}</td><td>${done?f-j.arr-j.len:'-'}</td></tr>`;});
+ document.getElementById('tbl').innerHTML=h;
+}
+function loop(){requestAnimationFrame(loop);if(!playing)return;acc+=+document.getElementById('spd').value/60;
+ if(acc>=1){acc=0;if(t<R.tl.length){t++;draw()}}}
+document.getElementById('play').onclick=e=>{playing=!playing;e.target.textContent=playing?'Pause':'Play'};
+document.getElementById('reset').onclick=restart;
+document.getElementById('q').oninput=restart;
+setAlgo('rr');loop();
+</script></body></html>"
+ :AT "2026-11-15T13:56:34" :VERSION 1)
+(:PINNED T :ID "interrupt-wiring-wire-to-control-unit" :MAP "computers" :NODE "interrupts" :TYPE
+ "svg" :TITLE "Interrupt wiring: wire to control unit" :LANGUAGE NIL :CONTENT
+ "<svg viewBox=\"0 0 900 640\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"system-ui,sans-serif\" font-size=\"14\">
+<rect width=\"900\" height=\"640\" fill=\"#fdf6e3\"/>
+<defs><marker id=\"a\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"5\" orient=\"auto\"><path d=\"M0,0L10,5L0,10z\" fill=\"#ef476f\"/></marker>
+<marker id=\"b\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"5\" orient=\"auto\"><path d=\"M0,0L10,5L0,10z\" fill=\"#2b2d42\"/></marker></defs>
+<text x=\"20\" y=\"28\" font-size=\"18\" font-weight=\"bold\" fill=\"#2b2d42\">An interrupt is just a wire that the CPU's control logic looks at</text>
+
+<!-- Device -->
+<rect x=\"20\" y=\"60\" width=\"150\" height=\"90\" rx=\"10\" fill=\"#fff\" stroke=\"#2b2d42\" stroke-width=\"2\"/>
+<text x=\"95\" y=\"85\" text-anchor=\"middle\" font-weight=\"bold\">Device</text>
+<text x=\"95\" y=\"105\" text-anchor=\"middle\" font-size=\"12\">(keyboard, disk, timer)</text>
+<text x=\"95\" y=\"128\" text-anchor=\"middle\" font-size=\"12\">has \"done/ready\" flip-flop</text>
+
+<!-- Device to controller -->
+<line x1=\"170\" y1=\"105\" x2=\"250\" y2=\"105\" stroke=\"#ef476f\" stroke-width=\"4\" marker-end=\"url(#a)\"/>
+<text x=\"210\" y=\"95\" text-anchor=\"middle\" font-size=\"12\" fill=\"#ef476f\">IRQ1 = 1</text>
+
+<!-- Controller -->
+<rect x=\"250\" y=\"50\" width=\"250\" height=\"170\" rx=\"10\" fill=\"#eaf6ff\" stroke=\"#2b2d42\" stroke-width=\"2\"/>
+<text x=\"375\" y=\"72\" text-anchor=\"middle\" font-weight=\"bold\">Interrupt controller</text>
+<rect x=\"265\" y=\"85\" width=\"90\" height=\"40\" fill=\"#fff\" stroke=\"#2b2d42\"/><text x=\"310\" y=\"102\" text-anchor=\"middle\" font-size=\"12\">latch (SR)</text><text x=\"310\" y=\"117\" text-anchor=\"middle\" font-size=\"11\">remembers pulse</text>
+<rect x=\"375\" y=\"85\" width=\"50\" height=\"40\" fill=\"#fff\" stroke=\"#2b2d42\"/><text x=\"400\" y=\"102\" text-anchor=\"middle\" font-size=\"12\">AND</text><text x=\"400\" y=\"117\" text-anchor=\"middle\" font-size=\"11\">mask bit</text>
+<rect x=\"440\" y=\"85\" width=\"50\" height=\"40\" fill=\"#fff\" stroke=\"#2b2d42\"/><text x=\"465\" y=\"102\" text-anchor=\"middle\" font-size=\"12\">priority</text><text x=\"465\" y=\"117\" text-anchor=\"middle\" font-size=\"11\">encoder</text>
+<line x1=\"355\" y1=\"105\" x2=\"375\" y2=\"105\" stroke=\"#2b2d42\" stroke-width=\"2\"/>
+<line x1=\"425\" y1=\"105\" x2=\"440\" y2=\"105\" stroke=\"#2b2d42\" stroke-width=\"2\"/>
+<text x=\"375\" y=\"160\" text-anchor=\"middle\" font-size=\"12\">other IRQ lines (timer, disk…) enter here too</text>
+<text x=\"375\" y=\"180\" text-anchor=\"middle\" font-size=\"12\">encoder outputs vector number, e.g. 1 (binary)</text>
+<text x=\"375\" y=\"200\" text-anchor=\"middle\" font-size=\"12\">and raises one line: INT</text>
+
+<!-- INT to CPU -->
+<line x1=\"500\" y1=\"105\" x2=\"580\" y2=\"105\" stroke=\"#ef476f\" stroke-width=\"4\" marker-end=\"url(#a)\"/>
+<text x=\"540\" y=\"95\" text-anchor=\"middle\" font-size=\"12\" fill=\"#ef476f\">INT = 1</text>
+<line x1=\"500\" y1=\"190\" x2=\"580\" y2=\"190\" stroke=\"#2b2d42\" stroke-width=\"3\" marker-end=\"url(#b)\"/>
+<text x=\"540\" y=\"182\" text-anchor=\"middle\" font-size=\"12\">vector # (data bus)</text>
+
+<!-- CPU -->
+<rect x=\"580\" y=\"40\" width=\"300\" height=\"330\" rx=\"12\" fill=\"#fff\" stroke=\"#2b2d42\" stroke-width=\"3\"/>
+<text x=\"730\" y=\"62\" text-anchor=\"middle\" font-weight=\"bold\">CPU control unit</text>
+<rect x=\"600\" y=\"80\" width=\"120\" height=\"50\" fill=\"#ffd166\" stroke=\"#2b2d42\"/><text x=\"660\" y=\"100\" text-anchor=\"middle\" font-size=\"12\">flip-flop \"INT</text><text x=\"660\" y=\"116\" text-anchor=\"middle\" font-size=\"12\">pending\" (sampled)</text>
+<rect x=\"600\" y=\"150\" width=\"120\" height=\"40\" fill=\"#ffd166\" stroke=\"#2b2d42\"/><text x=\"660\" y=\"175\" text-anchor=\"middle\" font-size=\"12\">IE flag (enabled)</text>
+<circle cx=\"770\" cy=\"135\" r=\"24\" fill=\"#fff\" stroke=\"#2b2d42\" stroke-width=\"2\"/><text x=\"770\" y=\"140\" text-anchor=\"middle\" font-size=\"13\">AND</text>
+<line x1=\"720\" y1=\"105\" x2=\"750\" y2=\"125\" stroke=\"#2b2d42\" stroke-width=\"2\"/>
+<line x1=\"720\" y1=\"170\" x2=\"750\" y2=\"146\" stroke=\"#2b2d42\" stroke-width=\"2\"/>
+<line x1=\"540\" y1=\"105\" x2=\"540\" y2=\"105\" />
+<line x1=\"580\" y1=\"105\" x2=\"600\" y2=\"105\" stroke=\"#ef476f\" stroke-width=\"3\"/>
+<text x=\"770\" y=\"180\" text-anchor=\"middle\" font-size=\"11\">only checked when</text>
+<text x=\"770\" y=\"194\" text-anchor=\"middle\" font-size=\"11\">\"instruction done\" = 1</text>
+<line x1=\"794\" y1=\"135\" x2=\"850\" y2=\"135\" stroke=\"#2b2d42\" stroke-width=\"2\"/>
+<text x=\"852\" y=\"125\" text-anchor=\"end\" font-size=\"11\">take = 1</text>
+
+<rect x=\"600\" y=\"215\" width=\"260\" height=\"140\" rx=\"8\" fill=\"#ffe3ea\" stroke=\"#ef476f\" stroke-width=\"2\"/>
+<text x=\"730\" y=\"236\" text-anchor=\"middle\" font-weight=\"bold\" font-size=\"13\">Control state machine (microcode)</text>
+<text x=\"615\" y=\"258\" font-size=\"12\">Normal: state = FETCH → DECODE → EXECUTE</text>
+<text x=\"615\" y=\"278\" font-size=\"12\">If take=1 at end of EXECUTE, next state is</text>
+<text x=\"615\" y=\"296\" font-size=\"12\">ENTRY instead of FETCH. ENTRY steps:</text>
+<text x=\"625\" y=\"314\" font-size=\"12\">1 write PC+flags to stack (SP→RAM)</text>
+<text x=\"625\" y=\"330\" font-size=\"12\">2 clear IE (block nested interrupts)</text>
+<text x=\"625\" y=\"346\" font-size=\"12\">3 PC ← vector_table[vector #]</text>
+<line x1=\"850\" y1=\"135\" x2=\"850\" y2=\"215\" stroke=\"#2b2d42\" stroke-width=\"2\"/><line x1=\"850\" y1=\"215\" x2=\"850\" y2=\"215\"/>
+
+<!-- vector table -->
+<rect x=\"20\" y=\"260\" width=\"540\" height=\"150\" rx=\"10\" fill=\"#fff\" stroke=\"#2b2d42\" stroke-width=\"2\"/>
+<text x=\"290\" y=\"282\" text-anchor=\"middle\" font-weight=\"bold\">RAM: vector table (set up by the OS at boot)</text>
+<rect x=\"40\" y=\"296\" width=\"220\" height=\"28\" fill=\"#fff\" stroke=\"#2b2d42\"/><text x=\"50\" y=\"315\" font-size=\"12\" font-family=\"monospace\">0: timer handler addr</text>
+<rect x=\"40\" y=\"324\" width=\"220\" height=\"28\" fill=\"#ffd166\" stroke=\"#2b2d42\"/><text x=\"50\" y=\"343\" font-size=\"12\" font-family=\"monospace\">1: keyboard handler addr</text>
+<rect x=\"40\" y=\"352\" width=\"220\" height=\"28\" fill=\"#fff\" stroke=\"#2b2d42\"/><text x=\"50\" y=\"371\" font-size=\"12\" font-family=\"monospace\">2: disk handler addr</text>
+<path d=\"M600 340 Q440 440 262 338\" fill=\"none\" stroke=\"#2b2d42\" stroke-width=\"2\" stroke-dasharray=\"5,4\" marker-end=\"url(#b)\"/>
+<text x=\"400\" y=\"405\" font-size=\"12\" text-anchor=\"middle\">step 3: index with vector # → load address into PC</text>
+<text x=\"300\" y=\"360\" font-size=\"12\">next fetch reads the</text><text x=\"300\" y=\"376\" font-size=\"12\">handler's first instruction</text>
+
+<!-- Return -->
+<rect x=\"20\" y=\"440\" width=\"860\" height=\"180\" rx=\"10\" fill=\"#fff\" stroke=\"#2b2d42\" stroke-width=\"2\"/>
+<text x=\"450\" y=\"464\" text-anchor=\"middle\" font-weight=\"bold\">Why this \"forces\" the CPU</text>
+<text x=\"40\" y=\"490\" font-size=\"13\">• The program never asks. The INT wire feeds the CPU's own control logic, the same circuit that picks the next step each cycle.</text>
+<text x=\"40\" y=\"514\" font-size=\"13\">• Voltage on a wire → flip-flop → AND gate → changes which state the control state machine enters next. That is all \"forcing\" is.</text>
+<text x=\"40\" y=\"538\" font-size=\"13\">• Program code cannot veto it, except by clearing the IE flag (privileged). The mask bits in the controller work the same way.</text>
+<text x=\"40\" y=\"562\" font-size=\"13\">• Checked only between instructions, so registers are in a clean state and PC points at the next instruction to run.</text>
+<text x=\"40\" y=\"586\" font-size=\"13\">• The handler ends with IRET: pop flags and PC from the stack, set IE. The old program continues from the saved PC.</text>
+<text x=\"40\" y=\"608\" font-size=\"13\">• Handler tells the device to drop IRQ (e.g. by reading its data register), otherwise the latch re-fires immediately.</text>
+</svg>"
+ :AT "2026-11-15T14:35:57" :VERSION 1)
+(:PINNED T :ID "page-tables-faults-and-eviction" :MAP "computers" :NODE "virtual-memory" :TYPE
+ "html" :TITLE "Page tables, faults and eviction" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:12px;color:#1b1f24;background:#fafafa}
+h3{margin:4px 0 8px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.card{background:#fff;border:1px solid #d0d7de;border-radius:8px;padding:10px;flex:1;min-width:210px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+td,th{border:1px solid #d0d7de;padding:4px 6px;text-align:center}
+.A{background:#dbeafe}.B{background:#fde68a}.free{background:#f1f5f9;color:#889}
+button{margin:2px;padding:6px 9px;border:1px solid #888;border-radius:6px;background:#fff;cursor:pointer;font-size:13px}
+button:hover{background:#eef}
+.btnA{border-color:#2563eb}.btnB{border-color:#d97706}.bad{border-color:#c00;color:#c00}
+#log{font-family:monospace;font-size:12.5px;height:170px;overflow:auto;background:#0f172a;color:#e2e8f0;padding:8px;border-radius:8px;margin-top:10px}
+.hit{color:#86efac}.flt{color:#fca5a5}.seg{color:#f0abfc}.note{font-size:12.5px;color:#555}
+.hl{outline:3px solid #16a34a}
+</style></head><body>
+<h3>Two processes, one 3-frame RAM</h3>
+<p class=\"note\">Both processes use the same virtual addresses (pages 0–3, 4 KB each). Click a page to access it. Eviction picks the least recently used frame.</p>
+<div>
+<b>Process A:</b> <span id=\"bA\"></span> <button class=\"bad\" onclick=\"seg('A')\">A touches page 7</button><br>
+<b>Process B:</b> <span id=\"bB\"></span> <button class=\"bad\" onclick=\"seg('B')\">B touches page 7</button>
+<button onclick=\"reset()\">Reset</button>
+</div>
+<div class=\"row\" style=\"margin-top:10px\">
+<div class=\"card\"><b>A's page table</b><div id=\"tA\"></div></div>
+<div class=\"card\"><b>B's page table</b><div id=\"tB\"></div></div>
+<div class=\"card\"><b>Physical RAM (3 frames)</b><div id=\"ram\"></div></div>
+<div class=\"card\"><b>Disk (swap/file)</b><div id=\"disk\"></div></div>
+</div>
+<div id=\"log\"></div>
+<p class=\"note\" id=\"stats\"></p>
+<script>
+const N=4,F=3;let pt,ram,clock,hits,faults;
+function reset(){pt={A:[],B:[]};for(const p of['A','B'])for(let i=0;i<N;i++)pt[p].push({present:false,frame:null});
+ram=Array(F).fill(null);clock=0;hits=0;faults=0;document.getElementById('log').innerHTML='';render();say('Start: nothing in RAM. All pages are on disk.','')}
+function say(t,c){const l=document.getElementById('log');l.innerHTML+=`<div class=\"${c}\">${t}</div>`;l.scrollTop=1e9}
+function access(p,v){clock++;const e=pt[p][v];const va='0x'+(v*4096).toString(16).padStart(4,'0');
+ if(e.present){hits++;ram[e.frame].t=clock;say(`${p} reads ${va}: page table says frame ${e.frame}. HIT, no kernel involved.`,'hit');render(p,v);return}
+ faults++;say(`${p} reads ${va}: present bit = 0 → PAGE FAULT, kernel runs.`,'flt');
+ let f=ram.findIndex(x=>!x);
+ if(f<0){f=0;for(let i=1;i<F;i++)if(ram[i].t<ram[f].t)f=i;const o=ram[f];pt[o.p][o.v].present=false;pt[o.p][o.v].frame=null;
+  say(`  RAM full: evict LRU frame ${f} (${o.p} page ${o.v}) back to disk, clear its present bit.`,'flt')}
+ ram[f]={p,v,t:clock};e.present=true;e.frame=f;
+ say(`  load ${p} page ${v} from disk into frame ${f}, set present bit, restart the instruction.`,'flt');render(p,v)}
+function seg(p){say(`${p} touches page 7: no table entry → SEGFAULT, kernel kills ${p}. The other process is untouched.`,'seg')}
+function render(hp,hv){
+ for(const p of['A','B']){let h='<table><tr><th>Virt page</th><th>Present</th><th>Frame</th></tr>';
+  pt[p].forEach((e,i)=>h+=`<tr class=\"${hp==p&&hv==i?'hl':''}\"><td>${i}</td><td>${e.present?1:0}</td><td>${e.present?e.frame:'–'}</td></tr>`);
+  document.getElementById('t'+p).innerHTML=h+'</table>';
+  document.getElementById('b'+p).innerHTML=[...Array(N).keys()].map(i=>`<button class=\"btn${p}\" onclick=\"access('${p}',${i})\">page ${i}</button>`).join('')}
+ let r='<table><tr><th>Frame</th><th>Holds</th></tr>';
+ ram.forEach((x,i)=>r+=`<tr><td>${i}</td><td class=\"${x?x.p:'free'}\">${x?x.p+' page '+x.v:'free'}</td></tr>`);
+ document.getElementById('ram').innerHTML=r+'</table>';
+ let d=[];for(const p of['A','B'])pt[p].forEach((e,i)=>{if(!e.present)d.push(`<span class=\"${p}\" style=\"padding:2px 5px;margin:2px;display:inline-block;border-radius:4px\">${p}${i}</span>`)});
+ document.getElementById('disk').innerHTML=d.join('');
+ document.getElementById('stats').textContent=`Hits: ${hits}  Faults: ${faults}. Try A page 0 and B page 0: same virtual address, different frames.`}
+reset();
+</script></body></html>"
+ :AT "2026-11-15T14:48:54" :VERSION 1)
+(:PINNED T :ID "cores-processes-threads-zoomable" :MAP "computers" :NODE "processes-threads" :TYPE
+ "html" :TITLE "Cores, processes, threads: zoomable" :LANGUAGE NIL :CONTENT "<!DOCTYPE html>
+<html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.4 system-ui,sans-serif;background:#0f1220;color:#e8eaf6}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;background:#171b30;border-bottom:1px solid #2a3050;position:sticky;top:0;z-index:5}
+button,select{background:#252b4a;color:#e8eaf6;border:1px solid #3a4270;border-radius:6px;padding:5px 10px;font:inherit;cursor:pointer}
+button:hover{background:#2f3760}
+.crumb span{cursor:pointer;color:#8fb4ff}.crumb b{color:#fff}
+#stage{padding:14px;max-width:1100px;margin:auto}
+.zin{animation:zin .45s ease-out}.zout{animation:zout .45s ease-out}
+@keyframes zin{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes zout{from{transform:scale(1.35);opacity:0}to{transform:scale(1);opacity:1}}
+h3{margin:14px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#9aa3d0}
+.cores{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.core{border:2px solid #3a4270;border-radius:12px;padding:10px;background:#181d36;cursor:pointer;transition:.2s}
+.core:hover{border-color:#8fb4ff;transform:scale(1.02)}
+.core .big{font-size:15px;min-height:42px;border-radius:8px;padding:6px 8px;color:#111;font-weight:600;transition:background .2s}
+.idle{background:#2a3050!important;color:#7e86b0!important}
+.strip{display:flex;gap:2px;margin-top:8px;height:14px}
+.strip i{flex:1;border-radius:2px;background:#2a3050}
+.chips{display:flex;flex-wrap:wrap;gap:6px;min-height:30px;padding:6px;border:1px dashed #3a4270;border-radius:8px}
+.chip{padding:2px 8px;border-radius:12px;color:#111;font-size:12px;font-weight:600}
+.procs{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:10px}
+.proc{border:2px solid;border-radius:12px;padding:8px 10px;cursor:pointer;background:#161a30;transition:.2s}
+.proc:hover{transform:scale(1.03);background:#1d2340}
+.proc .t{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.dot{font-size:11px;padding:1px 7px;border-radius:10px;border:1.5px solid}
+.dot.run{color:#111;font-weight:700}.dot.ready{background:transparent}.dot.blocked{opacity:.4;border-style:dotted}
+.cap{margin:12px 0;padding:10px 12px;background:#1b2140;border-left:4px solid #8fb4ff;border-radius:6px}
+.tl{display:flex;gap:3px;margin:6px 0}
+.tl div{flex:1;height:46px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#111;font-weight:700;text-align:center;overflow:hidden}
+.panel{border:2px solid #3a4270;border-radius:12px;padding:12px;margin:8px 0;background:#161a30}
+.mem{display:flex;flex-wrap:wrap;gap:8px}
+.obj{padding:6px 10px;border-radius:8px;border:2px solid #3a4270;background:#1d2340;transition:.15s}
+.threads{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.th{border:2px solid;border-radius:10px;padding:8px;background:#161a30}
+.stack{background:#0d1020;border-radius:6px;padding:4px 6px;font:12px monospace;margin:6px 0}
+.stack div{padding:1px 0;color:#8e97c8}.stack .pc{color:#fff;background:#2c3566;border-radius:3px}
+.st{font-size:12px;font-weight:700}
+.legend{font-size:12px;color:#9aa3d0}
+input[type=range]{vertical-align:middle}
+</style></head><body>
+<header>
+ <div class=\"crumb\" id=\"crumb\"></div>
+ <span style=\"flex:1\"></span>
+ <label>Cores <select id=\"ncores\"><option>1</option><option>2</option><option selected>4</option></select></label>
+ <label>Speed <input type=\"range\" id=\"spd\" min=\"1\" max=\"10\" value=\"4\"></label>
+ <button id=\"pp\">Pause</button>
+</header>
+<div id=\"stage\"></div>
+<script>
+const P=[
+ {n:'Minecraft',e:'⛏️',c:'#7ed957',th:[
+  ['Render',['draw chunks','draw entities','draw HUD','swap buffers'],'World'],
+  ['Chunk gen',['noise(x,z)','carve caves','place ores','save chunk'],'World'],
+  ['Game tick',['move mobs','update redstone','grow crops','check inventory'],'Player'],
+  ['Audio',['mix sounds','fill buffer','play footstep','mix music'],'Sounds']],
+  heap:['World','Player','Sounds']},
+ {n:'Fortnite',e:'🪂',c:'#b388ff',th:[
+  ['Render',['cull objects','draw players','draw storm','post-fx'],'Scene'],
+  ['Network',['send position','recv snapshot','ack packets','predict'],'Match'],
+  ['Physics',['step bullets','collide builds','ragdoll','gravity'],'Scene']],
+  heap:['Scene','Match']},
+ {n:'Rocket League',e:'🚗',c:'#ff9e40',th:[
+  ['Render',['draw car','draw ball','draw boost','swap'],'Arena'],
+  ['Physics',['ball bounce','car wheels','boost force','collide'],'Arena'],
+  ['Net',['recv inputs','send state','resync','ping'],'Score']],
+  heap:['Arena','Score']},
+ {n:'Stardew Valley',e:'🌾',c:'#ffd54f',th:[
+  ['Game loop',['water crops','move NPC','tick clock','draw farm'],'Farm'],
+  ['Audio',['play music','bird sfx','fade','mix'],'Farm']],heap:['Farm']},
+ {n:'Among Us',e:'🧑‍🚀',c:'#ff5c7a',th:[
+  ['Game loop',['move crew','check tasks','vent?','draw map'],'Lobby'],
+  ['Network',['recv votes','send chat','sync tasks','ping'],'Lobby']],heap:['Lobby']},
+ {n:'Tetris',e:'🟦',c:'#4dd0e1',th:[['Main loop',['drop piece','check line','score','draw'],'Board']],heap:['Board']},
+ {n:'Discord',e:'💬',c:'#7c8cff',th:[
+  ['UI',['draw chat','scroll','render emoji','typing…'],'Chat'],
+  ['Voice',['capture mic','encode opus','send UDP','decode'],'Chat']],heap:['Chat']},
+ {n:'Chrome',e:'🌐',c:'#f48fb1',th:[
+  ['UI',['draw tab','scroll','click','paint'],'DOM'],
+  ['JS',['run script','GC','parse JSON','layout'],'DOM'],
+  ['Network',['DNS','TLS','fetch','cache'],'DOM']],heap:['DOM']}
+];
+const WHY=['disk read','network packet','waiting for input','sleep(16ms)'];
+let threads=[],cores=[],queue=[],ncores=4,paused=false,view={t:'m'},tickN=0,timer;
+function reset(){
+ ncores=+document.getElementById('ncores').value;
+ threads=[];let id=0;
+ P.forEach((p,pi)=>p.th.forEach(t=>threads.push({id:id++,p:pi,name:t[0],acts:t[1],obj:t[2],st:'ready',core:-1,pc:0,slice:0,wait:0,why:''})));
+ cores=Array.from({length:ncores},()=>({cur:null,hist:[],sw:0}));
+ queue=threads.map(t=>t.id).sort(()=>Math.random()-.5);tickN=0;
+}
+function tick(){
+ tickN++;
+ threads.forEach(t=>{if(t.st==='blocked'&&--t.wait<=0){t.st='ready';queue.push(t.id)}});
+ cores.forEach((c,ci)=>{
+  if(c.cur!=null){const t=threads[c.cur];t.pc++;t.slice--;
+   if(Math.random()<.07){t.st='blocked';t.wait=3+Math.floor(Math.random()*7);t.why=WHY[Math.floor(Math.random()*4)];t.core=-1;c.cur=null}
+   else if(t.slice<=0){t.st='ready';t.core=-1;queue.push(t.id);c.cur=null}}
+ });
+ cores.forEach((c,ci)=>{
+  if(c.cur==null&&queue.length){const id=queue.shift(),t=threads[id];t.st='run';t.core=ci;t.slice=4;c.cur=id;
+   if(c.hist.length&&c.hist[c.hist.length-1]!=null&&c.hist[c.hist.length-1]!==id)c.sw++;}
+  c.hist.push(c.cur);if(c.hist.length>32)c.hist.shift();
+ });
+ render();
+}
+const col=t=>P[t.p].c;
+const lab=t=>P[t.p].e+' '+P[t.p].n+' · '+t.name;
+function go(v,dir){view=v;render(dir)}
+function render(anim){
+ const s=document.getElementById('stage');
+ let h='',cr='';
+ if(view.t==='m'){cr='<b>Machine</b>';h=machine()}
+ else if(view.t==='c'){cr='<span data-go=\"m\">Machine</span> › <b>Core '+view.i+'</b>';h=coreV()}
+ else{cr='<span data-go=\"m\">Machine</span> › <b>'+P[view.i].e+' '+P[view.i].n+' (process)</b>';h=procV()}
+ document.getElementById('crumb').innerHTML=cr;
+ s.innerHTML=h;
+ if(anim){s.className=anim;void s.offsetWidth}
+ if(anim)s.className=anim;
+}
+function machine(){
+ let h='<div class=\"cap\"><b>The real picture:</b> cores don\\'t run <i>programs</i>, they run <b>threads</b>. The scheduler keeps a queue of ready threads and hands each one a short time slice on a free core. Click a <b>core</b> to zoom into what it does over time, or a <b>process</b> to zoom into its threads and memory.</div>';
+ h+='<h3>'+ncores+' core'+(ncores>1?'s':'')+' (click to zoom)</h3><div class=\"cores\">';
+ cores.forEach((c,i)=>{const t=c.cur!=null?threads[c.cur]:null;
+  h+='<div class=\"core\" data-core=\"'+i+'\"><div class=\"legend\">Core '+i+' · '+c.sw+' context switches</div><div class=\"big '+(t?'':'idle')+'\" style=\"background:'+(t?col(t):'')+'\">'+(t?lab(t)+'<div style=\"font-weight:400;font-size:12px\">▶ '+t.acts[t.pc%4]+'</div>':'idle')+'</div><div class=\"strip\">'+
+  Array.from({length:32},(_,k)=>{const id=c.hist[c.hist.length-32+k];const tt=id!=null?threads[id]:null;return '<i style=\"'+(tt?'background:'+col(tt):'')+'\"></i>'}).join('')+'</div></div>'});
+ h+='</div><h3>Ready queue (waiting for a core)</h3><div class=\"chips\">'+queue.map(id=>{const t=threads[id];return '<span class=\"chip\" style=\"background:'+col(t)+'\">'+P[t.p].e+' '+t.name+'</span>'}).join('')+'</div>';
+ const bl=threads.filter(t=>t.st==='blocked');
+ h+='<h3>Blocked: sleeping, using no CPU</h3><div class=\"chips\">'+bl.map(t=>'<span class=\"chip\" style=\"background:'+col(t)+';opacity:.55\">'+P[t.p].e+' '+t.name+' ⏳ '+t.why+'</span>').join('')+'</div>';
+ h+='<h3>Processes: '+P.length+' programs, '+threads.length+' threads (click to zoom)</h3><div class=\"procs\">';
+ P.forEach((p,pi)=>{h+='<div class=\"proc\" data-proc=\"'+pi+'\" style=\"border-color:'+p.c+'\"><b>'+p.e+' '+p.n+'</b><div class=\"t\">'+
+  threads.filter(t=>t.p===pi).map(t=>'<span class=\"dot '+t.st+'\" style=\"border-color:'+p.c+';'+(t.st==='run'?'background:'+p.c:'')+'\">'+t.name+(t.st==='run'?' @core'+t.core:'')+'</span>').join('')+'</div></div>'});
+ h+='</div><p class=\"legend\">Filled = running on a core · outline = ready, waiting · faint dotted = blocked. Try 1 core: still smooth, because slices are tiny, but only <i>concurrent</i>, never <i>parallel</i>.</p>';
+ return h;
+}
+function coreV(){
+ const c=cores[view.i]||cores[0];const t=c.cur!=null?threads[c.cur]:null;
+ let h='<div class=\"cap\"><b>Zoomed into core '+view.i+'.</b> It has no idea what a \"program\" is. It runs one thread\\'s instructions, then the scheduler saves that thread\\'s registers and program counter and loads another\\'s (a <b>context switch</b>). Neighbouring blocks often belong to <b>different processes</b>, which is why processes aren\\'t pinned to cores.</div>';
+ h+='<div class=\"panel\"><b>Now executing:</b><div class=\"big\" style=\"margin-top:8px;padding:12px;border-radius:8px;font-size:17px;font-weight:700;color:#111;background:'+(t?col(t):'#2a3050')+'\">'+(t?lab(t)+' → <span style=\"font-weight:400\">'+t.acts[t.pc%4]+'</span>':'idle: nothing ready')+'</div>'+
+ (t?'<div class=\"legend\" style=\"margin-top:6px\">Program counter at \"'+t.acts[t.pc%4]+'\"; slice left: '+t.slice+' ticks; registers belong to this thread only.</div>':'')+'</div>';
+ h+='<h3>Last 32 time slices on this core (oldest → newest)</h3><div class=\"tl\">'+
+ Array.from({length:32},(_,k)=>{const id=c.hist[c.hist.length-32+k];const tt=id!=null?threads[id]:null;return '<div title=\"'+(tt?lab(tt):'idle')+'\" style=\"'+(tt?'background:'+col(tt):'background:#2a3050')+'\">'+(tt?P[tt.p].e:'')+'</div>'}).join('')+'</div>';
+ const seen=[...new Set(c.hist.filter(x=>x!=null))];
+ h+='<h3>Threads this core has run recently</h3><div class=\"chips\">'+seen.map(id=>{const t=threads[id];return '<span class=\"chip\" style=\"background:'+col(t)+'\">'+lab(t)+'</span>'}).join('')+'</div>';
+ h+='<p class=\"legend\">Context switches here: '+c.sw+'. Each costs a little time, which is why threads are cheaper than processes to switch between: threads of one process keep the same memory mapping.</p>';
+ return h;
+}
+function procV(){
+ const p=P[view.i],ts=threads.filter(t=>t.p===view.i);
+ const running=ts.filter(t=>t.st==='run');
+ let h='<div class=\"cap\"><b>Zoomed into '+p.n+'.</b> One process = one private memory space (top) shared by all its threads, plus a separate program counter and stack per thread (below). '+(running.length>1?'<b>Right now '+running.length+' of its threads are running on different cores: true parallelism.</b>':running.length==1?'Right now one thread is running; the others wait or sleep.':'Right now none of its threads has a core.')+'</div>';
+ h+='<div class=\"panel\" style=\"border-color:'+p.c+'\"><b>Shared memory (heap, code, globals):</b> every thread can read/write these<div class=\"mem\" style=\"margin-top:8px\">'+
+ p.heap.map(o=>{const w=running.filter(t=>t.obj===o);return '<div class=\"obj\" style=\"'+(w.length?'border-color:'+p.c+';box-shadow:0 0 12px '+p.c+';background:#2a3566':'')+'\">📦 '+o+(w.length?'<div class=\"legend\">touched by '+w.map(t=>t.name).join(', ')+'</div>':'')+'</div>'}).join('')+
+ '<div class=\"obj\">📜 game code</div></div><div class=\"legend\" style=\"margin-top:6px\">Two threads touching the same box at once is where race conditions come from. Other processes cannot see this memory at all.</div></div>';
+ h+='<h3>Threads: private PC + stack each</h3><div class=\"threads\">'+ts.map(t=>{
+  const a=t.acts[t.pc%4];
+  return '<div class=\"th\" style=\"border-color:'+p.c+'\"><b>'+t.name+'</b> <span class=\"st\" style=\"color:'+(t.st==='run'?'#7ed957':t.st==='ready'?'#ffd54f':'#ff8a80')+'\">'+(t.st==='run'?'● running on core '+t.core:t.st==='ready'?'○ ready, waiting for a core':'⏳ blocked: '+t.why)+'</span>'+
+  '<div class=\"stack\"><div>main()</div><div>'+t.name.toLowerCase().replace(/ /g,'_')+'_loop()</div><div class=\"pc\">▶ PC: '+a+'</div></div><div class=\"legend\">touches shared: '+t.obj+'</div></div>'}).join('')+'</div>';
+ return h;
+}
+document.addEventListener('click',e=>{
+ const g=e.target.closest('[data-go]'),c=e.target.closest('[data-core]'),p=e.target.closest('[data-proc]');
+ if(g)go({t:'m'},'zout');else if(c)go({t:'c',i:+c.dataset.core},'zin');else if(p)go({t:'p',i:+p.dataset.proc},'zin');
+});
+document.getElementById('ncores').onchange=()=>{reset();view={t:'m'};render('zout')};
+document.getElementById('pp').onclick=e=>{paused=!paused;e.target.textContent=paused?'Resume':'Pause'};
+function loop(){clearTimeout(timer);const d=1100-document.getElementById('spd').value*100;timer=setTimeout(()=>{if(!paused)tick();loop()},d)}
+reset();for(let i=0;i<5;i++)tick();render();loop();
+</script></body></html>
+"
+ :AT "2026-11-15T15:15:21" :VERSION 1)
+(:PINNED T :ID "minecraft-process-stacks-and-heap" :MAP "computers" :NODE "processes-threads" :TYPE
+ "svg" :TITLE "Minecraft process: full memory map" :LANGUAGE NIL :CONTENT
+ "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 960 860\" font-family=\"system-ui,sans-serif\">
+<rect width=\"960\" height=\"860\" fill=\"#0f1220\"/>
+<rect x=\"15\" y=\"15\" width=\"930\" height=\"830\" rx=\"16\" fill=\"#161a30\" stroke=\"#3a4270\" stroke-width=\"2\"/>
+<text x=\"35\" y=\"45\" font-size=\"18\" font-weight=\"700\" fill=\"#e8eaf6\">PROCESS: Minecraft — one private address space (other processes can't see in)</text>
+
+<!-- Threads -->
+<text x=\"35\" y=\"78\" font-size=\"14\" font-weight=\"700\" fill=\"#9aa3d0\">① THREADS — private per thread: own PC + own stack</text>
+
+<g font-size=\"12\">
+<rect x=\"35\" y=\"90\" width=\"210\" height=\"215\" rx=\"10\" fill=\"#0d1020\" stroke=\"#7ed957\" stroke-width=\"2\"/>
+<text x=\"140\" y=\"110\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"700\" fill=\"#7ed957\">Render thread</text>
+<text x=\"140\" y=\"127\" text-anchor=\"middle\" fill=\"#9aa3d0\">stack (newest on top)</text>
+<rect x=\"48\" y=\"135\" width=\"184\" height=\"30\" rx=\"4\" fill=\"#2c3566\" stroke=\"#fff\"/><text x=\"56\" y=\"154\" fill=\"#fff\">▶ drawBlock() x=3</text>
+<rect x=\"48\" y=\"169\" width=\"184\" height=\"30\" rx=\"4\" fill=\"#1d2340\"/><text x=\"56\" y=\"188\" fill=\"#c5cbe8\">drawChunk() id=7</text>
+<rect x=\"48\" y=\"203\" width=\"184\" height=\"30\" rx=\"4\" fill=\"#1d2340\"/><text x=\"56\" y=\"222\" fill=\"#c5cbe8\">renderFrame()</text>
+<rect x=\"48\" y=\"237\" width=\"184\" height=\"30\" rx=\"4\" fill=\"#1d2340\"/><text x=\"56\" y=\"256\" fill=\"#c5cbe8\">main()</text>
+<text x=\"140\" y=\"290\" text-anchor=\"middle\" fill=\"#9aa3d0\">▶ = PC (next line to run)</text>
+
+<rect x=\"255\" y=\"90\" width=\"210\" height=\"215\" rx=\"10\" fill=\"#0d1020\" stroke=\"#ffd54f\" stroke-width=\"2\"/>
+<text x=\"360\" y=\"110\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"700\" fill=\"#ffd54f\">Chunk gen thread</text>
+<text x=\"360\" y=\"127\" text-anchor=\"middle\" fill=\"#9aa3d0\">its own stack</text>
+<rect x=\"268\" y=\"135\" width=\"184\" height=\"30\" rx=\"4\" fill=\"#2c3566\" stroke=\"#fff\"/><text x=\"276\" y=\"154\" fill=\"#fff\">▶ noise() x=40,z=9</text>
+<rect x=\"268\" y=\"169\" width=\"184\" height=\"30\" rx=\"4\" fill=\"#1d2340\"/><text x=\"276\" y=\"188\" fill=\"#c5cbe8\">makeChunk()</text>
+<rect x=\"268\" y=\"203\" width=\"184\" height=\"30\" rx=\"4\" fill=\"#1d2340\"/><text x=\"276\" y=\"222\" fill=\"#c5cbe8\">genLoop()</text>
+
+<rect x=\"475\" y=\"90\" width=\"210\" height=\"215\" rx=\"10\" fill=\"#0d1020\" stroke=\"#ff9e40\" stroke-width=\"2\"/>
+<text x=\"580\" y=\"110\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"700\" fill=\"#ff9e40\">Game tick thread</text>
+<text x=\"580\" y=\"127\" text-anchor=\"middle\" fill=\"#9aa3d0\">its own stack</text>
+<rect x=\"488\" y=\"135\" width=\"184\" height=\"30\" rx=\"4\" fill=\"#2c3566\" stroke=\"#fff\"/><text x=\"496\" y=\"154\" fill=\"#fff\">▶ moveMob() id=2</text>
+<rect x=\"488\" y=\"169\" width=\"184\" height=\"30\" rx=\"4\" fill=\"#1d2340\"/><text x=\"496\" y=\"188\" fill=\"#c5cbe8\">tick()</text>
+
+<rect x=\"695\" y=\"90\" width=\"230\" height=\"215\" rx=\"10\" fill=\"#0d1020\" stroke=\"#b388ff\" stroke-width=\"2\"/>
+<text x=\"810\" y=\"110\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"700\" fill=\"#b388ff\">Audio thread</text>
+<text x=\"810\" y=\"127\" text-anchor=\"middle\" fill=\"#9aa3d0\">its own stack</text>
+<rect x=\"708\" y=\"135\" width=\"204\" height=\"30\" rx=\"4\" fill=\"#2c3566\" stroke=\"#fff\"/><text x=\"716\" y=\"154\" fill=\"#fff\">▶ mix()</text>
+<rect x=\"708\" y=\"169\" width=\"204\" height=\"30\" rx=\"4\" fill=\"#1d2340\"/><text x=\"716\" y=\"188\" fill=\"#c5cbe8\">audioLoop()</text>
+</g>
+
+<text x=\"35\" y=\"328\" font-size=\"12\" fill=\"#9aa3d0\">Stack = locals, arguments, return addresses. Freed automatically when each function returns. Never shared unless you hand out a pointer.</text>
+
+<!-- Shared -->
+<rect x=\"25\" y=\"345\" width=\"910\" height=\"485\" rx=\"12\" fill=\"none\" stroke=\"#8fb4ff\" stroke-width=\"2\" stroke-dasharray=\"8 5\"/>
+<text x=\"40\" y=\"368\" font-size=\"14\" font-weight=\"700\" fill=\"#8fb4ff\">SHARED BY ALL THREADS — one copy, every thread can reach it</text>
+
+<!-- Code -->
+<rect x=\"40\" y=\"385\" width=\"880\" height=\"95\" rx=\"10\" fill=\"#1d2a22\" stroke=\"#7ed957\" stroke-width=\"2\"/>
+<text x=\"55\" y=\"408\" font-size=\"15\" font-weight=\"700\" fill=\"#7ed957\">② CODE (text segment) — read-only</text>
+<text x=\"55\" y=\"430\" font-size=\"12\" fill=\"#c5cbe8\">The compiled instructions: drawBlock, noise, moveMob, mix … Loaded once from the program file.</text>
+<text x=\"55\" y=\"450\" font-size=\"12\" fill=\"#c5cbe8\">Every thread's PC points into here. Two threads can run the same function at once, each with its own stack frame.</text>
+<text x=\"55\" y=\"468\" font-size=\"12\" fill=\"#9aa3d0\">Lives: whole run · Size: fixed</text>
+
+<!-- Globals -->
+<rect x=\"40\" y=\"495\" width=\"880\" height=\"105\" rx=\"10\" fill=\"#2a2418\" stroke=\"#ffd54f\" stroke-width=\"2\"/>
+<text x=\"55\" y=\"518\" font-size=\"15\" font-weight=\"700\" fill=\"#ffd54f\">③ GLOBALS / STATIC DATA (.data, .bss)</text>
+<text x=\"55\" y=\"540\" font-size=\"12\" fill=\"#c5cbe8\">Named variables written in the source: static int frameCount;  World* theWorld;  const text like \"Creeper\".</text>
+<rect x=\"55\" y=\"550\" width=\"150\" height=\"38\" rx=\"6\" fill=\"#3a3220\" stroke=\"#fff\"/><text x=\"130\" y=\"574\" text-anchor=\"middle\" font-size=\"13\" fill=\"#fff\">frameCount = 9041</text>
+<rect x=\"220\" y=\"550\" width=\"150\" height=\"38\" rx=\"6\" fill=\"#3a3220\" stroke=\"#fff\"/><text x=\"295\" y=\"574\" text-anchor=\"middle\" font-size=\"13\" fill=\"#fff\">theWorld = 0x7f3a…</text>
+<text x=\"390\" y=\"574\" font-size=\"12\" fill=\"#9aa3d0\">Lives: whole run · Size: fixed at compile time · Writes can race</text>
+
+<!-- Heap -->
+<rect x=\"40\" y=\"615\" width=\"880\" height=\"200\" rx=\"10\" fill=\"#1b2140\" stroke=\"#8fb4ff\" stroke-width=\"2.5\"/>
+<text x=\"55\" y=\"638\" font-size=\"15\" font-weight=\"700\" fill=\"#8fb4ff\">④ HEAP — objects made at runtime with new / malloc</text>
+<rect x=\"55\" y=\"652\" width=\"250\" height=\"70\" rx=\"8\" fill=\"#252b4a\" stroke=\"#fff\"/>
+<text x=\"180\" y=\"679\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"700\" fill=\"#fff\">World</text>
+<text x=\"180\" y=\"702\" text-anchor=\"middle\" font-size=\"12\" fill=\"#c5cbe8\">chunks[], chunkCount</text>
+<rect x=\"325\" y=\"652\" width=\"170\" height=\"70\" rx=\"8\" fill=\"#252b4a\" stroke=\"#fff\"/>
+<text x=\"410\" y=\"679\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"700\" fill=\"#fff\">Player</text>
+<text x=\"410\" y=\"702\" text-anchor=\"middle\" font-size=\"12\" fill=\"#c5cbe8\">position, inventory</text>
+<rect x=\"515\" y=\"652\" width=\"170\" height=\"70\" rx=\"8\" fill=\"#252b4a\" stroke=\"#fff\"/>
+<text x=\"600\" y=\"679\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"700\" fill=\"#fff\">Sounds</text>
+<text x=\"600\" y=\"702\" text-anchor=\"middle\" font-size=\"12\" fill=\"#c5cbe8\">audio buffers</text>
+<rect x=\"705\" y=\"652\" width=\"200\" height=\"70\" rx=\"8\" fill=\"#1b2140\" stroke=\"#8fb4ff\" stroke-dasharray=\"4 3\"/>
+<text x=\"805\" y=\"684\" text-anchor=\"middle\" font-size=\"12\" fill=\"#8fb4ff\">+ thousands more chunks,</text>
+<text x=\"805\" y=\"702\" text-anchor=\"middle\" font-size=\"12\" fill=\"#8fb4ff\">mobs, items…</text>
+<text x=\"55\" y=\"750\" font-size=\"12\" fill=\"#c5cbe8\">Created while running, any size, freed when you say so (or a garbage collector does). Reached only through a pointer.</text>
+<text x=\"55\" y=\"772\" font-size=\"12\" fill=\"#c5cbe8\">Pointers live in stacks or globals: theWorld (global) → World (heap). Render and Chunk gen both follow it.</text>
+<text x=\"55\" y=\"800\" font-size=\"13\" font-weight=\"700\" fill=\"#ffb4c0\">⚠ Render + Chunk gen both write World at once → needs a lock. Globals and heap are the danger zones.</text>
+
+<!-- arrows from stacks to shared (pointers) -->
+<g fill=\"none\" stroke-width=\"2.2\" stroke-dasharray=\"6 4\">
+<path d=\"M140 305 L140 640 L60 640\" stroke=\"#7ed957\" opacity=\"0\"/>
+<path d=\"M120 305 Q 30 480 80 652\" stroke=\"#7ed957\"/>
+<path d=\"M360 305 Q 320 500 230 652\" stroke=\"#ffd54f\"/>
+<path d=\"M580 305 Q 560 480 410 652\" stroke=\"#ff9e40\"/>
+<path d=\"M810 305 Q 790 500 620 652\" stroke=\"#b388ff\"/>
+</g>
+<text x=\"460\" y=\"340\" text-anchor=\"middle\" font-size=\"11\" fill=\"#9aa3d0\">dashed arrows = pointers from a stack into shared memory</text>
+</svg>"
+ :AT "2026-11-15T15:55:09" :VERSION 2)
+(:PINNED T :ID "the-abstraction-ladder-so-far" :MAP "computers" :NODE "files" :TYPE "svg" :TITLE
+ "The abstraction ladder so far" :LANGUAGE NIL :CONTENT
+ "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 640\" font-family=\"system-ui, sans-serif\">
+<rect width=\"900\" height=\"640\" fill=\"#fafafa\"/>
+<text x=\"450\" y=\"34\" text-anchor=\"middle\" font-size=\"20\" font-weight=\"bold\" fill=\"#222\">The abstraction ladder: each rung hides the one below</text>
+<defs><marker id=\"a\" markerWidth=\"10\" markerHeight=\"10\" refX=\"5\" refY=\"5\" orient=\"auto\"><path d=\"M0,9 L5,0 L10,9 z\" fill=\"#555\"/></marker></defs>
+
+<!-- rungs, bottom to top -->
+<g>
+<rect x=\"60\" y=\"520\" width=\"520\" height=\"70\" rx=\"10\" fill=\"#fde7c8\" stroke=\"#d98a1f\" stroke-width=\"2\"/>
+<text x=\"80\" y=\"548\" font-size=\"17\" font-weight=\"bold\" fill=\"#7a4a00\">1. Transistors</text>
+<text x=\"80\" y=\"574\" font-size=\"14\" fill=\"#5a3a00\">Switches: voltage in, on/off out</text>
+
+<rect x=\"100\" y=\"425\" width=\"480\" height=\"70\" rx=\"10\" fill=\"#fff3b8\" stroke=\"#c9a800\" stroke-width=\"2\"/>
+<text x=\"120\" y=\"453\" font-size=\"17\" font-weight=\"bold\" fill=\"#5e5000\">2. Gates, flip-flops, RAM, clock</text>
+<text x=\"120\" y=\"479\" font-size=\"14\" fill=\"#5e5000\">Switches combine into logic and 1-bit memory</text>
+
+<rect x=\"140\" y=\"330\" width=\"440\" height=\"70\" rx=\"10\" fill=\"#d9f2d0\" stroke=\"#4a9a35\" stroke-width=\"2\"/>
+<text x=\"160\" y=\"358\" font-size=\"17\" font-weight=\"bold\" fill=\"#1f5a10\">3. Stored program: CPU + RAM</text>
+<text x=\"160\" y=\"384\" font-size=\"14\" fill=\"#1f5a10\">Instructions are data; fetch, decode, execute</text>
+
+<rect x=\"180\" y=\"235\" width=\"400\" height=\"70\" rx=\"10\" fill=\"#cfe9f7\" stroke=\"#2a85b8\" stroke-width=\"2\"/>
+<text x=\"200\" y=\"263\" font-size=\"17\" font-weight=\"bold\" fill=\"#0d4a6b\">4. Processes, scheduling, virtual memory</text>
+<text x=\"200\" y=\"289\" font-size=\"14\" fill=\"#0d4a6b\">Each program believes it owns the machine</text>
+
+<rect x=\"220\" y=\"140\" width=\"360\" height=\"70\" rx=\"10\" fill=\"#e6d6f5\" stroke=\"#8a4fc0\" stroke-width=\"2\"/>
+<text x=\"240\" y=\"168\" font-size=\"17\" font-weight=\"bold\" fill=\"#4a1f78\">5. Files (you are here)</text>
+<text x=\"240\" y=\"194\" font-size=\"14\" fill=\"#4a1f78\">Named, persistent bytes; directories nest names</text>
+</g>
+
+<!-- arrow -->
+<line x1=\"40\" y1=\"590\" x2=\"40\" y2=\"130\" stroke=\"#555\" stroke-width=\"3\" marker-end=\"url(#a)\"/>
+<text x=\"22\" y=\"360\" font-size=\"13\" fill=\"#555\" transform=\"rotate(-90 22 360)\" text-anchor=\"middle\">more powerful, fewer details needed</text>
+
+<!-- right side: what each rung lets you forget -->
+<g font-size=\"13\" fill=\"#333\">
+<text x=\"610\" y=\"110\" font-weight=\"bold\" font-size=\"14\">What you can forget at this rung</text>
+<text x=\"610\" y=\"165\">Disk blocks, sectors, device drivers;</text><text x=\"610\" y=\"183\">\"file\" covers disks, pipes, sockets</text>
+<text x=\"610\" y=\"260\">Other programs, physical RAM size,</text><text x=\"610\" y=\"278\">which core runs you</text>
+<text x=\"610\" y=\"355\">Wiring: just run instructions</text><text x=\"610\" y=\"373\">from memory</text>
+<text x=\"610\" y=\"450\">Voltages, transistor layout:</text><text x=\"610\" y=\"468\">just 0/1 and AND/OR/NOT</text>
+<text x=\"610\" y=\"545\">Physics of silicon:</text><text x=\"610\" y=\"563\">just a switch</text>
+</g>
+<g stroke=\"#bbb\" stroke-dasharray=\"4 4\">
+<line x1=\"585\" y1=\"175\" x2=\"605\" y2=\"175\"/><line x1=\"585\" y1=\"270\" x2=\"605\" y2=\"270\"/><line x1=\"585\" y1=\"365\" x2=\"605\" y2=\"365\"/><line x1=\"585\" y1=\"460\" x2=\"605\" y2=\"460\"/><line x1=\"585\" y1=\"555\" x2=\"605\" y2=\"555\"/>
+</g>
+<text x=\"450\" y=\"620\" text-anchor=\"middle\" font-size=\"13\" fill=\"#666\">Note the pyramid: each layer is built only from the one beneath it.</text>
+</svg>"
+ :AT "2026-11-15T16:13:01" :VERSION 1)
+(:PINNED T :ID "hardware-vs-software-data-paths" :MAP "computers" :NODE "files" :TYPE "svg" :TITLE
+ "Hardware vs software data paths" :LANGUAGE NIL :CONTENT
+ "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1000 720\" font-family=\"system-ui, sans-serif\">
+<rect width=\"1000\" height=\"720\" fill=\"#fafafa\"/>
+<text x=\"500\" y=\"30\" text-anchor=\"middle\" font-size=\"20\" font-weight=\"bold\" fill=\"#222\">Data-transfer terms: wired hardware vs software labels</text>
+
+<!-- Software -->
+<rect x=\"30\" y=\"50\" width=\"940\" height=\"330\" rx=\"12\" fill=\"#e6d6f5\" stroke=\"#8a4fc0\" stroke-width=\"2\"/>
+<text x=\"50\" y=\"78\" font-size=\"16\" font-weight=\"bold\" fill=\"#4a1f78\">SOFTWARE: kernel abstractions, changeable by code</text>
+<g font-size=\"13\" fill=\"#2a1048\">
+<rect x=\"50\" y=\"95\" width=\"210\" height=\"130\" rx=\"8\" fill=\"#fff\" stroke=\"#8a4fc0\"/>
+<text x=\"62\" y=\"118\" font-weight=\"bold\" font-size=\"14\">File descriptor</text>
+<text x=\"62\" y=\"140\">Small integer handle.</text><text x=\"62\" y=\"158\">read / write work on all</text><text x=\"62\" y=\"176\">of the ideas beside it.</text><text x=\"62\" y=\"200\" font-style=\"italic\">The common interface</text>
+
+<rect x=\"275\" y=\"95\" width=\"210\" height=\"130\" rx=\"8\" fill=\"#fff\" stroke=\"#8a4fc0\"/>
+<text x=\"287\" y=\"118\" font-weight=\"bold\" font-size=\"14\">Pipe</text>
+<text x=\"287\" y=\"140\">One-way buffer in RAM</text><text x=\"287\" y=\"158\">between processes on</text><text x=\"287\" y=\"176\">the same machine.</text><text x=\"287\" y=\"200\" font-style=\"italic\">ls | grep foo</text>
+
+<rect x=\"500\" y=\"95\" width=\"210\" height=\"130\" rx=\"8\" fill=\"#fff\" stroke=\"#8a4fc0\"/>
+<text x=\"512\" y=\"118\" font-weight=\"bold\" font-size=\"14\">Socket</text>
+<text x=\"512\" y=\"140\">One end of a two-way</text><text x=\"512\" y=\"158\">stream; can reach other</text><text x=\"512\" y=\"176\">machines (TCP/UDP).</text><text x=\"512\" y=\"200\" font-style=\"italic\">Unix socket: same machine</text>
+
+<rect x=\"725\" y=\"95\" width=\"225\" height=\"130\" rx=\"8\" fill=\"#fff\" stroke=\"#8a4fc0\"/>
+<text x=\"737\" y=\"118\" font-weight=\"bold\" font-size=\"14\">Port (network)</text>
+<text x=\"737\" y=\"140\">16-bit number in an</text><text x=\"737\" y=\"158\">address: picks which</text><text x=\"737\" y=\"176\">socket gets the packet.</text><text x=\"737\" y=\"200\" font-style=\"italic\">Not a channel; a label</text>
+
+<rect x=\"50\" y=\"245\" width=\"320\" height=\"115\" rx=\"8\" fill=\"#fff\" stroke=\"#8a4fc0\"/>
+<text x=\"62\" y=\"268\" font-weight=\"bold\" font-size=\"14\">Others: signals, shared memory,</text>
+<text x=\"62\" y=\"286\" font-weight=\"bold\" font-size=\"14\">message queues</text>
+<text x=\"62\" y=\"310\">Other ways for processes to talk:</text><text x=\"62\" y=\"328\">a nudge, or RAM both can see.</text>
+
+<rect x=\"385\" y=\"245\" width=\"270\" height=\"115\" rx=\"8\" fill=\"#fff\" stroke=\"#8a4fc0\"/>
+<text x=\"397\" y=\"268\" font-weight=\"bold\" font-size=\"14\">Protocols: TCP, IP, HTTP</text>
+<text x=\"397\" y=\"292\">Agreed rules for bytes on</text><text x=\"397\" y=\"310\">a wire. Code, not wire.</text>
+
+<rect x=\"670\" y=\"245\" width=\"280\" height=\"115\" rx=\"8\" fill=\"#fff\" stroke=\"#8a4fc0\"/>
+<text x=\"682\" y=\"268\" font-weight=\"bold\" font-size=\"14\">Device driver + pty</text>
+<text x=\"682\" y=\"292\">Driver: kernel code that talks</text><text x=\"682\" y=\"310\">to one piece of hardware.</text><text x=\"682\" y=\"328\">pty: fake terminal wire.</text>
+</g>
+
+<!-- boundary -->
+<line x1=\"30\" y1=\"400\" x2=\"970\" y2=\"400\" stroke=\"#333\" stroke-width=\"2\" stroke-dasharray=\"8 5\"/>
+<text x=\"500\" y=\"396\" text-anchor=\"middle\" font-size=\"13\" fill=\"#333\">system calls and drivers: the boundary</text>
+<text x=\"500\" y=\"418\" text-anchor=\"middle\" font-size=\"22\" fill=\"#333\">▲ ▼</text>
+
+<!-- Hardware -->
+<rect x=\"30\" y=\"435\" width=\"940\" height=\"260\" rx=\"12\" fill=\"#fde7c8\" stroke=\"#d98a1f\" stroke-width=\"2\"/>
+<text x=\"50\" y=\"463\" font-size=\"16\" font-weight=\"bold\" fill=\"#7a4a00\">HARDWARE: physical wires and chips, fixed by the electronics</text>
+<g font-size=\"13\" fill=\"#4a2a00\">
+<rect x=\"50\" y=\"480\" width=\"210\" height=\"195\" rx=\"8\" fill=\"#fff\" stroke=\"#d98a1f\"/>
+<text x=\"62\" y=\"503\" font-weight=\"bold\" font-size=\"14\">Buses</text>
+<text x=\"62\" y=\"525\">Shared parallel wires</text><text x=\"62\" y=\"543\">+ electrical rules.</text><text x=\"62\" y=\"567\">Memory bus: CPU to RAM</text><text x=\"62\" y=\"585\">PCIe: CPU to GPU, SSD</text><text x=\"62\" y=\"603\">(PCIe is point-to-point</text><text x=\"62\" y=\"621\">lanes, bus-like)</text>
+
+<rect x=\"275\" y=\"480\" width=\"210\" height=\"195\" rx=\"8\" fill=\"#fff\" stroke=\"#d98a1f\"/>
+<text x=\"287\" y=\"503\" font-weight=\"bold\" font-size=\"14\">Physical ports</text>
+<text x=\"287\" y=\"525\">Connectors + controllers:</text><text x=\"287\" y=\"543\">USB, HDMI, Ethernet jack.</text><text x=\"287\" y=\"567\">Same word as network</text><text x=\"287\" y=\"585\">port, unrelated idea.</text>
+
+<rect x=\"500\" y=\"480\" width=\"210\" height=\"195\" rx=\"8\" fill=\"#fff\" stroke=\"#d98a1f\"/>
+<text x=\"512\" y=\"503\" font-weight=\"bold\" font-size=\"14\">Links and radios</text>
+<text x=\"512\" y=\"525\">Ethernet cable, Wi-Fi,</text><text x=\"512\" y=\"543\">fibre, serial line.</text><text x=\"512\" y=\"567\">Carry the bits that sockets</text><text x=\"512\" y=\"585\">eventually send.</text>
+
+<rect x=\"725\" y=\"480\" width=\"225\" height=\"195\" rx=\"8\" fill=\"#fff\" stroke=\"#d98a1f\"/>
+<text x=\"737\" y=\"503\" font-weight=\"bold\" font-size=\"14\">Controllers and devices</text>
+<text x=\"737\" y=\"525\">NIC, disk controller,</text><text x=\"737\" y=\"543\">interrupt wires, DMA.</text><text x=\"737\" y=\"567\">Chips that move bits</text><text x=\"737\" y=\"585\">without the CPU copying.</text>
+</g>
+<text x=\"500\" y=\"712\" text-anchor=\"middle\" font-size=\"12\" fill=\"#666\">Rule of thumb: if you must unplug or resolder it, hardware. If code can create it, software.</text>
+</svg>"
+ :AT "2026-11-16T11:45:27" :VERSION 1)
+(:PINNED T :ID "terminal-shell-bash-and-the-kernel" :MAP "computers" :NODE "files" :TYPE "svg"
+ :TITLE "Onion of layers: keystroke to kernel" :LANGUAGE NIL :CONTENT
+ "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1300 800\" font-family=\"system-ui, sans-serif\">
+<rect width=\"1300\" height=\"800\" fill=\"#fafafa\"/>
+<defs>
+<marker id=\"in\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 z\" fill=\"#c0392b\"/></marker>
+<marker id=\"out\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 z\" fill=\"#2a6db8\"/></marker>
+<path id=\"sysarc\" d=\"M242.1,352.5 A168,168 0 0 1 342.5,252.1\" fill=\"none\"/>
+</defs>
+
+<!-- rings, outside to inside -->
+<circle cx=\"400\" cy=\"410\" r=\"385\" fill=\"#ffe3e3\" stroke=\"#d04545\" stroke-width=\"2\"/>
+<circle cx=\"400\" cy=\"410\" r=\"325\" fill=\"#e6d6f5\" stroke=\"#8a4fc0\" stroke-width=\"2\"/>
+<circle cx=\"400\" cy=\"410\" r=\"270\" fill=\"#cfe9f7\" stroke=\"#2a85b8\" stroke-width=\"2\"/>
+<circle cx=\"400\" cy=\"410\" r=\"210\" fill=\"#fff3b8\" stroke=\"#c9a800\" stroke-width=\"2\"/>
+<circle cx=\"400\" cy=\"410\" r=\"160\" fill=\"#d9f2d0\" stroke=\"#333\" stroke-width=\"3\" stroke-dasharray=\"9 5\"/>
+<circle cx=\"400\" cy=\"410\" r=\"60\" fill=\"#fde7c8\" stroke=\"#d98a1f\" stroke-width=\"2\"/>
+
+<!-- ring labels -->
+<g text-anchor=\"middle\">
+<text x=\"400\" y=\"48\" font-size=\"14\" font-weight=\"bold\" fill=\"#7a1a1a\">YOU + I/O devices</text>
+<text x=\"400\" y=\"67\" font-size=\"12\" fill=\"#7a1a1a\">keyboard, mouse, screen</text>
+
+<text x=\"400\" y=\"106\" font-size=\"13\" font-weight=\"bold\" fill=\"#4a1f78\">Terminal emulator · GUI apps</text>
+<text x=\"400\" y=\"125\" font-size=\"12\" fill=\"#4a1f78\">browser, editor, display server</text>
+
+<text x=\"400\" y=\"160\" font-size=\"13\" font-weight=\"bold\" fill=\"#0d4a6b\">Shell + its programs</text>
+<text x=\"400\" y=\"178\" font-size=\"12\" fill=\"#0d4a6b\">bash · ls · grep · python</text>
+
+<text x=\"400\" y=\"222\" font-size=\"13\" font-weight=\"bold\" fill=\"#5e5000\">Libraries (libc)</text>
+<text x=\"400\" y=\"240\" font-size=\"12\" fill=\"#5e5000\">wrap system calls</text>
+
+<text x=\"400\" y=\"272\" font-size=\"14\" font-weight=\"bold\" fill=\"#1f5a10\">KERNEL</text>
+<text x=\"400\" y=\"290\" font-size=\"12\" fill=\"#1f5a10\">files · processes · memory</text>
+<text x=\"400\" y=\"306\" font-size=\"12\" fill=\"#1f5a10\">pipes · sockets · ptys · drivers</text>
+<text x=\"400\" y=\"322\" font-size=\"12\" fill=\"#1f5a10\">permission checks</text>
+
+<text x=\"400\" y=\"388\" font-size=\"12\" font-weight=\"bold\" fill=\"#7a4a00\">HARDWARE</text>
+<text x=\"400\" y=\"404\" font-size=\"12\" fill=\"#7a4a00\">CPU · RAM</text>
+<text x=\"400\" y=\"420\" font-size=\"12\" fill=\"#7a4a00\">disk · NIC</text>
+</g>
+
+<!-- system-call boundary label, bent along the kernel border at 10-11 o'clock -->
+<text font-size=\"13\" font-weight=\"bold\" fill=\"#333\" letter-spacing=\"0.5\" stroke=\"#fff3b8\" stroke-width=\"3\" paint-order=\"stroke\">
+<textPath href=\"#sysarc\" startOffset=\"50%\" text-anchor=\"middle\">system-call boundary</textPath>
+</text>
+
+<!-- journey segments, in the 1-2 o'clock wedge: step 1 nearest 1 o'clock, step 7 nearest 2 o'clock -->
+<g stroke-width=\"2.5\" fill=\"none\">
+<line x1=\"574\" y1=\"109.7\" x2=\"484\" y2=\"287\" stroke=\"#c0392b\" marker-end=\"url(#in)\"/>
+<line x1=\"486.4\" y1=\"289.9\" x2=\"581.4\" y2=\"192.7\" stroke=\"#2a6db8\" marker-end=\"url(#out)\"/>
+<line x1=\"583.2\" y1=\"192.9\" x2=\"503.9\" y2=\"303.3\" stroke=\"#c0392b\" marker-end=\"url(#in)\"/>
+<line x1=\"506.1\" y1=\"307\" x2=\"572.3\" y2=\"263.7\" stroke=\"#2a6db8\" marker-end=\"url(#out)\"/>
+<line x1=\"574\" y1=\"264.3\" x2=\"453.1\" y2=\"370.8\" stroke=\"#c0392b\" marker-end=\"url(#in)\"/>
+<line x1=\"451.1\" y1=\"373.8\" x2=\"695.2\" y2=\"239.3\" stroke=\"#2a6db8\" marker-end=\"url(#out)\"/>
+</g>
+<g font-size=\"12\" font-weight=\"bold\" fill=\"#fff\" text-anchor=\"middle\">
+<circle cx=\"580\" cy=\"98\" r=\"11\" fill=\"#333\"/><text x=\"580\" y=\"102\">1</text>
+<circle cx=\"477.5\" cy=\"299.4\" r=\"11\" fill=\"#333\"/><text x=\"477.5\" y=\"303.4\">2</text>
+<circle cx=\"591\" cy=\"182.5\" r=\"11\" fill=\"#333\"/><text x=\"591\" y=\"186.5\">3</text>
+<circle cx=\"495.5\" cy=\"314.5\" r=\"11\" fill=\"#333\"/><text x=\"495.5\" y=\"318.5\">4</text>
+<circle cx=\"583.8\" cy=\"255.7\" r=\"11\" fill=\"#333\"/><text x=\"583.8\" y=\"259.7\">5</text>
+<circle cx=\"443\" cy=\"380\" r=\"11\" fill=\"#333\"/><text x=\"443\" y=\"384\">6</text>
+<circle cx=\"707.4\" cy=\"232.5\" r=\"11\" fill=\"#333\"/><text x=\"707.4\" y=\"236.5\">7</text>
+</g>
+
+<!-- right panel -->
+<text x=\"830\" y=\"40\" font-size=\"18\" font-weight=\"bold\" fill=\"#222\">One keystroke zigzags through the onion</text>
+<text x=\"830\" y=\"62\" font-size=\"13\" fill=\"#666\">Press a key, then Enter on \"ls\": in, out, in, out</text>
+<g font-size=\"12.5\" fill=\"#222\">
+<text x=\"830\" y=\"100\" font-weight=\"bold\">1</text><text x=\"850\" y=\"100\">Key pressed. Keyboard hardware raises an</text><text x=\"850\" y=\"117\">interrupt, pulling control inward.</text>
+<text x=\"830\" y=\"156\" font-weight=\"bold\">2</text><text x=\"850\" y=\"156\">Kernel keyboard driver reads the key and</text><text x=\"850\" y=\"173\">queues an input event.</text>
+<text x=\"830\" y=\"212\" font-weight=\"bold\">3</text><text x=\"850\" y=\"212\">Display server gives the event to the terminal</text><text x=\"850\" y=\"229\">emulator: an ordinary program, outer ring.</text>
+<text x=\"830\" y=\"268\" font-weight=\"bold\">4</text><text x=\"850\" y=\"268\">Terminal calls write() on the pty; the kernel</text><text x=\"850\" y=\"285\">carries the byte to the shell's end of it.</text>
+<text x=\"830\" y=\"324\" font-weight=\"bold\">5</text><text x=\"850\" y=\"324\">Shell's read() returns the byte. On Enter it</text><text x=\"850\" y=\"341\">fork/execs ls, still in user space.</text>
+<text x=\"830\" y=\"380\" font-weight=\"bold\">6</text><text x=\"850\" y=\"380\">ls open()s and read()s the directory: kernel</text><text x=\"850\" y=\"397\">file code asks the disk, in the hardware core.</text>
+<text x=\"830\" y=\"436\" font-weight=\"bold\">7</text><text x=\"850\" y=\"436\">ls write()s the names to the pty; the terminal</text><text x=\"850\" y=\"453\">draws them and the screen shows pixels.</text>
+</g>
+
+<line x1=\"830\" y1=\"490\" x2=\"880\" y2=\"490\" stroke=\"#c0392b\" stroke-width=\"2.5\" marker-end=\"url(#in)\"/>
+<text x=\"892\" y=\"494\" font-size=\"12.5\" fill=\"#222\">inward: system call or interrupt</text>
+<line x1=\"830\" y1=\"514\" x2=\"880\" y2=\"514\" stroke=\"#2a6db8\" stroke-width=\"2.5\" marker-end=\"url(#out)\"/>
+<text x=\"892\" y=\"518\" font-size=\"12.5\" fill=\"#222\">outward: result handed back up</text>
+
+<text x=\"830\" y=\"560\" font-size=\"14\" font-weight=\"bold\" fill=\"#222\">How to read the rings</text>
+<g font-size=\"12.5\" fill=\"#333\">
+<text x=\"830\" y=\"584\">• A ring uses only the ring just inside it, through a</text><text x=\"840\" y=\"601\">fixed interface (system calls, pty, files).</text>
+<text x=\"830\" y=\"627\">• Only the dashed ring holds hardware privilege.</text><text x=\"840\" y=\"644\">Everything outside it runs with your user's rights.</text>
+<text x=\"830\" y=\"670\">• Rings can be skipped, not breached: a GUI file</text><text x=\"840\" y=\"687\">manager skips the shell, but still needs system calls.</text>
+<text x=\"830\" y=\"713\">• bash, zsh, fish share one ring: same job, same rights.</text>
+<text x=\"830\" y=\"739\">• Rights come from your user ID, checked in the kernel,</text><text x=\"840\" y=\"756\">not by the terminal or shell.</text>
+</g>
+</svg>"
+ :AT "2026-11-16T12:46:27" :VERSION 4)
+(:PINNED T :ID "client-network-cloud-vertical-stack" :MAP "computers" :NODE "files" :TYPE "svg"
+ :TITLE "Client, Network, Cloud: vertical stack" :LANGUAGE NIL :CONTENT
+ "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1000 790\" font-family=\"system-ui, sans-serif\">
+<rect width=\"1000\" height=\"790\" fill=\"#fafafa\"/>
+<text x=\"500\" y=\"30\" text-anchor=\"middle\" font-size=\"20\" font-weight=\"bold\" fill=\"#222\">Modern computing: applications on client, network and cloud</text>
+<defs><marker id=\"ar\" markerWidth=\"8\" markerHeight=\"8\" refX=\"4\" refY=\"4\" orient=\"auto-start-reverse\"><path d=\"M0,0 L8,4 L0,8 z\" fill=\"#555\"/></marker></defs>
+
+<rect x=\"40\" y=\"46\" width=\"920\" height=\"64\" rx=\"10\" fill=\"#ffe3e3\" stroke=\"#d04545\" stroke-width=\"2\"/>
+<text x=\"60\" y=\"72\" font-size=\"16\" font-weight=\"bold\" fill=\"#7a1a1a\">APPLICATIONS: where economic value is made</text>
+<text x=\"60\" y=\"94\" font-size=\"13\" fill=\"#7a1a1a\">Chat assistants, coding agents, search, shopping, banking, games, workflow tools: each is a client piece plus a cloud piece</text>
+<line x1=\"500\" y1=\"112\" x2=\"500\" y2=\"126\" stroke=\"#555\" stroke-width=\"2\" marker-end=\"url(#ar)\" marker-start=\"url(#ar)\"/>
+
+<rect x=\"40\" y=\"128\" width=\"920\" height=\"150\" rx=\"10\" fill=\"#f3ecfa\" stroke=\"#8a4fc0\" stroke-width=\"2\"/>
+<text x=\"55\" y=\"152\" font-size=\"16\" font-weight=\"bold\" fill=\"#4a1f78\">CLIENT</text>
+<text x=\"125\" y=\"152\" font-size=\"12.5\" fill=\"#666\">where the human and the sensors are</text>
+<g font-size=\"12.5\" fill=\"#4a1f78\">
+<rect x=\"55\" y=\"165\" width=\"205\" height=\"100\" rx=\"8\" fill=\"#e6d6f5\" stroke=\"#8a4fc0\"/>
+<text x=\"67\" y=\"187\" font-weight=\"bold\">Hardware devices</text><text x=\"67\" y=\"208\">Phone, laptop, headset, car,</text><text x=\"67\" y=\"225\">watch, IoT. CPU + GPU + NPU,</text><text x=\"67\" y=\"242\">RAM, screen, sensors, battery</text>
+<rect x=\"280\" y=\"165\" width=\"205\" height=\"100\" rx=\"8\" fill=\"#e6d6f5\" stroke=\"#8a4fc0\"/>
+<text x=\"292\" y=\"187\" font-weight=\"bold\">Operating system</text><text x=\"292\" y=\"208\">Files, processes, permissions,</text><text x=\"292\" y=\"225\">sandbox, drivers,</text><text x=\"292\" y=\"242\">network stack</text>
+<rect x=\"505\" y=\"165\" width=\"205\" height=\"100\" rx=\"8\" fill=\"#e6d6f5\" stroke=\"#8a4fc0\"/>
+<text x=\"517\" y=\"187\" font-weight=\"bold\">Software on the OS</text><text x=\"517\" y=\"208\">Browser, native apps,</text><text x=\"517\" y=\"225\">local agents, on-device</text><text x=\"517\" y=\"242\">small models</text>
+<rect x=\"730\" y=\"165\" width=\"205\" height=\"100\" rx=\"8\" fill=\"#e6d6f5\" stroke=\"#8a4fc0\"/>
+<text x=\"742\" y=\"187\" font-weight=\"bold\">Local state</text><text x=\"742\" y=\"208\">Cache, offline files, keys,</text><text x=\"742\" y=\"225\">sessions</text>
+</g>
+<line x1=\"500\" y1=\"280\" x2=\"500\" y2=\"298\" stroke=\"#555\" stroke-width=\"2\" marker-end=\"url(#ar)\" marker-start=\"url(#ar)\"/>
+
+<rect x=\"40\" y=\"300\" width=\"920\" height=\"100\" rx=\"10\" fill=\"#eeeeee\" stroke=\"#777\" stroke-width=\"2\"/>
+<text x=\"55\" y=\"323\" font-size=\"16\" font-weight=\"bold\" fill=\"#444\">NETWORK</text>
+<text x=\"140\" y=\"323\" font-size=\"12.5\" fill=\"#666\">shared protocols: the only thing both sides must agree on. All just bytes.</text>
+<g font-size=\"12.5\" fill=\"#333\" text-anchor=\"middle\">
+<rect x=\"70\" y=\"337\" width=\"164\" height=\"50\" rx=\"8\" fill=\"#fff\" stroke=\"#777\"/><text x=\"152\" y=\"358\" font-weight=\"bold\">HTTP / WebSocket</text><text x=\"152\" y=\"376\">gRPC, MCP</text>
+<rect x=\"244\" y=\"337\" width=\"164\" height=\"50\" rx=\"8\" fill=\"#fff\" stroke=\"#777\"/><text x=\"326\" y=\"358\" font-weight=\"bold\">TLS</text><text x=\"326\" y=\"376\">encryption, certificates</text>
+<rect x=\"418\" y=\"337\" width=\"164\" height=\"50\" rx=\"8\" fill=\"#fff\" stroke=\"#777\"/><text x=\"500\" y=\"358\" font-weight=\"bold\">TCP / QUIC</text><text x=\"500\" y=\"376\">reliable streams</text>
+<rect x=\"592\" y=\"337\" width=\"164\" height=\"50\" rx=\"8\" fill=\"#fff\" stroke=\"#777\"/><text x=\"674\" y=\"358\" font-weight=\"bold\">IP + DNS</text><text x=\"674\" y=\"376\">addresses, names</text>
+<rect x=\"766\" y=\"337\" width=\"164\" height=\"50\" rx=\"8\" fill=\"#fff\" stroke=\"#777\"/><text x=\"848\" y=\"358\" font-weight=\"bold\">Wi-Fi, 5G, fibre</text><text x=\"848\" y=\"376\">subsea cables</text>
+</g>
+<line x1=\"500\" y1=\"402\" x2=\"500\" y2=\"408\" stroke=\"#555\" stroke-width=\"2\"/>
+
+<rect x=\"40\" y=\"410\" width=\"920\" height=\"350\" rx=\"10\" fill=\"#f4f9fc\" stroke=\"#2a85b8\" stroke-width=\"2\"/>
+<text x=\"55\" y=\"432\" font-size=\"16\" font-weight=\"bold\" fill=\"#0d4a6b\">CLOUD (server)</text>
+<text x=\"170\" y=\"432\" font-size=\"12.5\" fill=\"#666\">rented, shared, always on, in data centres</text>
+
+<rect x=\"55\" y=\"444\" width=\"435\" height=\"26\" rx=\"6\" fill=\"#0d4a6b\"/>
+<text x=\"272\" y=\"462\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#fff\">RETRIEVAL computing</text>
+<text x=\"272\" y=\"488\" text-anchor=\"middle\" font-size=\"12\" fill=\"#0d4a6b\">fetch what was stored: exact, cheap</text>
+<g font-size=\"12.5\" fill=\"#0d4a6b\">
+<rect x=\"55\" y=\"498\" width=\"435\" height=\"58\" rx=\"8\" fill=\"#cfe9f7\" stroke=\"#2a85b8\"/><text x=\"67\" y=\"519\" font-weight=\"bold\">Your service</text><text x=\"67\" y=\"538\">Auth, business logic, APIs, queues, payments, identity, email</text>
+<rect x=\"55\" y=\"564\" width=\"435\" height=\"58\" rx=\"8\" fill=\"#cfe9f7\" stroke=\"#2a85b8\"/><text x=\"67\" y=\"585\" font-weight=\"bold\">Data stores</text><text x=\"67\" y=\"604\">SQL / NoSQL databases, object storage, search and vector indexes</text>
+<rect x=\"55\" y=\"630\" width=\"435\" height=\"58\" rx=\"8\" fill=\"#cfe9f7\" stroke=\"#2a85b8\"/><text x=\"67\" y=\"651\" font-weight=\"bold\">Hosting</text><text x=\"67\" y=\"670\">Containers, Kubernetes, serverless, CDN, load balancers</text>
+<rect x=\"55\" y=\"696\" width=\"435\" height=\"58\" rx=\"8\" fill=\"#cfe9f7\" stroke=\"#2a85b8\"/><text x=\"67\" y=\"717\" font-weight=\"bold\">Cloud machines</text><text x=\"67\" y=\"736\">CPU servers, SSDs, networking, data centres</text>
+</g>
+
+<rect x=\"510\" y=\"444\" width=\"435\" height=\"26\" rx=\"6\" fill=\"#1f5a10\"/>
+<text x=\"727\" y=\"462\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#fff\">GENERATIVE computing</text>
+<text x=\"727\" y=\"488\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1f5a10\">make new output: flexible, costly per token</text>
+<g font-size=\"12.5\" fill=\"#1f5a10\">
+<rect x=\"510\" y=\"498\" width=\"435\" height=\"58\" rx=\"8\" fill=\"#d9f2d0\" stroke=\"#4a9a35\"/><text x=\"522\" y=\"519\" font-weight=\"bold\">Model API</text><text x=\"522\" y=\"538\">Tokens in, tokens out, tool calls, structured output, prompt caching</text>
+<rect x=\"510\" y=\"564\" width=\"435\" height=\"58\" rx=\"8\" fill=\"#d9f2d0\" stroke=\"#4a9a35\"/><text x=\"522\" y=\"585\" font-weight=\"bold\">Inference serving</text><text x=\"522\" y=\"604\">Batching, KV cache, routing, quantisation, speculative decoding</text>
+<rect x=\"510\" y=\"630\" width=\"435\" height=\"58\" rx=\"8\" fill=\"#d9f2d0\" stroke=\"#4a9a35\"/><text x=\"522\" y=\"651\" font-weight=\"bold\">Trained model</text><text x=\"522\" y=\"670\">Weights from pretraining, then RL / alignment on human feedback</text>
+<rect x=\"510\" y=\"696\" width=\"435\" height=\"58\" rx=\"8\" fill=\"#d9f2d0\" stroke=\"#4a9a35\"/><text x=\"522\" y=\"717\" font-weight=\"bold\">Accelerator clusters</text><text x=\"522\" y=\"736\">GPUs / TPUs, HBM, fast interconnect, power and cooling</text>
+</g>
+<line x1=\"492\" y1=\"720\" x2=\"508\" y2=\"720\" stroke=\"#555\" stroke-width=\"2\" marker-end=\"url(#ar)\" marker-start=\"url(#ar)\"/>
+</svg>
+"
+ :AT "2026-11-16T17:01:34" :VERSION 2)
+(:PINNED T :ID "race-condition-result-depends-on-timing" :MAP "computers" :NODE "concurrency-locks"
+ :TYPE "html" :TITLE "Race condition: result depends on timing" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:0;padding:16px;background:#fafafa;color:#222}
+h1{font-size:18px;margin:0 0 4px}
+.def{font-size:14px;margin:0 0 12px;color:#444}
+.stage{display:flex;align-items:center;justify-content:space-around;gap:8px}
+.p{width:140px;border:2px solid #888;border-radius:10px;padding:8px;background:#fff;text-align:center;transition:.2s}
+.p.A{border-color:#2b7bd6}.p.B{border-color:#d6772b}
+.p h3{margin:0 0 4px;font-size:15px}
+.note{font-size:13px;min-height:54px}
+.box{width:120px;height:120px;border:4px solid #333;border-radius:8px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.box.lock{border-color:#c0392b;background:#fdecea}
+.val{font-size:48px;font-weight:700}
+.lab{font-size:12px;color:#666}
+.ctrl{margin:14px 0;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+button{font-size:15px;padding:8px 16px;border-radius:8px;border:0;background:#333;color:#fff;cursor:pointer}
+button:disabled{opacity:.5}
+#res{font-size:15px;font-weight:600;min-height:22px}
+.bad{color:#c0392b}.good{color:#1e8449}
+#log{font-size:12px;font-family:monospace;background:#fff;border:1px solid #ddd;border-radius:6px;padding:6px;height:110px;overflow:auto}
+.A-t{color:#2b7bd6}.B-t{color:#d6772b}
+</style></head><body>
+<h1>Race condition</h1>
+<p class=\"def\">A race condition is when the result depends on the relative timing of threads that share data without coordination. Each person must read the box, add 1, and write it back. Start at 0, so the correct answer is 2.</p>
+<div class=\"stage\">
+<div class=\"p A\" id=\"pA\"><h3>Alice</h3><div class=\"note\" id=\"nA\">idle</div></div>
+<div class=\"box\" id=\"box\"><div class=\"val\" id=\"val\">0</div><div class=\"lab\">shared box</div></div>
+<div class=\"p B\" id=\"pB\"><h3>Bob</h3><div class=\"note\" id=\"nB\">idle</div></div>
+</div>
+<div class=\"ctrl\"><button id=\"go\">Play</button>
+<label><input type=\"checkbox\" id=\"lk\"> Use a lock</label>
+<span id=\"res\"></span></div>
+<div id=\"tally\" style=\"font-size:13px;margin-bottom:8px\"></div>
+<div id=\"log\"></div>
+<script>
+const $=id=>document.getElementById(id);
+let box=0,held=false,queue=[],tally={ok:0,bad:0,okL:0,badL:0};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const rnd=()=>300+Math.random()*1400;
+function log(n,t){const d=document.createElement('div');d.className=n+'-t';d.textContent=n==='A'?'Alice: '+t:'Bob: '+t;$('log').prepend(d)}
+function note(n,t){$('n'+n).textContent=t}
+function setBox(v){box=v;$('val').textContent=v}
+function acquire(){return new Promise(r=>{if(!held){held=true;$('box').classList.add('lock');r()}else queue.push(r)})}
+function release(){if(queue.length)queue.shift()();else{held=false;$('box').classList.remove('lock')}}
+async function person(n,useLock){
+ await sleep(rnd()*0.6);
+ if(useLock){note(n,'wants the box…');log(n,'asks for lock');await acquire();log(n,'got lock')}
+ const v=box;note(n,'read '+v+'. Thinking…');log(n,'read '+v);
+ await sleep(rnd());
+ note(n,'writing '+(v+1));
+ await sleep(200);
+ setBox(v+1);log(n,'wrote '+(v+1));note(n,'done: wrote '+(v+1));
+ if(useLock){release();log(n,'released lock')}
+}
+$('go').onclick=async()=>{
+ const L=$('lk').checked;$('go').disabled=true;$('res').textContent='';$('log').innerHTML='';
+ setBox(0);held=false;queue=[];$('box').classList.remove('lock');note('A','idle');note('B','idle');
+ await Promise.all([person('A',L),person('B',L)]);
+ const ok=box===2;
+ $('res').innerHTML=ok?'<span class=\"good\">Result 2. Correct this time.</span>':'<span class=\"bad\">Result '+box+'. Lost update! One write overwrote the other.</span>';
+ const k=L?(ok?'okL':'badL'):(ok?'ok':'bad');tally[k]++;
+ $('tally').textContent='No lock: '+tally.ok+' correct, '+tally.bad+' lost updates. With lock: '+tally.okL+' correct, '+tally.badL+' lost updates.';
+ $('go').disabled=false;
+};
+</script></body></html>"
+ :AT "2026-11-16T17:05:40" :VERSION 1)
+(:PINNED T :ID "heaven-and-hell-user-vs-kernel" :MAP "computers" :NODE "syscall-boundary" :TYPE
+ "svg" :TITLE "Heaven and hell: user vs kernel" :LANGUAGE NIL :CONTENT
+ "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 640\" font-family=\"Arial, sans-serif\">
+<defs>
+<linearGradient id=\"sky\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#bfe3ff\"/><stop offset=\"1\" stop-color=\"#fff8e1\"/></linearGradient>
+<linearGradient id=\"fire\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#5a0d0d\"/><stop offset=\"1\" stop-color=\"#c62800\"/></linearGradient>
+</defs>
+<rect width=\"800\" height=\"640\" fill=\"#222\"/>
+<!-- heaven -->
+<rect x=\"0\" y=\"0\" width=\"800\" height=\"280\" fill=\"url(#sky)\"/>
+<g fill=\"#fff\" opacity=\"0.9\"><ellipse cx=\"90\" cy=\"60\" rx=\"60\" ry=\"20\"/><ellipse cx=\"130\" cy=\"48\" rx=\"40\" ry=\"18\"/><ellipse cx=\"690\" cy=\"80\" rx=\"70\" ry=\"20\"/><ellipse cx=\"650\" cy=\"68\" rx=\"40\" ry=\"16\"/></g>
+<ellipse cx=\"400\" cy=\"28\" rx=\"50\" ry=\"9\" fill=\"none\" stroke=\"#e0b400\" stroke-width=\"4\"/>
+<text x=\"400\" y=\"62\" text-anchor=\"middle\" font-size=\"24\" font-weight=\"bold\" fill=\"#1a4f7a\">USER MODE: heaven</text>
+<text x=\"400\" y=\"84\" text-anchor=\"middle\" font-size=\"14\" fill=\"#1a4f7a\">Your apps. Every mistake stays inside its own walls.</text>
+<!-- apps -->
+<g font-size=\"13\" text-anchor=\"middle\" fill=\"#1a4f7a\">
+<rect x=\"60\" y=\"110\" width=\"150\" height=\"80\" rx=\"14\" fill=\"#fff\" stroke=\"#6aa9d8\" stroke-width=\"2\"/>
+<text x=\"135\" y=\"145\" font-weight=\"bold\">Browser</text><text x=\"135\" y=\"165\">crashes → only it dies</text>
+<rect x=\"325\" y=\"110\" width=\"150\" height=\"80\" rx=\"14\" fill=\"#fff\" stroke=\"#6aa9d8\" stroke-width=\"2\"/>
+<text x=\"400\" y=\"145\" font-weight=\"bold\">Your program</text><text x=\"400\" y=\"165\">bad pointer → segfault</text>
+<rect x=\"590\" y=\"110\" width=\"150\" height=\"80\" rx=\"14\" fill=\"#fff\" stroke=\"#6aa9d8\" stroke-width=\"2\"/>
+<text x=\"665\" y=\"145\" font-weight=\"bold\">Game</text><text x=\"665\" y=\"165\">restart and try again</text>
+</g>
+<text x=\"400\" y=\"228\" text-anchor=\"middle\" font-size=\"13\" fill=\"#1a4f7a\">Can only touch its own memory. Anything else must be asked for.</text>
+<text x=\"400\" y=\"248\" text-anchor=\"middle\" font-size=\"13\" fill=\"#1a4f7a\">Consequence of failure: one process is killed.</text>
+<!-- gate -->
+<rect x=\"0\" y=\"280\" width=\"800\" height=\"80\" fill=\"#333\"/>
+<rect x=\"250\" y=\"272\" width=\"300\" height=\"96\" rx=\"10\" fill=\"#f4d03f\" stroke=\"#7a5c00\" stroke-width=\"3\"/>
+<text x=\"400\" y=\"300\" text-anchor=\"middle\" font-size=\"16\" font-weight=\"bold\" fill=\"#3a2a00\">THE SYSCALL GATE</text>
+<text x=\"400\" y=\"320\" text-anchor=\"middle\" font-size=\"12\" fill=\"#3a2a00\">1. syscall instruction  2. mode flips to kernel</text>
+<text x=\"400\" y=\"337\" text-anchor=\"middle\" font-size=\"12\" fill=\"#3a2a00\">3. jump to FIXED entry  4. number picks the job</text>
+<text x=\"400\" y=\"354\" text-anchor=\"middle\" font-size=\"12\" fill=\"#3a2a00\">5. return, mode drops to user</text>
+<!-- arrows -->
+<g stroke=\"#fff\" stroke-width=\"4\" fill=\"#fff\">
+<line x1=\"150\" y1=\"200\" x2=\"150\" y2=\"395\"/><polygon points=\"140,385 160,385 150,405\" />
+<line x1=\"650\" y1=\"405\" x2=\"650\" y2=\"210\"/><polygon points=\"640,220 660,220 650,198\"/>
+</g>
+<text x=\"165\" y=\"300\" font-size=\"12\" fill=\"#fff\">request + number</text>
+<text x=\"525\" y=\"300\" font-size=\"0\"></text>
+<text x=\"665\" y=\"300\" font-size=\"12\" fill=\"#fff\">result</text>
+<!-- hell -->
+<rect x=\"0\" y=\"368\" width=\"800\" height=\"272\" fill=\"url(#fire)\"/>
+<g fill=\"#ff9800\" opacity=\"0.85\">
+<path d=\"M0 640 L30 570 L60 640Z\"/><path d=\"M80 640 L120 550 L160 640Z\"/><path d=\"M250 640 L285 575 L320 640Z\"/><path d=\"M480 640 L520 555 L560 640Z\"/><path d=\"M640 640 L680 570 L720 640Z\"/><path d=\"M740 640 L770 585 L800 640Z\"/>
+</g>
+<g fill=\"#ffd54f\" opacity=\"0.8\"><path d=\"M95 640 L120 590 L145 640Z\"/><path d=\"M495 640 L520 595 L545 640Z\"/><path d=\"M655 640 L680 600 L705 640Z\"/></g>
+<text x=\"400\" y=\"400\" text-anchor=\"middle\" font-size=\"24\" font-weight=\"bold\" fill=\"#ffd9b0\">KERNEL MODE: hell</text>
+<text x=\"400\" y=\"422\" text-anchor=\"middle\" font-size=\"14\" fill=\"#ffd9b0\">Full power over all memory and hardware. No safety net.</text>
+<g font-size=\"13\" text-anchor=\"middle\" fill=\"#ffe0c0\">
+<rect x=\"60\" y=\"445\" width=\"200\" height=\"70\" rx=\"6\" fill=\"#2b0505\" stroke=\"#ff5722\" stroke-width=\"2\"/>
+<text x=\"160\" y=\"475\" font-weight=\"bold\">Drivers + memory manager</text><text x=\"160\" y=\"495\">one bad write corrupts all</text>
+<rect x=\"300\" y=\"445\" width=\"200\" height=\"70\" rx=\"6\" fill=\"#2b0505\" stroke=\"#ff5722\" stroke-width=\"2\"/>
+<text x=\"400\" y=\"475\" font-weight=\"bold\">Scheduler + file system</text><text x=\"400\" y=\"495\">one bug hangs everything</text>
+<rect x=\"540\" y=\"445\" width=\"200\" height=\"70\" rx=\"6\" fill=\"#2b0505\" stroke=\"#ff5722\" stroke-width=\"2\"/>
+<text x=\"640\" y=\"475\" font-weight=\"bold\">Raw hardware access</text><text x=\"640\" y=\"495\">disk, network, CPU control</text>
+</g>
+<text x=\"400\" y=\"560\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"bold\" fill=\"#fff\">Consequence of failure: kernel panic / blue screen. The whole machine goes down.</text>
+<text x=\"400\" y=\"584\" text-anchor=\"middle\" font-size=\"13\" fill=\"#ffd9b0\">So the kernel keeps its code small and checks every request from above.</text>
+</svg>"
+ :AT "2026-11-16T17:15:32" :VERSION 1)
+(:PINNED T :ID "database-core-ideas" :MAP "computers" :NODE "databases" :TYPE "svg" :TITLE
+ "Database core ideas" :LANGUAGE NIL :CONTENT
+ "<svg viewBox=\"0 0 700 460\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"sans-serif\" font-size=\"14\">
+<rect width=\"700\" height=\"460\" fill=\"#fff\"/>
+<text x=\"350\" y=\"28\" text-anchor=\"middle\" font-size=\"18\" font-weight=\"bold\">Database = query language + engine over files</text>
+<rect x=\"230\" y=\"45\" width=\"240\" height=\"50\" rx=\"8\" fill=\"#dbeafe\" stroke=\"#2563eb\"/>
+<text x=\"350\" y=\"66\" text-anchor=\"middle\" font-weight=\"bold\">1. Declarative query (SQL)</text>
+<text x=\"350\" y=\"85\" text-anchor=\"middle\" font-size=\"12\">say WHAT, not HOW</text>
+<rect x=\"230\" y=\"120\" width=\"240\" height=\"50\" rx=\"8\" fill=\"#ede9fe\" stroke=\"#7c3aed\"/>
+<text x=\"350\" y=\"141\" text-anchor=\"middle\" font-weight=\"bold\">2. Query planner</text>
+<text x=\"350\" y=\"160\" text-anchor=\"middle\" font-size=\"12\">picks fastest way (uses indexes)</text>
+<rect x=\"40\" y=\"200\" width=\"190\" height=\"110\" rx=\"8\" fill=\"#dcfce7\" stroke=\"#16a34a\"/>
+<text x=\"135\" y=\"222\" text-anchor=\"middle\" font-weight=\"bold\">3. Relational model</text>
+<text x=\"135\" y=\"244\" text-anchor=\"middle\" font-size=\"12\">tables of rows; keys link</text>
+<text x=\"135\" y=\"262\" text-anchor=\"middle\" font-size=\"12\">tables (id → user_id)</text>
+<text x=\"135\" y=\"284\" text-anchor=\"middle\" font-size=\"12\">schema enforces structure</text>
+<rect x=\"255\" y=\"200\" width=\"190\" height=\"110\" rx=\"8\" fill=\"#fef9c3\" stroke=\"#ca8a04\"/>
+<text x=\"350\" y=\"222\" text-anchor=\"middle\" font-weight=\"bold\">4. Indexes (B-tree)</text>
+<text x=\"350\" y=\"244\" text-anchor=\"middle\" font-size=\"12\">sorted lookup: O(log n)</text>
+<text x=\"350\" y=\"262\" text-anchor=\"middle\" font-size=\"12\">instead of scanning every</text>
+<text x=\"350\" y=\"280\" text-anchor=\"middle\" font-size=\"12\">row</text>
+<rect x=\"470\" y=\"200\" width=\"190\" height=\"110\" rx=\"8\" fill=\"#fee2e2\" stroke=\"#dc2626\"/>
+<text x=\"565\" y=\"222\" text-anchor=\"middle\" font-weight=\"bold\">5. Transactions (ACID)</text>
+<text x=\"565\" y=\"244\" text-anchor=\"middle\" font-size=\"12\">Atomic: all or nothing</text>
+<text x=\"565\" y=\"262\" text-anchor=\"middle\" font-size=\"12\">Consistent · Isolated (locks)</text>
+<text x=\"565\" y=\"280\" text-anchor=\"middle\" font-size=\"12\">Durable: log survives crash</text>
+<rect x=\"230\" y=\"340\" width=\"240\" height=\"50\" rx=\"8\" fill=\"#f3f4f6\" stroke=\"#555\"/>
+<text x=\"350\" y=\"361\" text-anchor=\"middle\" font-weight=\"bold\">6. Storage: pages in files</text>
+<text x=\"350\" y=\"380\" text-anchor=\"middle\" font-size=\"12\">+ write-ahead log, cache</text>
+<g stroke=\"#555\" stroke-width=\"2\" fill=\"none\"><path d=\"M350 95v25M350 170v30M350 310v30M135 310v10l215 20M565 310v10l-215 20M300 170l-165 30M400 170l165 30\"/></g>
+<text x=\"350\" y=\"425\" text-anchor=\"middle\" font-size=\"12\" fill=\"#555\">Files give bytes; the database adds meaning, speed and safety on top.</text>
+</svg>"
+ :AT "2026-11-17T10:46:46" :VERSION 1)
+(:PINNED T :ID "indexing-scan-vs-sorted-lookup" :MAP "computers" :NODE "databases" :TYPE "html"
+ :TITLE "Indexing: scan vs sorted lookup" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:sans-serif;margin:14px;color:#222}
+h2{margin:0 0 6px;font-size:18px}
+.row{display:flex;flex-wrap:wrap;gap:3px;margin:6px 0 10px}
+.c{width:34px;height:26px;font-size:11px;display:flex;align-items:center;justify-content:center;border:1px solid #bbb;border-radius:4px;background:#f8f8f8}
+.c.x{background:#fecaca;border-color:#dc2626;color:#999}
+.c.cur{background:#fde047;border-color:#ca8a04;font-weight:bold}
+.c.hit{background:#4ade80;border-color:#16a34a;font-weight:bold}
+.c.out{opacity:.25}
+button,select{padding:6px 12px;margin-right:6px;font-size:14px}
+.box{border:1px solid #ddd;border-radius:8px;padding:8px 12px;margin:8px 0}
+.n{font-size:20px;font-weight:bold}
+table{border-collapse:collapse;font-size:13px;margin-top:6px}td,th{border:1px solid #ccc;padding:4px 10px;text-align:right}
+</style></head><body>
+<h2>Find the row where id = <span id=\"t\"></span></h2>
+<div>
+<button onclick=\"run()\">▶ Run both</button>
+<button onclick=\"pick()\">New random target</button>
+</div>
+<div class=\"box\"><b>No index: full scan</b> (check rows one by one) — checks: <span class=\"n\" id=\"n1\">0</span>
+<div class=\"row\" id=\"a\"></div></div>
+<div class=\"box\"><b>With sorted index</b> (look in the middle, discard half) — checks: <span class=\"n\" id=\"n2\">0</span>
+<div class=\"row\" id=\"b\"></div>
+<div style=\"font-size:12px;color:#555\">Grey = ruled out without looking. A real B-tree does this with wide nodes so each disk read rules out hundreds of rows.</div></div>
+<b>Scaling (worst case checks)</b>
+<table><tr><th>Rows</th><th>Scan</th><th>Index</th></tr>
+<tr><td>64 (above)</td><td>64</td><td>6</td></tr><tr><td>1,000</td><td>1,000</td><td>10</td></tr>
+<tr><td>1,000,000</td><td>1,000,000</td><td>20</td></tr>
+<tr><td>1,000,000,000</td><td>1,000,000,000</td><td>30</td></tr></table>
+<script>
+const N=64;let keys=[],target,timer;
+for(let i=0;i<N;i++)keys.push(10+i*7+(i*i)%5);
+function build(){for(const id of['a','b']){const e=document.getElementById(id);e.innerHTML='';keys.forEach(k=>{const d=document.createElement('div');d.className='c';d.textContent=k;e.appendChild(d)})}
+document.getElementById('t').textContent=target;n1.textContent=0;n2.textContent=0}
+function pick(){clearInterval(timer);target=keys[Math.floor(Math.random()*N)];build()}
+function run(){clearInterval(timer);build();const A=a.children,B=b.children;let i=0,lo=0,hi=N-1,s1=true,s2=true,c1=0,c2=0;
+timer=setInterval(()=>{
+if(s1){if(i>0)A[i-1].classList.replace('cur','x');A[i].classList.add('cur');c1++;n1.textContent=c1;if(keys[i]==target){A[i].classList.replace('cur','hit');s1=false}else i++}
+if(s2){const m=(lo+hi)>>1;[...B].forEach(e=>e.classList.remove('cur'));B[m].classList.add('cur');c2++;n2.textContent=c2;
+if(keys[m]==target){B[m].classList.replace('cur','hit');s2=false}
+else{if(keys[m]<target){for(let j=lo;j<=m;j++)B[j].classList.add('out');lo=m+1}else{for(let j=m;j<=hi;j++)B[j].classList.add('out');hi=m-1}}}
+if(!s1&&!s2)clearInterval(timer)},450)}
+pick();
+</script></body></html>"
+ :AT "2026-11-17T11:10:37" :VERSION 1)
+(:PINNED T :ID "usb-pulled-mid-save-corruption" :MAP "computers" :NODE "databases" :TYPE "html"
+ :TITLE "USB pulled mid-save: corruption" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:Segoe UI,sans-serif;margin:14px;color:#222}
+h2{margin:0 0 8px;font-size:18px}
+button{padding:7px 14px;margin:0 6px 6px 0;font-size:14px;cursor:pointer}
+button.red{background:#dc2626;color:#fff;border:0;border-radius:4px}
+.lab{font-size:12px;color:#555;margin-top:8px}
+.row{display:flex;gap:4px;margin:4px 0}
+.b{width:44px;height:34px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:12px;border:1px solid #888;background:#eee;color:#888}
+.o{background:#bfdbfe;border-color:#2563eb;color:#1e3a8a}
+.n{background:#bbf7d0;border-color:#16a34a;color:#14532d}
+.m{width:auto;padding:0 10px}
+.dirty{background:#fecaca;border-color:#dc2626;color:#7f1d1d}
+.usb{border:2px solid #444;border-radius:8px;padding:8px 12px;background:#f9fafb;transition:transform .6s,opacity .6s}
+.usb.out{transform:translateX(160px) rotate(8deg);opacity:.35}
+#msg{min-height:38px;font-size:14px;margin:8px 0;padding:6px 10px;background:#fffbe6;border-left:4px solid #eab308}
+#dlg{display:none;margin-top:10px;width:380px;border:1px solid #666;box-shadow:4px 4px 12px #0006;background:#fff;font-size:13px}
+#dlg .t{background:#1e66c0;color:#fff;padding:5px 8px;display:flex;justify-content:space-between}
+#dlg .bd{padding:14px;display:flex;gap:12px}
+#dlg .ic{background:#dc2626;color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-weight:bold;flex:none}
+#dlg.show{display:block;animation:shake .5s}
+@keyframes shake{20%{transform:translateX(-10px)}40%{transform:translateX(10px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+#ok{display:none;margin-top:10px;padding:10px;background:#dcfce7;border:1px solid #16a34a;border-radius:6px;width:360px}
+</style></head><body>
+<h2>Saving report.docx (v1 → v2) to a USB stick</h2>
+<button onclick=\"setMode('plain')\" id=\"bp\">Plain overwrite</button>
+<button onclick=\"setMode('jour')\" id=\"bj\">Journaled (transaction)</button>
+<div><button onclick=\"start()\" id=\"go\">💾 Save</button><button class=\"red\" onclick=\"pull()\">⏏ Pull the USB!</button><button onclick=\"plug()\" id=\"pl\" disabled>🔌 Plug back in</button><button onclick=\"reset()\">Reset</button></div>
+<div id=\"msg\"></div>
+<div class=\"usb\" id=\"usb\">
+<div class=\"lab\">Journal (log area)</div><div class=\"row\" id=\"jr\"></div>
+<div class=\"lab\">File data blocks (blue = v1 old, green = v2 new)</div><div class=\"row\" id=\"dt\"></div>
+<div class=\"lab\">File metadata</div><div class=\"row\"><div class=\"b m\" id=\"meta\"></div></div>
+</div>
+<div id=\"dlg\"><div class=\"t\"><span>Location is not available</span><span>✕</span></div>
+<div class=\"bd\"><div class=\"ic\">✕</div><div><b>E:\\ is not accessible.</b><br>The file or directory is corrupted and unreadable.<br><br>Some blocks hold v1, some hold v2, and the file size/records no longer match either version.<br><br><button onclick=\"dlg.classList.remove('show')\">OK</button></div></div></div>
+<div id=\"ok\"></div>
+<script>
+let mode='plain',step=0,pulled=false,timer,B,J,commit,meta,cleared;
+function reset(){clearInterval(timer);step=0;pulled=false;B=Array(8).fill('o');J=Array(4).fill(0);commit=false;cleared=false;meta='ok';
+usb.classList.remove('out');dlg.classList.remove('show');ok.style.display='none';pl.disabled=true;go.disabled=false;
+say(mode=='plain'?'Plain mode: the program overwrites the file in place, block by block, then updates the metadata. No log.':'Journaled mode: first write the new data to a log, then a commit marker, and only then copy it into place.');draw()}
+function setMode(m){mode=m;reset()}
+function say(s){msg.textContent=s}
+function draw(){jr.innerHTML=J.map((v,i)=>`<div class=\"b ${v?'n':''}\">${v?'v2·'+(i+1):'–'}</div>`).join('')+`<div class=\"b m ${commit&&!cleared?'n':''}\">${commit&&!cleared?'COMMIT ✔':'no commit'}</div>`;
+dt.innerHTML=B.map(v=>`<div class=\"b ${v}\">${v=='o'?'v1':'v2'}</div>`).join('');
+meta.className='b m '+(meta=='dirty'?'dirty':'o');meta.textContent=meta=='dirty'?'size/checksum = INCONSISTENT':'consistent';
+bp.style.fontWeight=mode=='plain'?'bold':'normal';bj.style.fontWeight=mode=='jour'?'bold':'normal'}
+const total=()=>mode=='plain'?6:10;
+function tick(){
+if(mode=='plain'){
+ if(step==0){meta='dirty';say('Marking file as being updated…')}
+ else if(step<=4){B[2*step-2]='n';B[2*step-1]='n';say('Overwriting blocks '+(2*step-1)+'–'+(2*step)+' in place…')}
+ else{meta='ok';say('Updating metadata… saved!')}
+}else{
+ if(step<4){J[step]=1;say('Writing new data to the journal ('+(step+1)+'/4)…')}
+ else if(step==4){commit=true;say('Commit marker written. The change is now guaranteed.')}
+ else if(step<9){const k=step-5;B[2*k]='n';B[2*k+1]='n';say('Copying from journal into place…')}
+ else{cleared=true;J=Array(4).fill(0);say('Journal cleared. Saved!')}
+}
+step++;draw();if(step>=total()){clearInterval(timer);go.disabled=true;say('Finished saving safely. Pulling the USB now would be harmless.')}}
+function start(){if(pulled||step>0)return;go.disabled=true;timer=setInterval(tick,900)}
+function pull(){if(pulled||step>=total())return;clearInterval(timer);pulled=true;usb.classList.add('out');pl.disabled=false;go.disabled=true;say('⏏ Power gone mid-write, at step '+step+' of '+total()+'. Whatever reached the disk is all there is.')}
+function plug(){usb.classList.remove('out');pl.disabled=true;
+if(mode=='plain'){
+ const mixed=B.includes('o')&&B.includes('n');
+ if(step==0){ok.style.display='block';ok.textContent='Nothing was written yet: v1 is intact.'}
+ else{dlg.classList.add('show');say('No log, so nothing knows what was half-done. The file is a mix of v1 and v2 with inconsistent metadata → corrupt.')}
+}else{
+ if(commit&&!cleared){B=Array(8).fill('n');J=Array(4).fill(0);cleared=true;draw();ok.style.display='block';ok.textContent='Recovery found a COMMIT in the journal and replayed it: file is cleanly v2.';say('Recovery: committed → replay journal → all-new.')}
+ else{J=Array(4).fill(0);draw();ok.style.display='block';ok.textContent='Recovery found no COMMIT, discarded the journal: file is cleanly v1 (the save was lost, but nothing is broken).';say('Recovery: not committed → throw away journal → all-old.')}
+}}
+reset();
+</script></body></html>"
+ :AT "2026-11-17T11:10:56" :VERSION 1)

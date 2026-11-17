@@ -277,12 +277,51 @@ The ISA fixes the instructions, the registers, the data types, and how memory is
  "sharing" :PREREQS ("processes-threads" "clock") :ERA 1962)
 (:NODE :ID "virtual-memory" :TITLE "Virtual memory" :COMPRESSION
  "Every address a program uses is translated through a table the kernel owns, so each program sees its own private memory."
- :BODY "Programs cannot read or corrupt each other, and memory can be larger than RAM." :GROUP
- "sharing" :PREREQS ("ram" "processes-threads") :ERA 1962)
+ :BODY
+ "Virtual memory lets many programs share one machine safely (the MMU, or memory management unit, is a small piece of CPU hardware that translates every address a program uses into a real RAM address): each program believes it owns a huge private memory, programs cannot read or corrupt each other, and memory can be larger than RAM.
+
+**Mechanism.** Programs use *virtual addresses*. On every load, store and instruction fetch, the hardware's MMU (the translator described above) translates the address using a **page table** owned by the kernel. Memory is split into fixed-size pages (usually 4 KB) that map to physical frames of RAM. Each process has its own table, so the same virtual address in two processes maps to different frames, or to nothing. A program has no address that reaches another's memory.
+
+**Beyond RAM (demand paging).** Each page-table entry has a *present* bit. If the page is in RAM, access proceeds at full speed. If not, the CPU raises a **page fault** (an interrupt); the kernel loads the page from disk into a free frame, evicting another page if RAM is full, updates the table, and restarts the instruction. The program only notices the delay. Locality makes this workable: RAM acts as a cache for the disk. When the working set exceeds RAM, the system **thrashes**.
+
+**Further ideas**
+- **The illusion:** each program sees one flat address space (e.g. 2⁴⁸ bytes), not a slice of RAM. Frames are handed out dynamically and need not be contiguous.
+- **The kernel decides** which pages sit in RAM and which sit on disk (swap space or the file itself), not the program.
+- **TLB:** a small cache of recent translations. Without it, every access would need extra memory reads to walk the table.
+- **Permission bits:** read/write/execute and user/kernel flags in each entry. The kernel can make code read-only and protect its own memory. An access to an unmapped or forbidden page causes a fault (segfault).
+- **Deliberate sharing:** the kernel can map one physical frame into several processes (shared libraries, shared memory), and can map files into memory.
+- **Limits:** virtual memory confines memory access only. Files, the network and system calls are controlled by separate permissions."
+ :GROUP "sharing" :PREREQS ("ram" "processes-threads") :ERA 1962)
 (:NODE :ID "files" :TITLE "Files" :COMPRESSION
  "A name mapped to a sequence of bytes on a disk; a directory is a file that lists other files."
  :BODY
- "Persistence and naming in one idea. Almost everything the kernel offers is made to look like a file."
+ "Programs die and power goes out, but data must not. Files give every program the same simple promise: put bytes under a name, and they will still be there later, whoever asks for them. Persistence and naming are one idea, and the kernel offers almost everything else through the same interface.
+
+## The problem files solve
+
+RAM is fast but forgets at power-off. A disk (SSD or hard drive) remembers, but it only offers numbered fixed-size blocks (typically 512 B to 4 KB). Nobody wants to remember \"my essay is in blocks 8812, 8813 and 40211\". The file system is the kernel layer that turns blocks into named, variable-length sequences of bytes.
+
+## Mechanism
+
+- **Inode.** Each file is described by a small record holding its size, owner, permissions, timestamps and the list of disk blocks that hold its bytes. The inode has no name.
+- **Directory.** A directory is itself a file whose contents are a table of (name, inode number) pairs. A path like `/home/ana/essay.txt` is resolved by starting at the root directory, looking up `home`, reading that directory, looking up `ana`, and so on. Nesting names this way gives a tree.
+- **Names are separate from files.** Because a directory entry only points to an inode, two names can point to the same file (a hard link). The file's blocks are freed when the last name is removed and no program still has it open.
+- **File descriptor.** A program calls `open(path)` and gets back a small integer. Every later `read(fd, ...)` or `write(fd, ...)` uses that integer, and the kernel remembers the current position and checks permissions. The program never sees blocks.
+- **Permissions.** The inode records who may read, write or execute. Since many programs and users share one disk, this is how the kernel enforces who may touch what.
+
+## Everything is a file
+
+The open/read/write/close interface turned out to fit far more than disks. Keyboards, terminals, pipes between programs, network sockets and kernel information (`/proc`) can all be opened and read as byte streams. A program written to read a file can often read from a pipe or a device unchanged. This is the main reason the idea generates so much of the rest of the system. Ritchie and Thompson describe it in \"The UNIX Time-Sharing System\" (CACM, 1974).
+
+## Speed and safety
+
+- **Page cache.** Disks are far slower than RAM, so the kernel keeps recently used file data in memory. A `write` usually returns once the data is in the cache, not once it is on the disk.
+- **Durability.** `fsync` forces the data to the disk. Without it, a crash can lose recent writes.
+- **Crash consistency.** Adding a file touches several structures: the directory, the inode and the data blocks. A crash halfway through could leave them inconsistent. Journaling (and copy-on-write file systems) first record the intended change so it can be finished or undone after a crash.
+
+## What a file is not
+
+A file is just bytes. The kernel does not know whether it holds text, an image or a program. Structure comes from the programs that read it. Databases build tables, indexes and transactions on top of files to get what plain files don't give."
  :GROUP "sharing" :PREREQS ("kernel" "drivers") :ERA 1965)
 (:NODE :ID "syscall-boundary" :TITLE "The system call boundary" :COMPRESSION
  "A program asks the kernel for something with a special instruction that raises privilege, passes a number, and drops it again on return."
@@ -292,7 +331,42 @@ The ISA fixes the instructions, the registers, the data types, and how memory is
 (:NODE :ID "os-as-referee" :TITLE "The OS as referee" :COMPRESSION
  "The kernel exists to share the hardware fairly and keep programs from touching each other; everything else it does is convenience."
  :BODY
- "Explains why an OS is needed at all, and what it is not: it is not the desktop, the shell or the apps."
+ "Many programs share one CPU, one pool of RAM and one set of devices, and none can be trusted. Without a referee, one bug could hog the CPU, overwrite another program's memory or corrupt the disk. The **kernel**, the core of the OS, is that referee.
+
+## Two jobs
+
+1. **Share**: split the machine among programs.
+2. **Protect**: stop programs harming each other or the kernel.
+
+Stack: hardware, then kernel, then all programs. The shell, desktop and bundled apps are ordinary programs that ask the kernel for things. The kernel *is* the handling layer; there is no layer between it and the apps.
+
+## Enforcement (hardware-backed)
+
+- **Privilege modes**: kernel can do anything; user programs can't touch devices or others' memory.
+- **Syscalls**: a program traps into the kernel at a fixed entry point; the kernel checks the request, then does it or refuses.
+- **Timer interrupt**: forces control back to the kernel, so no program can keep the CPU.
+- **MMU**: kernel sets page tables; hardware checks every memory access.
+
+## What it manages
+
+| Resource | Kernel mechanism | Idea |
+|---|---|---|
+| CPU | Scheduler time-slices | Time-sharing |
+| Memory | Virtual memory: private address spaces via page tables | Isolation |
+| Storage | File system: blocks become named files with permissions | Abstraction |
+| Devices | Drivers and interrupts behind a uniform interface | Abstraction |
+| Processes | Create, pause, end; IPC and synchronisation | Containment |
+| Permissions | Identity and rights checked on each request | Protection |
+
+Two moves repeat: **abstraction** (a file instead of raw blocks) and **multiplexing with isolation** (each program feels it owns the resource).
+
+## Examples
+
+- **Two programs, one core**: the timer fires, the kernel saves one program's registers, loads the other's, and resumes it.
+- **Same address, different data**: address 0x1000 in two processes maps to different RAM. An address a process doesn't own causes an MMU fault, and the kernel kills just that process.
+- **Saving a file**: `write()` traps in, the kernel checks permissions, and the disk driver writes blocks.
+- **Keystroke**: interrupt, then the kernel handler routes it to the focused program only.
+- **Crash**: the kernel reclaims the dead program's memory and files; the others carry on."
  :GROUP "sharing" :PREREQS ("scheduler" "virtual-memory" "syscall-boundary") :ERA 1969)
 (:NODE :ID "compiler-vs-interpreter" :TITLE "Compiler versus interpreter" :COMPRESSION
  "A compiler translates a whole program into machine code once; an interpreter reads and performs it a piece at a time while it runs."
@@ -438,7 +512,27 @@ Source: Turing, 'On Computable Numbers, with an Application to the Entscheidungs
 (:NODE :ID "databases" :TITLE "Databases" :COMPRESSION
  "Keep structured data in tables behind a query language, and let the system handle storage, concurrency and crash recovery."
  :BODY
- "Codd's relational model (1970) separated what you ask from how it is stored. Transactions let many programs change shared state without corrupting it. It is the next layer above files, and most servers are mainly a database with a front door."
+ "A database is what you get when a system understands the meaning of your data, not just its bytes, and guarantees it stays correct while many programs change it at once. Most servers are mainly a database with a front door.
+
+**Mechanism.** Codd's relational model (1970) separated what you ask from how it is stored: you write a declarative query (`WHERE age > 30`), and a planner picks the fastest route, using indexes (B-trees) rather than scanning every row. Data lives in tables with a schema, and keys and constraints enforce integrity. Underneath are ordinary files, plus a write-ahead log for crash recovery. Transactions (ACID) let many programs change shared state without corrupting it: atomic (all or nothing), consistent, isolated (via locks or versions), durable (the log survives a crash).
+
+**Why a file system doesn't qualify.** A file system is itself a kind of database, a hierarchical key-value store (path → bytes), and NTFS (New Technology File System, Microsoft's default Windows file system) uses database-like structures internally. The difference is what it guarantees about the contents:
+
+| | File system | Database |
+|---|---|---|
+| Knows about contents | No, just bytes | Yes, via schema and types |
+| Find things | By path or name | By any property (`WHERE age > 30`) |
+| Multi-step changes | None, so a crash mid-way leaves a mess | Atomic transactions |
+| Concurrent writers | Last write wins, or file locks | Isolation |
+| Integrity rules | None | Keys, constraints |
+
+**Test:** can you say \"move £50 from A to B\" and be guaranteed that either both changes happen or neither does, even if power dies mid-way, while others read and write at the same time? A file system can't. A database can.
+
+Two checks that separate them:
+- **Query by content, not location.** Finding \"all users over 30\" in a file system means opening every file yourself. A database does it declaratively, using indexes.
+- **Multi-object atomicity.** A file system's guarantees mostly cover its own metadata, such as a single rename. A database extends them to your data.
+
+Loose definition: a database is a file system whose contents have meaning to the system, with transactions on top. Cloud or external storage is incidental; a database on one laptop is still a database."
  :GROUP "sharing" :PREREQS NIL :ERA 1970)
 (:NODE :ID "cloud-virtualization" :TITLE "Virtualization and the cloud" :COMPRESSION
  "A program that pretends to be a whole machine lets one physical computer be sliced and rented out as many."
@@ -483,9 +577,20 @@ The scheduler's timer tick, device drivers and the system call mechanism all wor
 (:NODE :ID "concurrency-locks" :TITLE "Concurrency and locks" :COMPRESSION
  "When threads share memory, the result can depend on timing, so a lock lets only one thread at a time touch the shared piece."
  :BODY
- "Threads can be switched at any instruction, so two threads that read, change and write the same variable can overwrite each other's work. This is a race condition, and it is hard to reproduce because it depends on timing.
+ "When threads share memory, the answer a program gives can depend on luck. Locks are the standard way to take that luck out.
 
-A lock (Dijkstra's semaphore, 1965) lets one thread enter a critical section while the others wait. Atomic hardware instructions make the lock itself safe. Locks bring their own hazards: deadlock, where threads each wait for the other, and lost speed from waiting. Alternatives are message passing and immutable data."
+Threads can be switched at any instruction, so two threads that read, change and write the same variable can overwrite each other's work. If both read 0, both add 1 and both write, the result is 1, not 2. This is a race condition: the result depends on the relative timing of uncoordinated threads. It is hard to reproduce because the timing differs on every run.
+
+A lock (Dijkstra's semaphore, 1965) lets one thread enter a critical section while the others wait. Atomic hardware instructions make the lock itself safe. Locks bring their own hazards: deadlock, where threads each wait for the other, and lost speed from waiting. Alternatives are message passing and immutable data.
+
+**Relation to ACID.** Databases face the same problem and name the guarantees they want with the acronym ACID:
+
+- **A**tomicity: a transaction happens entirely or not at all.
+- **C**onsistency: the data's rules still hold afterwards.
+- **I**solation: concurrent transactions behave as if they ran one at a time.
+- **D**urability: once committed, the result survives a crash.
+
+Locks are the classic mechanism for isolation (two-phase locking, Gray et al., 1976), and a critical section is atomic in the sense that no other thread sees it half-done. Consistency still depends on the programmer's rules. Durability is a separate matter of storage, which locks do not address."
  :GROUP "sharing" :PREREQS NIL :ERA 1965)
 (:NODE :ID "parsing-grammars" :TITLE "Parsing and grammars" :COMPRESSION
  "A grammar defines which strings are valid programs, and a parser turns text into a tree that the rest of the language machinery works on."
@@ -649,3 +754,25 @@ A voltage-controlled oscillator (VCO) runs fast. A divider cuts its output by N.
 
 Chips therefore distribute the clock through a tree of buffers, each stage splitting into several branches, laid out so every path to a leaf has about the same length and delay. Skew eats into the period, so keeping it small is part of what sets the maximum clock speed."
  :GROUP "switches" :PREREQS NIL :ERA 1980)
+(:NODE :ID "fortran-vs-lisp" :TITLE "Two lineages: Fortran and Lisp" :COMPRESSION
+ "Fortran compressed numeric formulas into fast machine code, while Lisp compressed symbolic reasoning into recursion on lists, and the two split on whether a language mirrors the machine or the mathematics."
+ :BODY
+ "Almost every later language design choice is a position between two early answers to the question of what a language is for, so knowing the split makes the rest of this group easier to place.
+
+**Fortran (Backus and colleagues, 1957)** was built for scientists computing formulas. Its bet was that a compiler could turn `Y = A*X + B` into machine code as good as a skilled programmer's assembly. Data is arrays of numbers laid out as the hardware likes them, and control is loops and jumps. Speed is the goal, so the language stays close to the machine. The line runs on through Algol and C.
+
+**Lisp (McCarthy, 1958; published 1960)** was built for the AI problem of the day, which was manipulating symbols and not crunching numbers. Its ingredients follow from that: lists as the one data structure, recursion as the main way to repeat, conditional expressions, memory freed automatically (garbage collection), and programs written as the same lists they operate on, so an `eval` function can be written in the language itself (code as data). The language is built from mathematical function definitions rather than from the machine's operations, so a running system is easy to extend, but it needs runtime machinery that costs speed.
+
+| | Fortran | Lisp |
+|---|---|---|
+| Built for | numeric formulas | symbolic reasoning, AI |
+| Core data | arrays of numbers | lists of symbols |
+| Repeat by | loops | recursion |
+| Memory | laid out by the programmer | allocated and collected automatically |
+| Program is | text a compiler translates | data the language can build and run |
+| Strength | speed, close to hardware | flexibility, close to the mathematics |
+
+The split is not permanent. Later mainstream languages such as Python and JavaScript took garbage collection, first-class functions and interactive evaluation from the Lisp side, while keeping Fortran-style loops and arrays. Types, parsing and the call stack all have to be settled differently depending on which lineage a language follows.
+
+Primary sources: Backus et al., *The FORTRAN Automatic Coding System* (1957); McCarthy, *Recursive Functions of Symbolic Expressions and Their Computation by Machine, Part I* (CACM, 1960)."
+ :GROUP "languages" :PREREQS NIL :ERA 1958)
