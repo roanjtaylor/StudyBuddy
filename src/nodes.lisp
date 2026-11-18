@@ -36,6 +36,7 @@
               :title (getf* head :title name)
               :compression (getf head :compression)
               :axis (getf head :axis)
+              :kinds (getf head :kinds)
               :groups (tagged forms :group)
               :nodes (mapcar #'normalise-node (tagged forms :node)))))))
 
@@ -54,6 +55,20 @@
 (defun map-nodes () (getf (ensure-map) :nodes))
 (defun map-groups () (getf (ensure-map) :groups))
 
+;; Kinds colour-code the timeline's dots: (("hardware" "#e8833a") ("software" "#3b82f6") …) in the
+;; :map form's :kinds. A field with none has no colour coding. The colour is the learner's to set.
+(defun map-kinds () (getf (ensure-map) :kinds))
+(defun kind-colour (id) (second (assoc id (map-kinds) :test #'equal)))
+(defun valid-colour-p (c)
+  (and (stringp c) (= (length c) 7) (char= (char c 0) #\#) (every (lambda (ch) (digit-char-p ch 16)) (subseq c 1))))
+(defun set-kind-colour! (id colour)
+  (let ((k (assoc id (map-kinds) :test #'equal)))
+    (when (and k (valid-colour-p colour))
+      (setf (getf *map* :kinds)
+            (mapcar (lambda (x) (if (eq x k) (list (first x) (string-downcase colour)) x)) (map-kinds)))
+      (save-map!)
+      t)))
+
 ;; (list-maps) → ("computers" …) from data/maps/*.lisp
 (defun list-maps ()
   (sort (mapcar #'pathname-name (directory (data-path "maps/*.lisp"))) #'string<))
@@ -62,7 +77,8 @@
 
 (defun map-forms (map)
   (append (list (append (list :map :id (getf map :id) :title (getf map :title) :compression (getf map :compression))
-                        (when (getf map :axis) (list :axis (getf map :axis)))))
+                        (when (getf map :axis) (list :axis (getf map :axis)))
+                        (when (getf map :kinds) (list :kinds (getf map :kinds)))))
           (mapcar (lambda (g) (cons :group g)) (getf map :groups))
           (mapcar (lambda (n) (cons :node n)) (getf map :nodes))))
 
@@ -190,7 +206,7 @@
     t))
 
 (defun add-node! (node)
-  (let ((n (normalise-node node)))
+  (let ((n (check-kind (normalise-node node))))
     (unless (or (blankp (getf n :id)) (find-node (getf n :id)))
       (ensure-group! (getf n :group))
       (setf (getf *map* :nodes) (append (map-nodes) (list n)))
@@ -199,7 +215,7 @@
 
 ;; Replace the node with the same id, keeping its place in the map.
 (defun update-node! (node)
-  (let* ((n (normalise-node node)) (old (find-node (getf n :id))))
+  (let* ((n (check-kind (normalise-node node))) (old (find-node (getf n :id))))
     (when old
       (ensure-group! (getf n :group))
       (setf (getf *map* :nodes) (substitute n old (map-nodes)))
@@ -215,9 +231,16 @@
     (save-map!)
     id))
 
+;; Drop a :kind the current map does not define (a field with kinds colours only those).
+(defun check-kind (n)
+  (if (or (null (getf n :kind)) (assoc (getf n :kind) (map-kinds) :test #'equal))
+      n
+      (let ((c (copy-list n))) (remf c :kind) c)))
+
 ;; Turn a proposal plist (from the model, a form, or the file) into a clean node plist.
 (defun normalise-node (p)
-  (list :id (slugify (getf* p :id (getf* p :title "")))
+  (append
+   (list :id (slugify (getf* p :id (getf* p :title "")))
         :title (trim (getf* p :title ""))
         :compression (trim (getf* p :compression ""))
         ;; One body of text per idea. Older files kept :why and :notes apart; they fold into it.
@@ -230,7 +253,10 @@
         :era (let ((e (getf p :era)))
                (cond ((and (integerp e) (/= e 0)) e)
                      ((and (stringp e) (not (blankp e))) (parse-integer e :junk-allowed t))
-                     (t nil)))))
+                     (t nil))))
+   ;; Only written when set, so a field without kinds keeps its file as it was.
+   (let ((k (slugify (getf* p :kind ""))))
+     (unless (blankp k) (list :kind k)))))
 
 ;;; ---- What is in view ----------------------------------------------------
 

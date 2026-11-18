@@ -26,7 +26,8 @@
               (:compression :string "one sentence that compresses the idea")
               (:body :string "the idea's explanation in markdown, one piece; at its shortest, one or two sentences on why it matters")
               (:group :string "group id this node belongs to")
-              (:era :integer "year the idea was first had; negative for BC; 0 if unknown"))))
+              (:era :integer "year the idea was first had; negative for BC; 0 if unknown")
+              (:kind (:maybe :string) "which of the field's kinds the idea is, if it has kinds; the timeline colours the dot by it"))))
 
 ;;; ---- URLs ----------------------------------------------------------------
 
@@ -68,12 +69,17 @@
   (str "Field: " (map-title) " — " (getf *map* :compression) #\Newline
        "Groups (id: compression):" #\Newline
        (join #\Newline (mapcar (lambda (g) (str "  " (getf g :id) ": " (getf g :compression))) (map-groups)))
-       #\Newline "Ideas (id | title | group | era | compression | latest verdict):" #\Newline
+       (if (map-kinds)
+           (str #\Newline "Kinds (each idea has at most one; the timeline colours its dot by it): "
+                (join ", " (mapcar #'first (map-kinds))))
+           "")
+       #\Newline "Ideas (id | title | group | era | kind | compression | latest verdict):" #\Newline
        (join #\Newline
              (mapcar (lambda (n)
                        (let ((id (getf n :id)))
                          (str "  " id " | " (getf n :title) " | " (getf n :group) " | "
                               (or (getf n :era) "?") " | "
+                              (or (getf n :kind) "-") " | "
                               (getf n :compression) " | "
                               (or (getf (getf (latest-attempt id) :feedback) :verdict) "no attempt"))))
                      (map-nodes)))))
@@ -132,13 +138,14 @@
               (:compression (:maybe :string) "one sentence")
               (:body (:maybe :string) "the complete rewritten body in markdown; replaces the old one, with new material worked in, not appended")
               (:group (:maybe :string))
-              (:era (:maybe :integer) "year; 0 if unknown"))))
+              (:era (:maybe :integer) "year; 0 if unknown")
+              (:kind (:maybe :string) "one of the field's kinds, or an empty string for none"))))
 
 ;; The breadth chat never edits the map directly: it proposes, the learner sees the timeline
 ;; with the changes marked red and green, and nothing is applied until they approve
 ;; (/action/apply-map).
 (defparameter *map-fields*
-  '(("title" "Title") ("compression" "Compression") ("body" "Body") ("era" "Era") ("group" "Group")))
+  '(("title" "Title") ("compression" "Compression") ("body" "Body") ("era" "Era") ("group" "Group") ("kind" "Kind")))
 
 (deftool propose-map-changes
   "Propose changes to the map: new groups, new ideas, changes to existing ideas, ideas to remove. Nothing is changed until the learner approves; they see each affected group on the timeline with what changes marked red and green. Send everything you want in ONE call. Ids are lowercase slugs; a new idea's group must exist or be in groups. Ideas are independent: no links between them. For an update give the id and only the fields you are changing. To change a body, read the idea first (read_node) unless you already have its full body, then send the whole body rewritten with the new material worked in where it belongs; never the old text with a section added at the end."
@@ -199,7 +206,8 @@
           (push id taken)
           (push (obj "kind" "add"
                      "node" (obj "id" id "title" (getf n :title) "compression" (getf n :compression)
-                                 "body" (getf n :body) "group" (getf n :group) "era" (field-text n :era)))
+                                 "body" (getf n :body) "group" (getf n :group) "era" (field-text n :era)
+                                 "kind" (field-text (check-kind n) :kind)))
                 changes))))
     (dolist (p (getf input :update))
       (let ((old (find-node (getf p :id))) (fields '()))
@@ -212,6 +220,7 @@
                            (after (case key
                                     (:era (if (eql new 0) "" (princ-to-string new)))
                                     (:group (slugify new))
+                                    (:kind (field-text (check-kind (list :kind (slugify new))) :kind))
                                     (t (trim new)))))
                        (unless (equal before after)
                          (push (obj "field" name "label" label "before" before "after" after) fields))))
@@ -651,6 +660,10 @@
     (redirect (cond ((and a (getf a :node) (select-map (getf a :map))) (node-url (getf a :node)))
                     (a (field-url (getf a :map)))
                     (t "/")))))
+
+(defaction save-kind-colour "/action/kind-colour" (map-name kind colour)
+  (unless (select-map map-name) (return-from save-kind-colour (not-found "field")))
+  (raw-response "application/json" (jzon:stringify (obj "ok" (and (set-kind-colour! kind colour) t)))))
 
 (defaction about "/action/about" (text)
   (set-about-text! (or text ""))

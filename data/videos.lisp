@@ -91,11 +91,6 @@
 (:ID "computers/databases/B5UBO2tKfyw" :MAP "computers" :NODE "databases" :VIDEO "B5UBO2tKfyw"
  :TITLE "Every Type of Database Explained in 5 Minutes!" :CHANNEL "Swag Professor Explainer" :AT
  "2026-11-17T11:12:41")
-(:ID "computers/databases/W2Z7fbCLSTw" :MAP "computers" :NODE "databases" :VIDEO "W2Z7fbCLSTw"
- :TITLE "7 Database Paradigms" :CHANNEL "Fireship" :AT "2026-11-17T11:12:46")
-(:ID "computers/databases/YC50j-nozZs" :MAP "computers" :NODE "databases" :VIDEO "YC50j-nozZs"
- :TITLE "Database Indexes Explained In 6 Minutes" :CHANNEL "PawelCodeStuff" :AT
- "2026-11-17T11:13:32")
 (:ID "computers/databases/uHm6FEb2Re4" :MAP "computers" :NODE "databases" :VIDEO "uHm6FEb2Re4"
  :TITLE "DuckDB in 100 Seconds" :CHANNEL "Fireship" :AT "2026-11-17T11:13:57")
 (:ID "computers/databases/4Wa5DivljOM" :MAP "computers" :NODE "databases" :VIDEO "4Wa5DivljOM"
@@ -107,6 +102,14 @@
 (:ID "computers/databases/3JW732GrMdg" :MAP "computers" :NODE "databases" :VIDEO "3JW732GrMdg"
  :TITLE "I replaced my entire tech stack with Postgres..." :CHANNEL "Fireship" :AT
  "2026-11-17T11:14:22")
-(:ID "computers/databases/jb2AvF8XzII" :MAP "computers" :NODE "databases" :VIDEO "jb2AvF8XzII"
- :TITLE "15 futuristic databases you’ve never heard of" :CHANNEL "Fireship" :AT
- "2026-11-17T11:14:27")
+(:ID "computers/gpu-inference/pPStdjuYzSI" :MAP "computers" :NODE "gpu-inference" :VIDEO
+ "pPStdjuYzSI" :TITLE "Nvidia CUDA in 100 Seconds" :CHANNEL "Fireship" :AT "2026-11-17T15:01:47")
+(:ID "computers/crystal-oscillator/j5qxHloRuAE" :MAP "computers" :NODE "crystal-oscillator" :VIDEO
+ "j5qxHloRuAE" :TITLE "Crystal Oscillator explained in 66 Seconds" :CHANNEL "SparkLabx" :AT
+ "2026-11-18T10:28:11")
+(:ID "computers/complexity-big-o/g2o22C3CRfU" :MAP "computers" :NODE "complexity-big-o" :VIDEO
+ "g2o22C3CRfU" :TITLE "Big-O Notation in 100 Seconds" :CHANNEL "Fireship" :AT "2026-11-18T10:45:50")
+(:ID "computers/kernel/5S-tTDeFZfY" :MAP "computers" :NODE "kernel" :VIDEO "5S-tTDeFZfY" :TITLE
+ "What is a Kernel?" :CHANNEL "Techquickie" :AT "2026-11-18T10:50:48")
+(:ID "computers/linking-loading/4daUujBgQQ8" :MAP "computers" :NODE "linking-loading" :VIDEO
+ "4daUujBgQQ8" :TITLE "What Are DLLs?" :CHANNEL "Techquickie" :AT "2026-11-18T11:04:02")

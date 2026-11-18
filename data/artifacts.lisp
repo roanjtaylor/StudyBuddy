@@ -4280,3 +4280,837 @@ if(mode=='plain'){
 reset();
 </script></body></html>"
  :AT "2026-11-17T11:10:56" :VERSION 1)
+(:PINNED T :ID "sorting-and-searching-visualiser" :MAP "computers" :NODE "databases" :TYPE "html"
+ :TITLE "Sorting and searching visualiser" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:sans-serif;margin:12px;color:#222}
+h3{margin:4px 0}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
+button,select{padding:6px 10px;font-size:14px}
+input[type=range]{width:110px}
+#bars{display:flex;align-items:flex-end;height:260px;gap:1px;border:1px solid #ddd;padding:6px;border-radius:8px;background:#fafafa}
+.bar{flex:1;background:#93c5fd;min-width:2px;position:relative}
+.bar.cmp{background:#facc15}.bar.swp{background:#ef4444}.bar.done{background:#4ade80}
+.bar.out{background:#e5e7eb}.bar.hit{background:#16a34a}.bar.rng{background:#bfdbfe}.bar.piv{background:#a855f7}
+#stats{margin:8px 0;font-size:14px}
+#info{font-size:13px;color:#444;background:#f3f4f6;padding:8px 10px;border-radius:6px}
+.lab{font-size:12px;color:#555}
+</style></head><body>
+<h3>Sorting and searching visualiser</h3>
+<div class=\"ctl\">
+<select id=\"mode\"><option value=\"sort\">Sorting</option><option value=\"search\">Searching</option></select>
+<select id=\"alg\"></select>
+<label>Size <input type=\"range\" id=\"size\" min=\"8\" max=\"120\" value=\"40\"></label>
+<label>Speed <input type=\"range\" id=\"speed\" min=\"1\" max=\"100\" value=\"60\"></label>
+</div>
+<div class=\"ctl\">
+<button id=\"gen\">🔀 New data</button>
+<button id=\"run\">▶ Run</button>
+<button id=\"stop\">⏹ Stop</button>
+<label><input type=\"checkbox\" id=\"snd\" checked> 🔊 Sound</label>
+<label>Volume <input type=\"range\" id=\"vol\" min=\"0\" max=\"100\" value=\"50\"></label>
+<span id=\"tgtbox\" style=\"display:none\">Target: <b id=\"tgt\"></b> <button id=\"newt\">New target</button></span>
+</div>
+<div id=\"bars\"></div>
+<div class=\"lab\">Yellow = comparing · Red = swapping/writing · Purple = pivot · Green = sorted/found · Grey = ruled out</div>
+<div class=\"lab\">Sound: each step plays the pitch of the bar being touched (low bar = low note, tall bar = high note, 4 octaves in semitones). A bell ping marks the end of each pass; a rising scale and chord mark the finish.</div>
+<div id=\"stats\"></div>
+<div id=\"info\"></div>
+<script>
+const $=id=>document.getElementById(id);
+const SORTS={
+bubble:['Bubble sort','O(n²) – repeatedly swap adjacent out-of-order pairs; the largest value bubbles to the end each pass.'],
+selection:['Selection sort','O(n²) – find the minimum of the unsorted part, put it at the front. Few swaps, many comparisons.'],
+insertion:['Insertion sort','O(n²), fast on nearly-sorted data – grow a sorted prefix by sliding each new item into place.'],
+merge:['Merge sort','O(n log n) – split in halves, sort each, merge. Always n log n, needs extra memory.'],
+quick:['Quick sort','O(n log n) average, O(n²) worst – partition around a pivot, recurse on both sides.'],
+heap:['Heap sort','O(n log n) – build a max-heap, repeatedly move the root to the end.']};
+const SEARCHES={
+linear:['Linear search','O(n) – check each item in turn. Works on unsorted data.'],
+binary:['Binary search','O(log n) – needs sorted data; check the middle, discard half. This is what an index exploits.'],
+jump:['Jump search','O(√n) – needs sorted data; jump ahead in blocks of √n, then scan back linearly.'],
+interp:['Interpolation search','O(log log n) on uniform data – guess where the target is by its value, like opening a phone book near the name.']};
+let a=[],tgt,running=false,token=0,cmp=0,acc=0,t0=0;
+const delay=()=>Math.max(1,(101-$('speed').value)**1.6/8);
+const sleep=()=>new Promise(r=>setTimeout(r,delay()));
+
+/* ---------- audio ---------- */
+let ac=null,master=null,lastPing=0;
+function audioOn(){
+  if(!ac){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return false;ac=new AC();master=ac.createGain();
+    const comp=ac.createDynamicsCompressor();master.connect(comp);comp.connect(ac.destination)}
+  if(ac.state==='suspended')ac.resume();
+  master.gain.value=($('vol').value/100)*0.8;
+  return $('snd').checked;
+}
+const BASE=130.81, SPAN=48; /* C3 up 4 octaves, chromatic */
+function freqOf(v){const mx=Math.max(a.length,2);const k=Math.round((v-1)/(mx-1)*SPAN);return BASE*Math.pow(2,k/12)}
+function tone(f,dur,type,peak){
+  const t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();
+  o.type=type;o.frequency.value=f;
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(peak,t+0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+0.02);
+}
+function blip(c){
+  if(!audioOn())return;
+  const prio=['swp','cmp','hit','piv'];let idx=-1;
+  for(const p of prio){for(const k in c){if(c[k]===p){idx=+k;break}}if(idx>=0)break}
+  if(idx<0||a[idx]===undefined)return;
+  const dur=Math.min(0.2,Math.max(0.05,delay()*1.3/1000));
+  tone(freqOf(a[idx]),dur,'triangle',0.22);
+}
+/* bell ping at the end of each iteration */
+function ping(freq=1318.5,big=false){
+  if(!audioOn())return;
+  const now=ac.currentTime;if(!big&&now-lastPing<0.07)return;lastPing=now;
+  const d=big?1.2:0.55;
+  tone(freq,d,'sine',0.3);
+  tone(freq*2.0,d*0.7,'sine',0.12);
+  tone(freq*3.0,d*0.4,'sine',0.05);
+}
+function fanfare(){ /* major chord ping */
+  if(!audioOn())return;
+  [523.25,659.25,783.99,1046.5].forEach((f,i)=>setTimeout(()=>ping(f,true),i*90));
+}
+/* ---------------------------- */
+
+function fill(){const m=$('mode').value,S=m=='sort'?SORTS:SEARCHES;$('alg').innerHTML=Object.entries(S).map(([k,v])=>`<option value=\"${k}\">${v[0]}</option>`).join('');
+$('tgtbox').style.display=m=='search'?'inline':'none';info()}
+function info(){const m=$('mode').value,S=m=='sort'?SORTS:SEARCHES;$('info').textContent=S[$('alg').value][1]+(m=='search'&&$('alg').value!='linear'?' (data is sorted automatically for this algorithm.)':'')}
+function gen(){token++;running=false;const n=+$('size').value;a=Array.from({length:n},(_,i)=>i+1);
+if($('mode').value=='search'&&$('alg').value!='linear'){/* sorted */}else shuffle(a);
+if($('mode').value=='search'){tgt=a[Math.floor(Math.random()*n)];$('tgt').textContent=tgt}
+cmp=acc=0;draw();stats('Ready.')}
+function shuffle(x){for(let i=x.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[x[i],x[j]]=[x[j],x[i]]}}
+function draw(c={}){const mx=Math.max(...a);$('bars').innerHTML=a.map((v,i)=>`<div class=\"bar ${c[i]||''}\" style=\"height:${v/mx*100}%\"></div>`).join('')}
+function stats(s){$('stats').textContent=`${s}  Comparisons/checks: ${cmp}  ·  Writes/swaps: ${acc}`}
+async function step(c,msg){draw(c);stats(msg||'');blip(c);if(msg&&msg.startsWith('Found'))fanfare();await sleep();if(!running)throw 0}
+const sw=(i,j)=>{[a[i],a[j]]=[a[j],a[i]];acc++};
+async function finish(){const c={};for(let i=0;i<a.length;i++){c[i]='done';draw(c);
+  if(audioOn())tone(freqOf(a[i]),0.09,'triangle',0.2);
+  await new Promise(r=>setTimeout(r,Math.max(8,Math.min(40,1800/a.length))))}
+  fanfare()}
+const algos={
+async bubble(){const n=a.length;for(let i=0;i<n-1;i++){for(let j=0;j<n-1-i;j++){cmp++;const c={};for(let k=n-i;k<n;k++)c[k]='done';c[j]='cmp';c[j+1]='cmp';if(a[j]>a[j+1]){sw(j,j+1);c[j]='swp';c[j+1]='swp'}await step(c,'Bubbling…')}ping()}},
+async selection(){const n=a.length;for(let i=0;i<n-1;i++){let m=i;for(let j=i+1;j<n;j++){cmp++;const c={};for(let k=0;k<i;k++)c[k]='done';c[m]='piv';c[j]='cmp';if(a[j]<a[m])m=j;await step(c,'Finding minimum…')}if(m!=i){sw(i,m)}ping()}},
+async insertion(){const n=a.length;for(let i=1;i<n;i++){let j=i;while(j>0){cmp++;const c={};c[j]='cmp';c[j-1]='cmp';if(a[j-1]>a[j]){sw(j-1,j);c[j]='swp';c[j-1]='swp';await step(c,'Inserting…');j--}else{await step(c,'Inserting…');break}}ping()}},
+async merge(){const n=a.length;async function ms(l,r){if(r-l<1)return;const m=(l+r)>>1;await ms(l,m);await ms(m+1,r);const L=a.slice(l,m+1),R=a.slice(m+1,r+1);let i=0,j=0,k=l;while(i<L.length||j<R.length){cmp++;if(j>=R.length||(i<L.length&&L[i]<=R[j]))a[k]=L[i++];else a[k]=R[j++];acc++;const c={};for(let x=l;x<=r;x++)c[x]='rng';c[k]='swp';await step(c,'Merging…');k++}ping(r-l+1>n/2?1760:1318.5)}await ms(0,n-1)},
+async quick(){async function qs(l,r){if(l>=r)return;const p=a[r];let i=l;for(let j=l;j<r;j++){cmp++;const c={};c[r]='piv';c[j]='cmp';c[i]='swp';await step(c,'Partitioning…');if(a[j]<p){sw(i,j);i++}}sw(i,r);await step({[i]:'piv'},'Pivot placed');ping();await qs(l,i-1);await qs(i+1,r)}await qs(0,a.length-1)},
+async heap(){const n=a.length;async function sift(s,e){let r=s;while(2*r+1<=e){let c=2*r+1;cmp++;if(c+1<=e&&a[c]<a[c+1])c++;const cl={};for(let k=e+1;k<n;k++)cl[k]='done';cl[r]='cmp';cl[c]='cmp';if(a[r]<a[c]){sw(r,c);cl[r]='swp';cl[c]='swp';await step(cl,'Heapifying…');r=c}else{await step(cl,'Heapifying…');return}}}
+for(let s=(n>>1)-1;s>=0;s--)await sift(s,n-1);ping(1568);for(let e=n-1;e>0;e--){sw(0,e);await sift(0,e-1);ping()}},
+async linear(){for(let i=0;i<a.length;i++){cmp++;if(a[i]==tgt){await step({[i]:'hit'},'Found at index '+i);return}const c={};for(let k=0;k<i;k++)c[k]='out';c[i]='cmp';await step(c,'Scanning…')}},
+async binary(){let lo=0,hi=a.length-1;while(lo<=hi){const m=(lo+hi)>>1;cmp++;const c={};for(let k=0;k<a.length;k++)c[k]=(k<lo||k>hi)?'out':'rng';c[m]='cmp';await step(c,'Checking middle…');if(a[m]==tgt){await step({[m]:'hit'},'Found at index '+m);return}if(a[m]<tgt)lo=m+1;else hi=m-1;ping()}},
+async jump(){const n=a.length,s=Math.floor(Math.sqrt(n));let prev=0,cur=s;while(prev<n){const idx=Math.min(cur,n)-1;cmp++;const c={};for(let k=0;k<prev;k++)c[k]='out';c[idx]='cmp';await step(c,'Jumping by '+s+'…');if(a[idx]>=tgt)break;prev=cur;cur+=s;ping()}
+ping(1760);for(let i=prev;i<Math.min(cur,n);i++){cmp++;const c={};for(let k=0;k<prev;k++)c[k]='out';c[i]='cmp';await step(c,'Linear scan in block…');if(a[i]==tgt){await step({[i]:'hit'},'Found at index '+i);return}}},
+async interp(){let lo=0,hi=a.length-1;while(lo<=hi&&tgt>=a[lo]&&tgt<=a[hi]){const p=a[hi]==a[lo]?lo:lo+Math.floor((tgt-a[lo])*(hi-lo)/(a[hi]-a[lo]));cmp++;const c={};for(let k=0;k<a.length;k++)c[k]=(k<lo||k>hi)?'out':'rng';c[p]='cmp';await step(c,'Guessing position by value…');if(a[p]==tgt){await step({[p]:'hit'},'Found at index '+p);return}if(a[p]<tgt)lo=p+1;else hi=p-1;ping()}}};
+$('run').onclick=async()=>{if(running)return;audioOn();cmp=acc=0;running=true;try{await algos[$('alg').value]();if($('mode').value=='sort'){await finish()}stats('Done.')}catch(e){}running=false};
+$('stop').onclick=()=>{running=false};
+$('vol').oninput=()=>{if(master)master.gain.value=($('vol').value/100)*0.8};
+$('gen').onclick=gen;$('size').oninput=gen;
+$('newt').onclick=()=>{running=false;tgt=a[Math.random()*a.length|0];$('tgt').textContent=tgt;cmp=acc=0;draw();stats('Ready.')};
+$('mode').onchange=()=>{fill();gen()};$('alg').onchange=()=>{info();gen()};
+fill();gen();
+</script></body></html>
+"
+ :AT "2026-11-17T15:27:26" :VERSION 2)
+(:PINNED T :ID "at-cut-quartz-thickness-shear" :MAP "computers" :NODE "crystal-oscillator" :TYPE
+ "html" :TITLE "AT-cut quartz: thickness-shear" :LANGUAGE NIL :CONTENT "<!DOCTYPE html>
+<html lang=\"en\">
+<head>
+<meta charset=\"utf-8\">
+<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+<title>AT-cut quartz: thickness-shear vibration</title>
+<style>
+  :root{--bg:#0f1115;--panel:#171a21;--ink:#e8e8ec;--mute:#9aa0ab;--quartz:#8fd3ff;--gold:#f0c24b;--x:#ff6b6b;--y:#5be37b;--z:#6fa8ff;--warn:#ff9f43}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  header{padding:14px 18px 6px}
+  h1{margin:0;font-size:18px;font-weight:600}
+  header p{margin:4px 0 0;color:var(--mute)}
+  .controls{display:flex;flex-wrap:wrap;gap:14px 22px;padding:10px 18px;align-items:center;border-top:1px solid #23272f;border-bottom:1px solid #23272f}
+  .controls label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mute)}
+  .controls input[type=range]{width:170px}
+  .controls .val{color:var(--ink);font-weight:600;font-size:13px}
+  .seg{display:inline-flex;border:1px solid #333a46;border-radius:6px;overflow:hidden}
+  .seg button{background:transparent;color:var(--mute);border:0;padding:5px 10px;cursor:pointer;font-size:12px}
+  .seg button.on{background:#2b3240;color:var(--ink)}
+  button.plain{background:#2b3240;color:var(--ink);border:0;border-radius:6px;padding:6px 12px;cursor:pointer}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px 18px 18px}
+  .panel{background:var(--panel);border:1px solid #23272f;border-radius:10px;padding:10px}
+  .panel h2{margin:0 0 6px;font-size:13px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+  canvas{width:100%;height:auto;display:block;border-radius:6px}
+  #cut{cursor:grab;touch-action:none;background:#0f1115}
+  #cut.dragging{cursor:grabbing}
+  .viewbar{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+  .viewbar span{color:var(--mute);font-size:12px;margin-right:4px}
+  .viewbar button{background:#2b3240;color:var(--ink);border:0;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px}
+  .viewbar button.on{background:#3b4a66}
+  .wide{grid-column:1/-1}
+  .readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px}
+  .readout div{background:#0f1115;border-radius:6px;padding:8px 10px}
+  .readout b{display:block;font-size:18px;font-weight:600}
+  .readout span{color:var(--mute);font-size:12px}
+  .warn{color:var(--warn)}
+  .note{color:var(--mute);font-size:12px;margin-top:6px}
+  @media (max-width:760px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>AT-cut quartz plate: dimensions, shear axes, vibration</h1>
+  <p>Thickness sets the frequency; the two faces slide in opposite directions (thickness-shear). Drag the thickness and watch the frequency and the standing wave change.</p>
+</header>
+
+<div class=\"controls\">
+  <label>Thickness t <span class=\"val\" id=\"tVal\">170 µm</span>
+    <input id=\"t\" type=\"range\" min=\"25\" max=\"210\" value=\"170\" step=\"1\"></label>
+  <label>Mode
+    <span class=\"seg\"><button id=\"n1\" class=\"on\">fundamental (N=1)</button><button id=\"n3\">3rd overtone (N=3)</button></span></label>
+  <label>Shear exaggeration <span class=\"val\" id=\"aVal\">×1</span>
+    <input id=\"amp\" type=\"range\" min=\"0\" max=\"2\" value=\"1\" step=\"0.05\"></label>
+  <label>Animation speed <span class=\"val\" id=\"sVal\">1.0</span>
+    <input id=\"spd\" type=\"range\" min=\"0\" max=\"3\" value=\"1\" step=\"0.1\"></label>
+  <label>&nbsp;<button class=\"plain\" id=\"pause\">Pause</button></label>
+</div>
+
+<div class=\"grid\">
+  <div class=\"panel\">
+    <h2>1 · Where the slice comes from — drag to rotate</h2>
+    <canvas id=\"cut\" width=\"560\" height=\"400\"></canvas>
+    <div class=\"viewbar\">
+      <span>views:</span>
+      <button id=\"vDefault\">default</button>
+      <button id=\"vAlongX\">along X (see the 35° tilt edge-on)</button>
+      <button id=\"vDownZ\">down Z (optic axis)</button>
+      <button id=\"vAlongY\">along Y</button>
+      <button id=\"vSpin\">auto-spin</button>
+      <label style=\"display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mute)\"><input type=\"checkbox\" id=\"showBar\" checked> show bar</label>
+    </div>
+    <p class=\"note\">Quartz bar with crystal axes X, Y, Z. The AT plate is sliced about <b>35°15′</b> off the Z (optic) axis, rotated about X. The plate's own axes: <span style=\"color:var(--x)\">X</span> runs along the plate and is the <b>shear direction</b>; <span style=\"color:var(--y)\">Y′</span> is the <b>thickness</b> normal; <span style=\"color:var(--z)\">Z′</span> is the plate's long direction. Look along X and the plate is a thin line tilted 35° from Z — the whole cut is that one angle. It is what gives near-zero temperature drift at room temperature.</p>
+  </div>
+
+  <div class=\"panel\">
+    <h2>2 · Frequency vs thickness</h2>
+    <canvas id=\"graph\" width=\"560\" height=\"360\"></canvas>
+    <div class=\"readout\">
+      <div><b id=\"fOut\">9.76 MHz</b><span>f = N · 1660 / t(µm) MHz</span></div>
+      <div><b id=\"lamOut\">340 µm</b><span>acoustic wavelength λ = 2t/N</span></div>
+      <div><b id=\"ratioOut\">1 : 29</b><span>thickness : width (5 mm blank)</span></div>
+      <div><b id=\"dfOut\">+0.59 %</b><span>Δf if 1 µm lapped off</span></div>
+    </div>
+    <p class=\"note\" id=\"warn\"></p>
+  </div>
+
+  <div class=\"panel wide\">
+    <h2>3 · Cross-section (X–Y′ plane), shear motion zoomed</h2>
+    <canvas id=\"shear\" width=\"1140\" height=\"420\"></canvas>
+    <p class=\"note\">Top strip: the plate at true scale, 5 mm wide. Below: the same plate with its thickness blown up so you can see the motion. Vertical lines are material \"fibres\": the top face slides +X while the bottom slides −X, with a node (no motion) at mid-thickness for N=1, and three nodes for N=3. The bevelled edges and the mounting clips sit where the amplitude has died away (energy trapping), so the clamps do not damp the vibration. The piezoelectric voltage between the gold electrodes follows the shear.</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const state = { t:170, N:1, amp:1, spd:1, paused:false, phase:0, last:performance.now() };
+  const WIDTH_UM = 5000; // 5 mm blank
+  const K = 1660;        // MHz·µm for AT-cut thickness-shear
+
+  // ---------- controls ----------
+  $('t').oninput = e => { state.t = +e.target.value; updateReadouts(); drawGraph(); };
+  $('amp').oninput = e => { state.amp = +e.target.value; $('aVal').textContent = '×' + state.amp.toFixed(2).replace(/\\.?0+$/,''); };
+  $('spd').oninput = e => { state.spd = +e.target.value; $('sVal').textContent = state.spd.toFixed(1); };
+  $('n1').onclick = () => setN(1); $('n3').onclick = () => setN(3);
+  $('pause').onclick = () => { state.paused = !state.paused; $('pause').textContent = state.paused ? 'Play' : 'Pause'; };
+  function setN(n){ state.N=n; $('n1').classList.toggle('on',n===1); $('n3').classList.toggle('on',n===3); updateReadouts(); drawGraph(); }
+
+  const freq = (t,N) => N*K/t;
+  function updateReadouts(){
+    const {t,N} = state;
+    const f = freq(t,N);
+    $('tVal').textContent = t + ' µm';
+    $('fOut').textContent = f.toFixed(2) + ' MHz';
+    $('lamOut').textContent = (2*t/N).toFixed(0) + ' µm';
+    $('ratioOut').textContent = '1 : ' + Math.round(WIDTH_UM/t);
+    $('dfOut').textContent = '+' + (100*(freq(t-1,N)-f)/f).toFixed(2) + ' %';
+    let w = '';
+    if (t < 40) w = '⚠ Below ~40 µm the plate is too fragile to lap and handle. Real crystals above ~30–40 MHz use the 3rd overtone of a thicker plate, or an etched \"inverted mesa\" pocket in a thick rim.';
+    else if (N===3 && f > 60) w = 'Overtone of a thin plate: possible, but usually one would just use a thicker plate at N=3.';
+    $('warn').innerHTML = w ? '<span class=\"warn\">'+w+'</span>' : 'The lateral size does not set f; it only has to be many times t so the shear mode is clean and spurious modes stay away.';
+  }
+
+  // ---------- helpers ----------
+  function arrow(ctx,x1,y1,x2,y2,color,w=2,head=8){
+    ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=w;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    const a=Math.atan2(y2-y1,x2-x1);
+    ctx.beginPath(); ctx.moveTo(x2,y2);
+    ctx.lineTo(x2-head*Math.cos(a-0.45),y2-head*Math.sin(a-0.45));
+    ctx.lineTo(x2-head*Math.cos(a+0.45),y2-head*Math.sin(a+0.45)); ctx.closePath(); ctx.fill();
+  }
+  function text(ctx,s,x,y,color='#e8e8ec',size=13,align='left',weight=''){
+    ctx.fillStyle=color; ctx.font=`${weight} ${size}px system-ui,sans-serif`; ctx.textAlign=align; ctx.textBaseline='middle'; ctx.fillText(s,x,y);
+  }
+
+  // ---------- Panel 1: the cut, rotatable 3D ----------
+  const view = { yaw:-0.55, pitch:0.38, spin:false, dragged:false, showBar:true };
+  const VIEWS = {
+    default:{yaw:-0.55,pitch:0.38},
+    alongX:{yaw:-Math.PI/2,pitch:0},     // camera on +X looking toward −X: Y–Z plane face-on
+    downZ:{yaw:-0.55,pitch:Math.PI/2-0.001},
+    alongY:{yaw:0,pitch:0},
+  };
+  function setView(v){ view.yaw=v.yaw; view.pitch=v.pitch; view.spin=false; $('vSpin').classList.remove('on'); }
+  $('vDefault').onclick=()=>setView(VIEWS.default);
+  $('vAlongX').onclick=()=>setView(VIEWS.alongX);
+  $('vDownZ').onclick=()=>setView(VIEWS.downZ);
+  $('vAlongY').onclick=()=>setView(VIEWS.alongY);
+  $('vSpin').onclick=()=>{ view.spin=!view.spin; $('vSpin').classList.toggle('on',view.spin); };
+  $('showBar').onchange=e=>{ view.showBar=e.target.checked; };
+
+  // pointer drag
+  (() => {
+    const c=$('cut'); let down=false, lx=0, ly=0;
+    c.addEventListener('pointerdown',e=>{down=true;lx=e.clientX;ly=e.clientY;c.setPointerCapture(e.pointerId);c.classList.add('dragging');view.spin=false;$('vSpin').classList.remove('on');});
+    c.addEventListener('pointermove',e=>{ if(!down)return; const dx=e.clientX-lx, dy=e.clientY-ly; lx=e.clientX; ly=e.clientY;
+      view.yaw += dx*0.011; view.pitch = Math.max(-Math.PI/2+0.01, Math.min(Math.PI/2-0.01, view.pitch + dy*0.011)); view.dragged=true; });
+    const up=e=>{down=false;c.classList.remove('dragging');};
+    c.addEventListener('pointerup',up); c.addEventListener('pointercancel',up); c.addEventListener('pointerleave',()=>{ if(!down) c.classList.remove('dragging'); });
+  })();
+
+  // rotate crystal coords (x,y,z; Z up) into view space: returns [sx, sy, depth, viewVec]
+  function makeProjector(W,H){
+    const cy=Math.cos(view.yaw), sy=Math.sin(view.yaw), cp=Math.cos(view.pitch), sp=Math.sin(view.pitch);
+    const ox=W/2, oy=H/2+10, S=1.0;
+    const rot=(x,y,z)=>{ const x1=x*cy - y*sy, y1=x*sy + y*cy; const y2=y1*cp - z*sp, z2=y1*sp + z*cp; return [x1,y2,z2]; };
+    const P=(x,y,z)=>{ const [a,d,b]=rot(x,y,z); return [ox+a*S, oy-b*S, d]; };
+    return {P,rot};
+  }
+
+  function drawCut(){
+    const c=$('cut'), ctx=c.getContext('2d'); const W=c.width,H=c.height;
+    ctx.clearRect(0,0,W,H);
+    const {P,rot}=makeProjector(W,H);
+    const th=35.25*Math.PI/180;
+
+    // geometry
+    const R=66, hTop=125, hBot=-125;
+    const hex=[];for(let i=0;i<6;i++){const a=Math.PI/6+i*Math.PI/3;hex.push([R*Math.cos(a),R*Math.sin(a)]);}
+    const halfL=54, halfW=50, thick=6;
+    const Zp=[0, Math.sin(th), Math.cos(th)];   // plate long axis, Z tilted toward Y
+    const Yp=[0, Math.cos(th), -Math.sin(th)];  // plate normal (thickness)
+    const pt=(x,s,n)=>[x, s*Zp[1]+n*Yp[1], s*Zp[2]+n*Yp[2]];
+
+    // polygon list with depth + normal for shading
+    const polys=[];
+    function addPoly(pts3,fill,stroke,group,lw=1.5){
+      const proj=pts3.map(p=>P(...p));
+      const depth=proj.reduce((s,p)=>s+p[2],0)/proj.length;
+      // normal via cross product in view space
+      const a=rot(...pts3[0]),b=rot(...pts3[1]),d=rot(...pts3[2]);
+      const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], v=[d[0]-a[0],d[1]-a[1],d[2]-a[2]];
+      const n=[u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]];
+      const len=Math.hypot(...n)||1; const nz=Math.abs(n[1]/len); // |component toward viewer|
+      const nl=Math.abs((n[0]*(-0.4)+n[1]*(-0.7)+n[2]*0.6)/len);
+      polys.push({proj,depth,fill,stroke,group,shade:0.55+0.45*nl,facing:nz,lw});
+    }
+    const rgba=(r,g,b,a)=>`rgba(${r},${g},${b},${a})`;
+
+    if(view.showBar){
+      for(let i=0;i<6;i++){const a=hex[i],b=hex[(i+1)%6];
+        addPoly([[a[0],a[1],hBot],[b[0],b[1],hBot],[b[0],b[1],hTop],[a[0],a[1],hTop]],'bar','bar','bar');}
+      addPoly(hex.map(h=>[h[0],h[1],hTop]),'bar','bar','bar');
+      addPoly(hex.map(h=>[h[0],h[1],hBot]),'bar','bar','bar');
+    }
+    // plate: 6 faces
+    const c8=(n)=>[pt(-halfL,-halfW,n),pt(halfL,-halfW,n),pt(halfL,halfW,n),pt(-halfL,halfW,n)];
+    const lo=c8(-thick/2), hi=c8(thick/2);
+    addPoly(hi,'plate','plate','plate'); addPoly(lo,'plate','plate','plate');
+    for(let i=0;i<4;i++){const j=(i+1)%4; addPoly([lo[i],lo[j],hi[j],hi[i]],'plate','plate','plate');}
+
+    // draw order: bar faces behind (depth > 0 = far), plate, bar faces in front (translucent)
+    const far=polys.filter(p=>p.group==='bar'&&p.depth>=0).sort((a,b)=>b.depth-a.depth);
+    const near=polys.filter(p=>p.group==='bar'&&p.depth<0).sort((a,b)=>b.depth-a.depth);
+    const plate=polys.filter(p=>p.group==='plate').sort((a,b)=>b.depth-a.depth);
+    function paint(p,alphaMul=1){
+      ctx.beginPath(); p.proj.forEach((q,i)=>i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1])); ctx.closePath();
+      if(p.group==='bar'){ ctx.fillStyle=rgba(143,211,255,0.10*alphaMul*p.shade*1.4); ctx.strokeStyle=rgba(143,211,255,0.5); }
+      else { const s=p.shade; ctx.fillStyle=rgba(Math.round(240*s),Math.round(194*s),Math.round(75*s),0.92); ctx.strokeStyle='#f6d47a'; }
+      ctx.lineWidth=p.lw; ctx.fill(); ctx.stroke();
+    }
+    far.forEach(p=>paint(p,1)); plate.forEach(p=>paint(p)); near.forEach(p=>paint(p,0.8));
+
+    // crystal axes (grey) and plate axes (coloured) drawn on top
+    const o=P(0,0,0);
+    const lab=(s,p,color,dx=0,dy=0,al='center')=>text(ctx,s,p[0]+dx,p[1]+dy,color,13,al,'600');
+    const ax=(v,len,color,w,label,pad)=>{ const e=P(v[0]*len,v[1]*len,v[2]*len); arrow(ctx,o[0],o[1],e[0],e[1],color,w); const l=P(v[0]*(len+pad),v[1]*(len+pad),v[2]*(len+pad)); return l; };
+    lab('X', ax([1,0,0],150,'#c6c9d1',1.5,'X',14),'#c6c9d1');
+    lab('Y', ax([0,1,0],150,'#c6c9d1',1.5,'Y',14),'#c6c9d1');
+    lab('Z (optic axis)', ax([0,0,1],170,'#c6c9d1',1.5,'Z',16),'#c6c9d1',0,-4);
+    lab('Z′', ax(Zp,120,'#6fa8ff',2,'Z′',14),'#6fa8ff');
+    lab('Y′ thickness', ax(Yp,80,'#5be37b',2,'Y′',16),'#5be37b',0,0);
+    lab('X  shear', ax([1,0,0],118,'#ff6b6b',2.5,'X',0),'#ff6b6b',0,16);
+
+    // angle arc between Z and Z′ in the Y–Z plane
+    ctx.strokeStyle='#ffffff';ctx.lineWidth=1.2;ctx.beginPath();
+    for(let a=0;a<=th+1e-6;a+=0.02){const p=P(0,95*Math.sin(a),95*Math.cos(a));a?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]);}
+    ctx.stroke();
+    const am=P(0,112*Math.sin(th/2),112*Math.cos(th/2)); text(ctx,'35°15′',am[0],am[1],'#fff',13,'center','600');
+
+    const pl=P(...pt(0,-halfW-16,0)); text(ctx,'AT plate',pl[0],pl[1],'#f0c24b',13,'center','600');
+    if(view.showBar){ const bl=P(0,0,hBot-16); text(ctx,'quartz bar',bl[0],bl[1],'#8fd3ff',12,'center'); }
+
+    // view readout + hint
+    const deg=r=>((r*180/Math.PI)%360+360)%360;
+    text(ctx,`yaw ${deg(view.yaw).toFixed(0)}°  pitch ${(view.pitch*180/Math.PI).toFixed(0)}°`,W-10,H-12,'#6b7280',11,'right');
+    if(!view.dragged) text(ctx,'↔ drag to rotate',10,14,'#9aa0ab',12,'left');
+    // eye direction hint: which axis you look along
+    const d=rot(1,0,0)[1], dy=rot(0,1,0)[1], dz=rot(0,0,1)[1];
+    const best=[['X',d],['Y',dy],['Z',dz]].sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))[0];
+    if(Math.abs(best[1])>0.97) text(ctx,`looking along ${best[1]>0?'+':'−'}${best[0]}`,10,H-12,'#9aa0ab',11,'left');
+  }
+
+  // ---------- Panel 2: graph ----------
+  function drawGraph(){
+    const c=$('graph'), ctx=c.getContext('2d'); const W=c.width,H=c.height;
+    ctx.clearRect(0,0,W,H);
+    const L=56,R=20,T=18,B=44; const gw=W-L-R, gh=H-T-B;
+    const tmin=20,tmax=220,fmin=0,fmax=80;
+    const X=t=>L+(t-tmin)/(tmax-tmin)*gw, Y=f=>T+gh-(f-fmin)/(fmax-fmin)*gh;
+    ctx.strokeStyle='#2a2f3a';ctx.lineWidth=1;
+    for(let f=0;f<=fmax;f+=10){ctx.beginPath();ctx.moveTo(L,Y(f));ctx.lineTo(W-R,Y(f));ctx.stroke();text(ctx,f,L-8,Y(f),'#9aa0ab',11,'right');}
+    for(let t=20;t<=220;t+=40){ctx.beginPath();ctx.moveTo(X(t),T);ctx.lineTo(X(t),T+gh);ctx.stroke();text(ctx,t,X(t),T+gh+14,'#9aa0ab',11,'center');}
+    text(ctx,'thickness t (µm)',L+gw/2,H-10,'#9aa0ab',12,'center');
+    ctx.save();ctx.translate(14,T+gh/2);ctx.rotate(-Math.PI/2);text(ctx,'frequency (MHz)',0,0,'#9aa0ab',12,'center');ctx.restore();
+    ctx.fillStyle='rgba(255,159,67,0.12)';ctx.fillRect(X(tmin),T,X(40)-X(tmin),gh);
+    text(ctx,'too thin',X(30),T+12,'#ff9f43',11,'center');
+    const curve=(N,color,dash)=>{ctx.setLineDash(dash);ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();let first=true;
+      for(let t=tmin;t<=tmax;t+=1){const f=freq(t,N);if(f>fmax)continue;const x=X(t),y=Y(f);first?ctx.moveTo(x,y):ctx.lineTo(x,y);first=false;}ctx.stroke();ctx.setLineDash([]);};
+    curve(1,'#8fd3ff',[]); curve(3,'#f0c24b',[6,4]);
+    text(ctx,'N=1 fundamental',X(150),Y(freq(150,1))-14,'#8fd3ff',12,'left');
+    text(ctx,'N=3 overtone',X(120),Y(freq(120,3))-14,'#f0c24b',12,'left');
+    [[8,'8'],[16,'16'],[32,'32'],[50,'50']].forEach(([f])=>{const t=K/f;if(t>=tmin&&t<=tmax){ctx.fillStyle='#8fd3ff';ctx.beginPath();ctx.arc(X(t),Y(f),3,0,7);ctx.fill();}});
+    const f=freq(state.t,state.N); if(f<=fmax){
+      ctx.strokeStyle='#ffffff';ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(X(state.t),Y(f));ctx.lineTo(X(state.t),T+gh);ctx.moveTo(X(state.t),Y(f));ctx.lineTo(L,Y(f));ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(X(state.t),Y(f),6,0,7);ctx.fill();
+      text(ctx,`${state.t} µm → ${f.toFixed(1)} MHz`,X(state.t)+10,Y(f)-12,'#fff',12,'left','600');
+    } else text(ctx,`${f.toFixed(0)} MHz (off scale)`,W-R-6,T+14,'#fff',12,'right');
+  }
+
+  // ---------- Panel 3: shear animation ----------
+  const trace=[]; const TRACE_LEN=260;
+  function drawShear(){
+    const c=$('shear'), ctx=c.getContext('2d'); const W=c.width,H=c.height;
+    ctx.clearRect(0,0,W,H);
+    const {t,N,amp,phase}=state;
+    const s=Math.sin(phase);
+    const mainW=820; const left=40;
+
+    const scale=mainW/WIDTH_UM;
+    const tsY=28, tsH=Math.max(1,t*scale);
+    text(ctx,'true scale, 5 mm wide:',left,tsY-14,'#9aa0ab',12,'left');
+    ctx.fillStyle='#8fd3ff';ctx.fillRect(left,tsY,mainW,tsH);
+    text(ctx,`t = ${t} µm = ${(t/1000).toFixed(3)} mm`,left+mainW+10,tsY+tsH/2,'#9aa0ab',12,'left');
+
+    const top=90, plateH=200, bottom=top+plateH;
+    const cx=left+mainW/2;
+    const A=amp*34;
+    const env=x=>{const u=(x-cx)/(mainW/2);return Math.exp(-6*u*u);};
+    const u=(x,v)=>A*env(x)*Math.cos(N*Math.PI*v)*s;
+
+    const bev=40;
+    ctx.beginPath();
+    ctx.moveTo(left+u(left,0)+0,top+bev*0.35);
+    ctx.lineTo(left+bev+u(left+bev,0),top);
+    ctx.lineTo(left+mainW-bev+u(left+mainW-bev,0),top);
+    ctx.lineTo(left+mainW+u(left+mainW,0),top+bev*0.35);
+    ctx.lineTo(left+mainW+u(left+mainW,1),bottom-bev*0.35);
+    ctx.lineTo(left+mainW-bev+u(left+mainW-bev,1),bottom);
+    ctx.lineTo(left+bev+u(left+bev,1),bottom);
+    ctx.lineTo(left+u(left,1),bottom-bev*0.35);
+    ctx.closePath();
+    ctx.fillStyle='rgba(143,211,255,0.14)';ctx.fill();ctx.strokeStyle='#8fd3ff';ctx.lineWidth=1.5;ctx.stroke();
+
+    const nF=33; const steps=40;
+    for(let i=0;i<=nF;i++){
+      const x=left+bev*0.6+(mainW-bev*1.2)*i/nF;
+      const inElectrode=Math.abs(x-cx)<mainW*0.22;
+      ctx.strokeStyle=inElectrode?'rgba(232,232,236,0.75)':'rgba(232,232,236,0.3)';ctx.lineWidth=1.2;
+      ctx.beginPath();
+      for(let k=0;k<=steps;k++){const v=k/steps;const px=x+u(x,v),py=top+v*plateH;k?ctx.lineTo(px,py):ctx.moveTo(px,py);}
+      ctx.stroke();
+    }
+    ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(91,227,123,0.6)';ctx.lineWidth=1;
+    for(let m=0;m<N;m++){const v=(m+0.5)/N;const y=top+v*plateH;ctx.beginPath();ctx.moveTo(left+10,y);ctx.lineTo(left+mainW-10,y);ctx.stroke();}
+    ctx.setLineDash([]);
+    text(ctx,N===1?'node (no motion)':'nodes',left+mainW-14,top+(0.5/N)*plateH-10,'#5be37b',11,'right');
+
+    const eW=mainW*0.44;
+    ctx.fillStyle='#f0c24b';
+    ctx.fillRect(cx-eW/2+u(cx,0),top-6,eW,6);
+    ctx.fillRect(cx-eW/2+u(cx,1),bottom,eW,6);
+    text(ctx,'gold electrode (~100 nm)',cx+eW/2+8+u(cx,0),top-3,'#f0c24b',11,'left');
+
+    ctx.fillStyle='#6b7280';
+    ctx.fillRect(left-10,top+plateH*0.3,14,plateH*0.4);
+    ctx.fillRect(left+mainW-4,top+plateH*0.3,14,plateH*0.4);
+    text(ctx,'mount',left-3,bottom+16,'#9aa0ab',11,'center');
+    text(ctx,'mount',left+mainW+3,bottom+16,'#9aa0ab',11,'center');
+
+    const d=u(cx,0);
+    if(Math.abs(s)>0.15){
+      const dir=Math.sign(d);
+      arrow(ctx,cx-60*dir,top-22,cx+60*dir,top-22,'#ff6b6b',3,10);
+      arrow(ctx,cx+60*dir,bottom+22,cx-60*dir,bottom+22,'#ff6b6b',3,10);
+    }
+    text(ctx,'top face  → +X',cx-eW/2-10,top-22,'#ff6b6b',12,'right','600');
+    text(ctx,'bottom face → −X',cx-eW/2-10,bottom+22,'#ff6b6b',12,'right','600');
+
+    arrow(ctx,left,bottom+60,left+70,bottom+60,'#ff6b6b',2); text(ctx,'X (shear)',left+78,bottom+60,'#ff6b6b',12,'left','600');
+    arrow(ctx,left+180,bottom+80,left+180,bottom+40,'#5be37b',2); text(ctx,\"Y′ (thickness, not to scale)\",left+190,bottom+60,'#5be37b',12,'left','600');
+    arrow(ctx,left+mainW+30,top+plateH/2,left+mainW+30,top,'#5be37b',1.5,7);
+    arrow(ctx,left+mainW+30,top+plateH/2,left+mainW+30,bottom,'#5be37b',1.5,7);
+    text(ctx,`t = ${t} µm`,left+mainW+40,top+plateH/2-10,'#5be37b',12,'left','600');
+    text(ctx,`λ/2 × ${N}`,left+mainW+40,top+plateH/2+10,'#9aa0ab',12,'left');
+
+    const vx=left+mainW+40, vy=bottom+40, vw=W-vx-20, vh=70;
+    ctx.strokeStyle='#2a2f3a';ctx.strokeRect(vx,vy,vw,vh);
+    text(ctx,'piezo voltage across electrodes',vx,vy-10,'#9aa0ab',11,'left');
+    ctx.strokeStyle='#f0c24b';ctx.lineWidth=2;ctx.beginPath();
+    for(let i=0;i<trace.length;i++){const px=vx+vw*(i/(TRACE_LEN-1));const py=vy+vh/2-trace[i]*(vh/2-6);i?ctx.lineTo(px,py):ctx.moveTo(px,py);}
+    ctx.stroke();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(vx+vw*((trace.length-1)/(TRACE_LEN-1)),vy+vh/2-s*(vh/2-6),3,0,7);ctx.fill();
+    text(ctx,`${freq(t,N).toFixed(2)} MHz — shown ~10⁷× slowed`,vx,vy+vh+14,'#9aa0ab',11,'left');
+  }
+
+  // ---------- loop ----------
+  function frame(now){
+    const dt=(now-state.last)/1000; state.last=now;
+    if(!state.paused){
+      state.phase += dt*state.spd*2*Math.PI*0.8;
+      trace.push(Math.sin(state.phase)); if(trace.length>TRACE_LEN) trace.shift();
+    }
+    if(view.spin) view.yaw += dt*0.5;
+    drawCut();
+    drawShear();
+    requestAnimationFrame(frame);
+  }
+
+  updateReadouts(); drawGraph(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
+"
+ :AT "2026-11-18T10:36:48" :VERSION 2)
+(:PINNED T :ID "reset-circuit-forcing-the-first-fetch" :MAP "computers" :NODE
+ "reset-vector-bootstrap" :TYPE "svg" :TITLE "Reset circuit forcing the first fetch" :LANGUAGE NIL
+ :CONTENT
+ "<svg viewBox=\"0 0 900 730\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"system-ui,sans-serif\">
+<style>
+.a1{animation:k1 32s linear infinite}
+.a2{animation:k2 32s linear infinite}
+.a3{animation:k3 32s linear infinite}
+.a4{animation:k4 32s linear infinite}
+.a5{animation:k5 32s linear infinite}
+.a6{animation:k6 32s linear infinite}
+.a7{animation:k7 32s linear infinite}
+.aL{animation:kL 32s linear infinite}
+.aH{animation:kH 32s linear infinite}
+.aG{animation:kG 32s linear infinite}
+.aF{animation:kF 32s linear infinite}
+.aFz{animation:kFz 32s linear infinite}
+.a56{animation:k56 32s linear infinite}
+.fl{fill:none;stroke-dasharray:10 8;stroke-linecap:round;animation:flow .7s linear infinite}
+.vbar{transform-box:fill-box;transform-origin:0 50%;animation:vcc 32s linear infinite}
+.cbar{transform-box:fill-box;transform-origin:0 50%;animation:cap 32s linear infinite}
+.cur{animation:cur 32s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-18}}
+@keyframes cur{from{transform:translateX(0)}to{transform:translateX(210px)}}
+@keyframes vcc{0%{transform:scaleX(0)}15%,100%{transform:scaleX(1)}}
+@keyframes cap{0%,15%{transform:scaleX(0)}52%,100%{transform:scaleX(1)}}
+@keyframes k1{0%,14.5%{opacity:1}15%,100%{opacity:0}}
+@keyframes k2{0%,15%{opacity:0}15.5%,36.5%{opacity:1}37%,100%{opacity:0}}
+@keyframes k3{0%,37%{opacity:0}37.5%,51.5%{opacity:1}52%,100%{opacity:0}}
+@keyframes k4{0%,52%{opacity:0}52.5%,64.5%{opacity:1}65%,100%{opacity:0}}
+@keyframes k5{0%,65%{opacity:0}65.5%,77.5%{opacity:1}78%,100%{opacity:0}}
+@keyframes k6{0%,78%{opacity:0}78.5%,89.5%{opacity:1}90%,100%{opacity:0}}
+@keyframes k7{0%,90%{opacity:0}90.5%,99.5%{opacity:1}100%{opacity:0}}
+@keyframes kL{0%,15%{opacity:0}15.5%,51.5%{opacity:1}52%,100%{opacity:0}}
+@keyframes kH{0%,52%{opacity:0}52.5%,100%{opacity:1}}
+@keyframes kG{0%,36.5%{opacity:1}37%,100%{opacity:0}}
+@keyframes kF{0%,37%{opacity:0}37.5%,89.5%{opacity:1}90%,100%{opacity:0}}
+@keyframes kFz{0%,51.5%{opacity:1}52%,100%{opacity:0}}
+@keyframes k56{0%,65%{opacity:0}65.5%,89.5%{opacity:1}90%,100%{opacity:0}}
+</style>
+<rect width=\"900\" height=\"730\" fill=\"#fff\"/>
+<text x=\"450\" y=\"30\" font-size=\"20\" font-weight=\"bold\" text-anchor=\"middle\">Power-on: how a wire forces the first fetch</text>
+<text x=\"450\" y=\"48\" font-size=\"12\" text-anchor=\"middle\" fill=\"#666\">animated loop, 32 s. Moving dashes show current/logic flow; colour shows what the wire is doing.</text>
+
+<!-- ===== static base wires ===== -->
+<g fill=\"none\" stroke=\"#ccc\" stroke-width=\"4\">
+<path d=\"M160 105 L230 105\"/>
+<path d=\"M60 140 L60 270 L330 270\"/>
+<path d=\"M400 105 L520 105 L520 250\"/>
+<path d=\"M520 235 L445 235 L445 295\"/>
+<path d=\"M520 235 L655 235 L655 295\"/>
+<path d=\"M160 330 L330 330\" stroke-dasharray=\"6 4\"/>
+<path d=\"M445 520 L445 560 L425 560\"/>
+<path d=\"M350 560 L330 560\"/>
+<path d=\"M200 520 L200 480 L330 480 L330 455 L350 455\"/>
+</g>
+<circle cx=\"520\" cy=\"235\" r=\"5\" fill=\"#ccc\"/>
+
+<!-- Power supply -->
+<rect x=\"20\" y=\"70\" width=\"140\" height=\"70\" rx=\"8\" fill=\"#fdecea\" stroke=\"#c0392b\" stroke-width=\"2\"/>
+<text x=\"90\" y=\"92\" font-size=\"14\" text-anchor=\"middle\" font-weight=\"bold\">Power supply</text>
+<text x=\"90\" y=\"110\" font-size=\"12\" text-anchor=\"middle\">rails ramp 0 → 3.3 V</text>
+<rect x=\"35\" y=\"120\" width=\"110\" height=\"9\" fill=\"#eee\" stroke=\"#c0392b\" stroke-width=\"0.5\"/>
+<rect class=\"vbar\" x=\"35\" y=\"120\" width=\"110\" height=\"9\" fill=\"#c0392b\"/>
+<text x=\"62\" y=\"158\" font-size=\"11\" fill=\"#c0392b\" text-anchor=\"start\">VCC to CPU and ROM</text>
+
+<!-- Reset generator -->
+<rect x=\"230\" y=\"60\" width=\"170\" height=\"110\" rx=\"8\" fill=\"#fff4e0\" stroke=\"#e67e22\" stroke-width=\"2\"/>
+<text x=\"315\" y=\"80\" font-size=\"14\" text-anchor=\"middle\" font-weight=\"bold\">Reset generator</text>
+<text x=\"315\" y=\"97\" font-size=\"12\" text-anchor=\"middle\">supervisor chip, or R + C delay:</text>
+<text x=\"315\" y=\"112\" font-size=\"12\" text-anchor=\"middle\">holds RESET# low until VCC</text>
+<text x=\"315\" y=\"127\" font-size=\"12\" text-anchor=\"middle\">and clock are stable</text>
+<rect x=\"240\" y=\"137\" width=\"150\" height=\"9\" fill=\"#eee\" stroke=\"#e67e22\" stroke-width=\"0.5\"/>
+<rect class=\"cbar\" x=\"240\" y=\"137\" width=\"150\" height=\"9\" fill=\"#e67e22\"/>
+<text x=\"315\" y=\"162\" font-size=\"11\" text-anchor=\"middle\" fill=\"#a85a10\">capacitor charging toward threshold</text>
+
+<!-- Reset button -->
+<rect x=\"230\" y=\"185\" width=\"170\" height=\"36\" rx=\"6\" fill=\"#f3f3f3\" stroke=\"#888\"/>
+<text x=\"315\" y=\"208\" font-size=\"12\" text-anchor=\"middle\">manual reset button → GND</text>
+<line x1=\"315\" y1=\"185\" x2=\"315\" y2=\"170\" stroke=\"#888\" stroke-width=\"2\"/>
+
+<!-- Waveform panel -->
+<rect x=\"640\" y=\"60\" width=\"240\" height=\"145\" rx=\"6\" fill=\"#f8faff\" stroke=\"#bbb\"/>
+<text x=\"760\" y=\"78\" font-size=\"12\" text-anchor=\"middle\" font-weight=\"bold\">VCC and RESET# vs time</text>
+<line x1=\"655\" y1=\"185\" x2=\"865\" y2=\"185\" stroke=\"#999\"/>
+<polyline points=\"655,185 687,100 865,100\" fill=\"none\" stroke=\"#c0392b\" stroke-width=\"3\"/>
+<polyline points=\"655,185 764,185 764,125 865,125\" fill=\"none\" stroke=\"#2b5fd9\" stroke-width=\"3\"/>
+<text x=\"800\" y=\"94\" font-size=\"11\" fill=\"#c0392b\">VCC</text>
+<text x=\"800\" y=\"119\" font-size=\"11\" fill=\"#2b5fd9\">RESET#</text>
+<text x=\"710\" y=\"200\" font-size=\"11\" text-anchor=\"middle\" fill=\"#2b5fd9\">LOW: CPU frozen</text>
+<text x=\"815\" y=\"200\" font-size=\"11\" text-anchor=\"middle\" fill=\"#2b5fd9\">HIGH: runs</text>
+<line class=\"cur\" x1=\"655\" y1=\"88\" x2=\"655\" y2=\"185\" stroke=\"#222\" stroke-width=\"2\" stroke-dasharray=\"3 3\"/>
+
+<!-- CPU -->
+<rect x=\"330\" y=\"250\" width=\"440\" height=\"270\" rx=\"10\" fill=\"#eef3ff\" stroke=\"#2b5fd9\" stroke-width=\"3\"/>
+<text x=\"550\" y=\"275\" font-size=\"16\" text-anchor=\"middle\" font-weight=\"bold\">CPU</text>
+
+<rect x=\"350\" y=\"295\" width=\"190\" height=\"90\" rx=\"6\" fill=\"#fff\" stroke=\"#2b5fd9\"/>
+<text x=\"445\" y=\"316\" font-size=\"13\" text-anchor=\"middle\" font-weight=\"bold\">Program counter (PC)</text>
+<text x=\"445\" y=\"335\" font-size=\"12\" text-anchor=\"middle\">flip-flops with a reset input.</text>
+<text x=\"445\" y=\"351\" font-size=\"12\" text-anchor=\"middle\">RESET# low → bits forced to:</text>
+<text class=\"aG\" x=\"445\" y=\"374\" font-size=\"15\" text-anchor=\"middle\" font-family=\"monospace\" fill=\"#999\">0x???????? (garbage)</text>
+<text class=\"aF\" x=\"445\" y=\"374\" font-size=\"15\" text-anchor=\"middle\" font-family=\"monospace\" font-weight=\"bold\" fill=\"#2b5fd9\">0xFFFFFFF0</text>
+<text class=\"a7\" x=\"445\" y=\"374\" font-size=\"14\" text-anchor=\"middle\" font-family=\"monospace\" font-weight=\"bold\" fill=\"#27ae60\">next: 0xFFFFFFF0 + n</text>
+
+<rect x=\"560\" y=\"295\" width=\"190\" height=\"90\" rx=\"6\" fill=\"#fff\" stroke=\"#2b5fd9\"/>
+<text x=\"655\" y=\"316\" font-size=\"13\" text-anchor=\"middle\" font-weight=\"bold\">Control unit</text>
+<text x=\"655\" y=\"335\" font-size=\"12\" text-anchor=\"middle\">reset: caches off, interrupts</text>
+<text x=\"655\" y=\"351\" font-size=\"12\" text-anchor=\"middle\">masked, registers known</text>
+<text class=\"aG\" x=\"655\" y=\"374\" font-size=\"13\" text-anchor=\"middle\" fill=\"#999\">state: unknown</text>
+<text class=\"aF\" x=\"655\" y=\"374\" font-size=\"13\" text-anchor=\"middle\" font-weight=\"bold\" fill=\"#2b5fd9\">state: FETCH</text>
+<text class=\"a7\" x=\"655\" y=\"374\" font-size=\"13\" text-anchor=\"middle\" font-weight=\"bold\" fill=\"#27ae60\">state: DECODE → EXECUTE</text>
+
+<rect x=\"350\" y=\"405\" width=\"400\" height=\"95\" rx=\"6\" fill=\"#fff\" stroke=\"#27ae60\" stroke-width=\"2\"/>
+<text x=\"550\" y=\"425\" font-size=\"13\" text-anchor=\"middle\" font-weight=\"bold\">Fetch → Decode → Execute loop</text>
+<g font-size=\"13\" text-anchor=\"middle\">
+<rect x=\"370\" y=\"438\" width=\"105\" height=\"28\" rx=\"5\" fill=\"#eee\"/><text x=\"422\" y=\"457\" fill=\"#666\">FETCH</text>
+<rect x=\"487\" y=\"438\" width=\"105\" height=\"28\" rx=\"5\" fill=\"#eee\"/><text x=\"539\" y=\"457\" fill=\"#666\">DECODE</text>
+<rect x=\"604\" y=\"438\" width=\"105\" height=\"28\" rx=\"5\" fill=\"#eee\"/><text x=\"656\" y=\"457\" fill=\"#666\">EXECUTE</text>
+<g class=\"a56\"><rect x=\"370\" y=\"438\" width=\"105\" height=\"28\" rx=\"5\" fill=\"#27ae60\"/><text x=\"422\" y=\"457\" fill=\"#fff\" font-weight=\"bold\">FETCH</text></g>
+<g class=\"a7\"><rect x=\"487\" y=\"438\" width=\"105\" height=\"28\" rx=\"5\" fill=\"#27ae60\"/><text x=\"539\" y=\"457\" fill=\"#fff\" font-weight=\"bold\">DECODE</text>
+<rect x=\"604\" y=\"438\" width=\"105\" height=\"28\" rx=\"5\" fill=\"#27ae60\"/><text x=\"656\" y=\"457\" fill=\"#fff\" font-weight=\"bold\">EXECUTE</text></g>
+</g>
+<text class=\"aFz\" x=\"550\" y=\"488\" font-size=\"12\" text-anchor=\"middle\" fill=\"#c0392b\" font-weight=\"bold\">FROZEN: RESET# low, no cycle runs</text>
+<text class=\"aH\" x=\"550\" y=\"488\" font-size=\"12\" text-anchor=\"middle\" fill=\"#27ae60\">RUNNING: each clock edge steps the cycle, PC += length</text>
+
+<!-- Clock -->
+<rect x=\"20\" y=\"300\" width=\"140\" height=\"60\" rx=\"8\" fill=\"#f3f3f3\" stroke=\"#888\"/>
+<text x=\"90\" y=\"325\" font-size=\"13\" text-anchor=\"middle\" font-weight=\"bold\">Crystal + clock</text>
+<text x=\"90\" y=\"343\" font-size=\"12\" text-anchor=\"middle\">steps the cycle</text>
+<text class=\"aL\" x=\"245\" y=\"322\" font-size=\"11\" text-anchor=\"middle\" fill=\"#0d2a8a\">ticking, but ignored</text>
+<text class=\"aH\" x=\"245\" y=\"322\" font-size=\"11\" text-anchor=\"middle\" fill=\"#27ae60\">clock now steps CPU</text>
+
+<!-- Address decoder -->
+<rect x=\"350\" y=\"535\" width=\"75\" height=\"50\" rx=\"6\" fill=\"#f4ecf7\" stroke=\"#8e44ad\" stroke-width=\"2\"/>
+<text x=\"387\" y=\"557\" font-size=\"11\" text-anchor=\"middle\" fill=\"#6c3483\">address</text>
+<text x=\"387\" y=\"571\" font-size=\"11\" text-anchor=\"middle\" fill=\"#6c3483\">decoder</text>
+<text x=\"350\" y=\"602\" font-size=\"11\" fill=\"#6c3483\">top addresses → ROM chip-select</text>
+<text x=\"458\" y=\"548\" font-size=\"12\" fill=\"#8e44ad\">address bus: PC value</text>
+
+<!-- ROM -->
+<rect x=\"60\" y=\"520\" width=\"270\" height=\"90\" rx=\"8\" fill=\"#f4ecf7\" stroke=\"#8e44ad\" stroke-width=\"2\"/>
+<text x=\"195\" y=\"545\" font-size=\"14\" text-anchor=\"middle\" font-weight=\"bold\">Boot ROM / flash</text>
+<text x=\"195\" y=\"565\" font-size=\"12\" text-anchor=\"middle\">decoder maps the top of the</text>
+<text x=\"195\" y=\"581\" font-size=\"12\" text-anchor=\"middle\">address space to this chip, so the</text>
+<text x=\"195\" y=\"597\" font-size=\"12\" text-anchor=\"middle\">first instruction is already there</text>
+<text x=\"218\" y=\"502\" font-size=\"11\" fill=\"#b9590c\">data bus: instruction</text>
+<text x=\"218\" y=\"515\" font-size=\"11\" fill=\"#b9590c\">word returns</text>
+
+<!-- ===== animated overlays ===== -->
+<!-- step 1: power -->
+<g class=\"a1\">
+<path class=\"fl\" d=\"M160 105 L230 105\" stroke=\"#c0392b\" stroke-width=\"5\"/>
+<path class=\"fl\" d=\"M60 140 L60 270 L330 270\" stroke=\"#c0392b\" stroke-width=\"5\"/>
+<rect x=\"20\" y=\"70\" width=\"140\" height=\"70\" rx=\"8\" fill=\"none\" stroke=\"#c0392b\" stroke-width=\"4\"/>
+<text x=\"195\" y=\"96\" font-size=\"11\" fill=\"#c0392b\" text-anchor=\"middle\">power-good?</text>
+</g>
+<!-- RESET low -->
+<g class=\"aL\">
+<path class=\"fl\" d=\"M400 105 L520 105 L520 250\" stroke=\"#0d2a8a\" stroke-width=\"5\"/>
+<path class=\"fl\" d=\"M520 235 L445 235 L445 295\" stroke=\"#0d2a8a\" stroke-width=\"5\"/>
+<path class=\"fl\" d=\"M520 235 L655 235 L655 295\" stroke=\"#0d2a8a\" stroke-width=\"5\"/>
+<text x=\"462\" y=\"95\" font-size=\"13\" font-weight=\"bold\" fill=\"#0d2a8a\" text-anchor=\"middle\">RESET# = LOW (0 V)</text>
+</g>
+<g class=\"a2\"><rect x=\"230\" y=\"60\" width=\"170\" height=\"110\" rx=\"8\" fill=\"none\" stroke=\"#e67e22\" stroke-width=\"4\"/></g>
+<g class=\"a3\">
+<rect x=\"350\" y=\"295\" width=\"190\" height=\"90\" rx=\"6\" fill=\"none\" stroke=\"#0d2a8a\" stroke-width=\"4\"/>
+<rect x=\"560\" y=\"295\" width=\"190\" height=\"90\" rx=\"6\" fill=\"none\" stroke=\"#0d2a8a\" stroke-width=\"4\"/>
+</g>
+<!-- RESET high -->
+<g class=\"aH\">
+<path class=\"fl\" d=\"M400 105 L520 105 L520 250\" stroke=\"#27ae60\" stroke-width=\"5\"/>
+<path class=\"fl\" d=\"M520 235 L445 235 L445 295\" stroke=\"#27ae60\" stroke-width=\"5\"/>
+<path class=\"fl\" d=\"M520 235 L655 235 L655 295\" stroke=\"#27ae60\" stroke-width=\"5\"/>
+<text x=\"462\" y=\"95\" font-size=\"13\" font-weight=\"bold\" fill=\"#27ae60\" text-anchor=\"middle\">RESET# = HIGH (3.3 V)</text>
+<path class=\"fl\" d=\"M160 330 L330 330\" stroke=\"#27ae60\" stroke-width=\"5\"/>
+</g>
+<g class=\"a4\"><rect x=\"230\" y=\"60\" width=\"170\" height=\"110\" rx=\"8\" fill=\"none\" stroke=\"#27ae60\" stroke-width=\"4\"/></g>
+<!-- low: clock ticking but ignored -->
+<g class=\"aL\"><path class=\"fl\" d=\"M160 330 L330 330\" stroke=\"#999\" stroke-width=\"3\"/></g>
+<!-- step 5: address -->
+<g class=\"a5\">
+<path class=\"fl\" d=\"M445 520 L445 560 L425 560\" stroke=\"#8e44ad\" stroke-width=\"5\"/>
+<path class=\"fl\" d=\"M350 560 L330 560\" stroke=\"#8e44ad\" stroke-width=\"5\"/>
+<rect x=\"350\" y=\"535\" width=\"75\" height=\"50\" rx=\"6\" fill=\"none\" stroke=\"#8e44ad\" stroke-width=\"4\"/>
+</g>
+<!-- step 6: data -->
+<g class=\"a6\">
+<path class=\"fl\" d=\"M200 520 L200 480 L330 480 L330 455 L350 455\" stroke=\"#e67e22\" stroke-width=\"5\"/>
+<rect x=\"60\" y=\"520\" width=\"270\" height=\"90\" rx=\"8\" fill=\"none\" stroke=\"#e67e22\" stroke-width=\"4\"/>
+</g>
+<!-- step 7 -->
+<g class=\"a7\"><rect x=\"350\" y=\"405\" width=\"400\" height=\"95\" rx=\"6\" fill=\"none\" stroke=\"#27ae60\" stroke-width=\"4\"/></g>
+
+<!-- step badges -->
+<g font-size=\"13\" font-weight=\"bold\" text-anchor=\"middle\" fill=\"#fff\">
+<g class=\"a1\"><circle cx=\"20\" cy=\"70\" r=\"12\" fill=\"#c0392b\"/><text x=\"20\" y=\"75\">1</text></g>
+<g class=\"a2\"><circle cx=\"230\" cy=\"60\" r=\"12\" fill=\"#e67e22\"/><text x=\"230\" y=\"65\">2</text></g>
+<g class=\"a3\"><circle cx=\"350\" cy=\"295\" r=\"12\" fill=\"#0d2a8a\"/><text x=\"350\" y=\"300\">3</text><circle cx=\"560\" cy=\"295\" r=\"12\" fill=\"#0d2a8a\"/><text x=\"560\" y=\"300\">3</text></g>
+<g class=\"a4\"><circle cx=\"520\" cy=\"150\" r=\"12\" fill=\"#27ae60\"/><text x=\"520\" y=\"155\">4</text></g>
+<g class=\"a5\"><circle cx=\"350\" cy=\"535\" r=\"12\" fill=\"#8e44ad\"/><text x=\"350\" y=\"540\">5</text></g>
+<g class=\"a6\"><circle cx=\"200\" cy=\"500\" r=\"12\" fill=\"#e67e22\"/><text x=\"200\" y=\"505\">6</text></g>
+<g class=\"a7\"><circle cx=\"350\" cy=\"405\" r=\"12\" fill=\"#27ae60\"/><text x=\"350\" y=\"410\">7</text></g>
+</g>
+
+<!-- caption box -->
+<rect x=\"20\" y=\"624\" width=\"860\" height=\"66\" rx=\"8\" fill=\"#fffbea\" stroke=\"#d4ac0d\"/>
+<g font-size=\"13\">
+<g class=\"a1\"><text x=\"34\" y=\"645\" font-size=\"15\" font-weight=\"bold\">1 · Power rises: voltage is not yet trustworthy</text>
+<text x=\"34\" y=\"663\">The supply ramps 0 → 3.3 V. While it climbs, flip-flops power up in random states, so nothing may run yet.</text>
+<text x=\"34\" y=\"679\">The same rail feeds the CPU, the ROM and the reset generator.</text></g>
+<g class=\"a2\"><text x=\"34\" y=\"645\" font-size=\"15\" font-weight=\"bold\">2 · The reset generator holds RESET# low</text>
+<text x=\"34\" y=\"663\">A supervisor chip (or capacitor C charging through resistor R) keeps RESET# at 0 V until VCC passes its threshold.</text>
+<text x=\"34\" y=\"679\">The crystal ticks meanwhile but the CPU ignores it. The button can pull the same wire to ground.</text></g>
+<g class=\"a3\"><text x=\"34\" y=\"645\" font-size=\"15\" font-weight=\"bold\">3 · RESET# low forces a known state</text>
+<text x=\"34\" y=\"663\">The wire drives the reset pins of the PC's flip-flops. Their reset value is fixed in silicon (0xFFFFFFF0 on x86).</text>
+<text x=\"34\" y=\"679\">It also puts the control unit in FETCH, masks interrupts, clears caches: garbage becomes a defined start.</text></g>
+<g class=\"a4\"><text x=\"34\" y=\"645\" font-size=\"15\" font-weight=\"bold\">4 · Threshold crossed: RESET# released</text>
+<text x=\"34\" y=\"663\">VCC and the clock are stable, so the generator lets RESET# go high, after a guaranteed delay, on every power-on.</text>
+<text x=\"34\" y=\"679\">That fixed delay is why the start is repeatable. Now each clock edge advances the cycle.</text></g>
+<g class=\"a5\"><text x=\"34\" y=\"645\" font-size=\"15\" font-weight=\"bold\">5 · Fetch: the PC value goes on the address bus</text>
+<text x=\"34\" y=\"663\">The address decoder sees a top-of-memory address and asserts the ROM's chip-select, so the boot ROM/flash answers.</text>
+<text x=\"34\" y=\"679\">The memory map is wired so that ROM is what lives at the reset address.</text></g>
+<g class=\"a6\"><text x=\"34\" y=\"645\" font-size=\"15\" font-weight=\"bold\">6 · The ROM puts the instruction word on the data bus</text>
+<text x=\"34\" y=\"663\">The word stored at the reset address travels back to the CPU.</text>
+<text x=\"34\" y=\"679\">It is the first instruction of the first loader.</text></g>
+<g class=\"a7\"><text x=\"34\" y=\"645\" font-size=\"15\" font-weight=\"bold\">7 · Decode, execute, PC += length, repeat</text>
+<text x=\"34\" y=\"663\">The control unit decodes and executes the word, then advances the PC. From here it is the ordinary FDE loop,</text>
+<text x=\"34\" y=\"679\">only started at an address chosen by wiring, not by software. The animation now loops.</text></g>
+</g>
+
+<!-- step progress pills -->
+<g font-size=\"12\" text-anchor=\"middle\">
+<rect x=\"20\" y=\"698\" width=\"116\" height=\"24\" rx=\"12\" fill=\"#eee\"/><text x=\"78\" y=\"714\" fill=\"#555\">1 Power rises</text>
+<rect x=\"144\" y=\"698\" width=\"116\" height=\"24\" rx=\"12\" fill=\"#eee\"/><text x=\"202\" y=\"714\" fill=\"#555\">2 Hold RESET#</text>
+<rect x=\"268\" y=\"698\" width=\"116\" height=\"24\" rx=\"12\" fill=\"#eee\"/><text x=\"326\" y=\"714\" fill=\"#555\">3 Force PC</text>
+<rect x=\"392\" y=\"698\" width=\"116\" height=\"24\" rx=\"12\" fill=\"#eee\"/><text x=\"450\" y=\"714\" fill=\"#555\">4 Release</text>
+<rect x=\"516\" y=\"698\" width=\"116\" height=\"24\" rx=\"12\" fill=\"#eee\"/><text x=\"574\" y=\"714\" fill=\"#555\">5 Fetch</text>
+<rect x=\"640\" y=\"698\" width=\"116\" height=\"24\" rx=\"12\" fill=\"#eee\"/><text x=\"698\" y=\"714\" fill=\"#555\">6 ROM answers</text>
+<rect x=\"764\" y=\"698\" width=\"116\" height=\"24\" rx=\"12\" fill=\"#eee\"/><text x=\"822\" y=\"714\" fill=\"#555\">7 Decode/exec</text>
+<g fill=\"#fff\" font-weight=\"bold\">
+<g class=\"a1\"><rect x=\"20\" y=\"698\" width=\"116\" height=\"24\" rx=\"12\" fill=\"#c0392b\"/><text x=\"78\" y=\"714\">1 Power rises</text></g>
+<g class=\"a2\"><rect x=\"144\" y=\"698\" width=\"116\" height=\"24\" rx=\"12\" fill=\"#e67e22\"/><text x=\"202\" y=\"714\">2 Hold RESET#</text></g>
+<g class=\"a3\"><rect x=\"268\" y=\"698\" width=\"116\" height=\"24\" rx=\"12\" fill=\"#0d2a8a\"/><text x=\"326\" y=\"714\">3 Force PC</text></g>
+<g class=\"a4\"><rect x=\"392\" y=\"698\" width=\"116\" height=\"24\" rx=\"12\" fill=\"#27ae60\"/><text x=\"450\" y=\"714\">4 Release</text></g>
+<g class=\"a5\"><rect x=\"516\" y=\"698\" width=\"116\" height=\"24\" rx=\"12\" fill=\"#8e44ad\"/><text x=\"574\" y=\"714\">5 Fetch</text></g>
+<g class=\"a6\"><rect x=\"640\" y=\"698\" width=\"116\" height=\"24\" rx=\"12\" fill=\"#e67e22\"/><text x=\"698\" y=\"714\">6 ROM answers</text></g>
+<g class=\"a7\"><rect x=\"764\" y=\"698\" width=\"116\" height=\"24\" rx=\"12\" fill=\"#27ae60\"/><text x=\"822\" y=\"714\">7 Decode/exec</text></g>
+</g>
+</g>
+</svg>"
+ :AT "2026-11-18T10:57:53" :VERSION 2)
+(:PINNED T :ID "linking-and-loading-step-through" :MAP "computers" :NODE "linking-loading" :TYPE
+ "html" :TITLE "Linking and loading: step through" :LANGUAGE NIL :CONTENT
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>
+body{font-family:system-ui,sans-serif;margin:0;padding:14px;background:#0f172a;color:#e2e8f0}
+h3{margin:0 0 6px;font-size:15px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.box{background:#1e293b;border:2px solid #475569;border-radius:8px;padding:8px;min-width:140px;transition:all .5s}
+.box.hl{border-color:#fbbf24;box-shadow:0 0 12px #fbbf2466}
+.cell{font-family:monospace;font-size:12px;padding:3px 6px;margin:2px 0;border-radius:4px;background:#334155;transition:all .5s}
+.unres{background:#7f1d1d}.res{background:#166534}.pc{outline:2px solid #38bdf8}
+.mem .cell{height:16px;background:#1e293b;border:1px dashed #475569}
+.mem .cell.f{background:#1d4ed8;border:1px solid #60a5fa}.mem .cell.d{background:#7c3aed;border:1px solid #c4b5fd}.mem .cell.l{background:#0f766e;border:1px solid #5eead4}
+button{background:#38bdf8;border:0;border-radius:6px;padding:8px 14px;font-weight:600;cursor:pointer;margin-right:6px}
+#msg{margin:12px 0;padding:10px;background:#1e293b;border-left:4px solid #fbbf24;min-height:44px;font-size:14px}
+.arrow{align-self:center;font-size:24px;opacity:.5}
+</style></head><body>
+<div id=\"msg\"></div>
+<div><button onclick=\"prev()\">◀ Back</button><button onclick=\"next()\">Next ▶</button><button onclick=\"play()\">▶ Auto</button> <span id=\"st\"></span></div>
+<br>
+<div class=\"row\">
+<div class=\"box\" id=\"A\"><h3>main.o</h3>
+<div class=\"cell\">0: main code</div><div class=\"cell unres\" id=\"c1\">call print → ???</div><div class=\"cell\">data: \"hi\"</div></div>
+<div class=\"box\" id=\"B\"><h3>print.o</h3><div class=\"cell\">0: print code</div><div class=\"cell\">symbol: print</div></div>
+<div class=\"box\" id=\"L\"><h3>libc.so (shared)</h3><div class=\"cell\">write()</div><div class=\"cell\">symbol: write</div></div>
+<div class=\"arrow\">→</div>
+<div class=\"box\" id=\"E\"><h3>executable</h3>
+<div class=\"cell\" id=\"h\">header: entry=?</div>
+<div class=\"cell\" id=\"e1\">code @ ?</div><div class=\"cell\" id=\"e2\">call → ???</div><div class=\"cell\" id=\"e3\">data @ ?</div></div>
+<div class=\"arrow\">→</div>
+<div class=\"box mem\" id=\"M\"><h3>memory</h3>
+<div id=\"mem\"></div><div class=\"cell\" id=\"pc\" style=\"background:none;border:0;color:#38bdf8;margin-top:6px\">PC = —</div></div>
+</div>
+<script>
+const mem=document.getElementById('mem');
+for(let i=0;i<8;i++){mem.innerHTML+=`<div class=\"cell\" id=\"m${i}\">0x${(0x400000+i*0x10).toString(16)}</div>`}
+const $=id=>document.getElementById(id);
+const steps=[
+[\"Start: separate object files. main.o calls print, but doesn't know where print lives — an unresolved reference.\",()=>{}],
+[\"LINKER: collects the pieces and lays them out one after another. Each section gets an address.\",()=>{$('A').classList.add('hl');$('B').classList.add('hl');$('e1').textContent='code @ 0x400000';$('e3').textContent='data @ 0x400030'}],
+[\"LINKER: resolves the name 'print' to its new address 0x400020 and patches the call. The libc reference is left for load time (dynamic linking).\",()=>{$('c1').className='cell res';$('c1').textContent='call print → 0x400020';$('e2').textContent='call → 0x400020';$('e2').className='cell res';$('h').textContent='header: entry=0x400000'}],
+[\"Executable written to disk: a header (where things go, entry point) plus code and data.\",()=>{['A','B'].forEach(i=>$(i).classList.remove('hl'));$('E').classList.add('hl')}],
+[\"LOADER: reads the header and copies code and data into memory at the stated addresses.\",()=>{[0,1,2,3].forEach(i=>$('m'+i).className='cell f');[4].forEach(i=>$('m'+i).className='cell d');$('m0').textContent='code main';$('m1').textContent='code main';$('m2').textContent='code print';$('m3').textContent='code print';$('m4').textContent='data \"hi\"'}],
+[\"LOADER (dynamic linking): maps the shared libc once and fixes up the call to write() so it points at the shared copy.\",()=>{$('L').classList.add('hl');$('m6').className='cell l';$('m6').textContent='libc write (shared)'}],
+[\"LOADER: sets the PC to the entry point from the header and jumps. The program runs.\",()=>{$('L').classList.remove('hl');$('E').classList.remove('hl');$('pc').textContent='PC = 0x400000 ▶ running';$('m0').classList.add('pc')}]
+];
+let i=0,t=null;
+function show(){$('msg').textContent=(i+1)+'/'+steps.length+'  '+steps[i][0];}
+function reset(){location.reload()}
+function render(n){document.querySelectorAll('.hl,.pc').forEach(e=>e.classList.remove('hl','pc'));
+ $('c1').className='cell unres';$('c1').textContent='call print → ???';$('e1').textContent='code @ ?';$('e2').textContent='call → ???';$('e2').className='cell';$('e3').textContent='data @ ?';$('h').textContent='header: entry=?';
+ for(let k=0;k<8;k++){$('m'+k).className='cell';$('m'+k).textContent='0x'+(0x400000+k*16).toString(16)}$('pc').textContent='PC = —';
+ for(let k=0;k<=n;k++)steps[k][1]();i=n;show();$('st').textContent=''}
+function next(){if(i<steps.length-1)render(i+1)}
+function prev(){if(i>0)render(i-1)}
+function play(){clearInterval(t);render(0);t=setInterval(()=>{if(i>=steps.length-1)clearInterval(t);else next()},2500)}
+render(0);
+</script></body></html>"
+ :AT "2026-11-18T11:03:39" :VERSION 1)

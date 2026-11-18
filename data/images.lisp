@@ -68,3 +68,23 @@
  :PAGE
  "https://commons.wikimedia.org/wiki/File:A_schematic_of_WackoWiki_r6.0_database_structure.png" :AT
  "2026-11-17T11:13:01")
+(:ID "computers/crystal-oscillator/F750JG2DREX1" :MAP "computers" :NODE "crystal-oscillator" :KEY
+ "F750JG2DREX1" :TITLE "BOMAR 27.000MHz VCXO Crystal Oscillator" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/37/BOMAR_27.000MHz_VCXO_Crystal_Oscillator.jpg/500px-BOMAR_27.000MHz_VCXO_Crystal_Oscillator.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE "https://commons.wikimedia.org/wiki/File:BOMAR_27.000MHz_VCXO_Crystal_Oscillator.jpg" :AT
+ "2026-11-18T10:39:30")
+(:ID "computers/crystal-oscillator/OMUX6P3EVBTI" :MAP "computers" :NODE "crystal-oscillator" :KEY
+ "OMUX6P3EVBTI" :TITLE "Pocket watch with chain" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7c/Pocket_watch_with_chain.jpg/500px-Pocket_watch_with_chain.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE "https://commons.wikimedia.org/wiki/File:Pocket_watch_with_chain.jpg" :AT
+ "2026-11-18T10:39:40")
+(:ID "computers/divide-and-conquer/LSTM9Q7CWU3K" :MAP "computers" :NODE "divide-and-conquer" :KEY
+ "LSTM9Q7CWU3K" :TITLE "Array maximum - divide et impera" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2a/Array_maximum_-_divide_et_impera.png/500px-Array_maximum_-_divide_et_impera.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE "https://commons.wikimedia.org/wiki/File:Array_maximum_-_divide_et_impera.png" :AT
+ "2026-11-18T10:42:52")
+(:ID "computers/linking-loading/M3Q3ZV20NZ5X" :MAP "computers" :NODE "linking-loading" :KEY
+ "M3Q3ZV20NZ5X" :TITLE "Binary executable file" :THUMB
+ "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9b/Binary_executable_file.png/500px-Binary_executable_file.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+ :PAGE "https://commons.wikimedia.org/wiki/File:Binary_executable_file.png" :AT
+ "2026-11-18T11:01:50")

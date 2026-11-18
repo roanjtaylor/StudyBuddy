@@ -43,6 +43,19 @@
     if (anyBusy()) { e.preventDefault(); e.returnValue = ''; }
   });
 
+  // Kind colours (the swatches in the navbar): a pick recolours the dots at once and is saved
+  // with the field. Delegated, because the navbar is swapped when an idea is opened.
+  function kindPick(e, save) {
+    var i = e.target;
+    if (!i.matches || !i.matches('.kinds input[type=color]')) return;
+    document.documentElement.style.setProperty('--k-' + i.dataset.kind, i.value);
+    if (!save) return;
+    var body = new URLSearchParams({ 'map-name': i.closest('.kinds').dataset.map, kind: i.dataset.kind, colour: i.value });
+    fetch('/action/kind-colour', { method: 'POST', body: body }).catch(function () {});
+  }
+  document.addEventListener('input', function (e) { kindPick(e, false); });
+  document.addEventListener('change', function (e) { kindPick(e, true); });
+
   var grid = document.querySelector('.stage.grid');
   if (!grid) return;
 

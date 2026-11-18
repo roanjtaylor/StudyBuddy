@@ -134,6 +134,12 @@ details.edit textarea { width: 100%; margin-top: .5rem; }
 .artifact-list { display: flex; flex-wrap: wrap; gap: .5rem; }
 
 /* Navbar extras: subtitle */
+nav.top .kinds { margin-left: auto; display: flex; gap: .75rem; flex: none; }
+nav.top .kind { display: inline-flex; align-items: center; gap: .3rem; font-size: .8rem; color: var(--muted); cursor: pointer; }
+nav.top .kind input { width: 1.1rem; height: 1.1rem; padding: 0; border: 1px solid var(--fg); border-radius: 50%; background: none; cursor: pointer; }
+nav.top .kind input::-webkit-color-swatch-wrapper { padding: 0; }
+nav.top .kind input::-webkit-color-swatch { border: 0; border-radius: 50%; }
+nav.top .kind input::-moz-color-swatch { border: 0; border-radius: 50%; }
 nav.top .tagline { font-size: .8rem; margin-left: .75rem; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 /* Field pages: the content fills the window under the navbar */
@@ -167,6 +173,8 @@ svg .lane { stroke: var(--line); }
 svg .tick { font-size: 15px; fill: var(--muted); }
 svg .span { fill: var(--l2); }
 svg .dot { fill: var(--l2); stroke: var(--fg); stroke-width: 1; }
+/* Dots coloured by their idea's kind (--kind, from the navbar's swatches); review marks below win. */
+svg a.kinded .dot { fill: var(--kind); }
 svg a:hover .dot, svg a:hover .span { stroke: var(--fg); stroke-width: 2; }
 .nodelink { text-decoration: none; border-bottom: 1px solid var(--line); }
 

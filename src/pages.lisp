@@ -366,7 +366,10 @@
                                 (html (:a :href (node-url (getf n :id))
                                         :class (let ((base (if (equal (getf n :id) current) "tl-idea tl-current" "tl-idea"))
                                                      (mark (cdr (assoc (getf n :id) *tl-marks* :test #'equal))))
+                                                 (when (kind-colour (getf n :kind)) (setf base (str base " kinded")))
                                                  (if mark (str base " tl-m-" mark) base))
+                                        ;; The dot takes its kind's colour, which the navbar sets (--k-<kind>).
+                                        :style (and (kind-colour (getf n :kind)) (str "--kind:var(--k-" (getf n :kind) ")"))
                                         ;; The idea being read below gets a highlighter-yellow band behind its label.
                                         (when (equal (getf n :id) current)
                                           (html (:rect :x (+ nx 7) :y (+ 3 (* *row-h* row))
@@ -473,6 +476,18 @@
 ;;; ---- A field, or one group of it -----------------------------------------
 
 ;; The field page: the timeline and its chat, and below them the idea (if one is open).
+;; The kinds of the field: one colour per kind as CSS variables, and in the navbar a swatch
+;; per kind to set it (static/map.js applies a pick at once and saves it).
+(defun kinds-legend ()
+  (let ((kinds (map-kinds)))
+    (when kinds
+      (html (:style (:raw (str ":root{" (join "" (mapcar (lambda (k) (str "--k-" (first k) ":" (second k) ";")) kinds)) "}")))
+            (:span :class "kinds" :data-map (map-id)
+              (dolist (k kinds)
+                (html (:label :class "kind" :title (str "Colour of " (first k) " ideas")
+                        (:input :type "color" :value (second k) :data-kind (first k))
+                        (:span (first k))))))))))
+
 (defun render-field (&optional idea-id)
   (let* ((idea (and (not (blankp idea-id)) (find-node idea-id)))
          (nodes (map-nodes))
@@ -480,7 +495,8 @@
          (*focus* (if idea idea-id ""))
          (*crumbs* (append (list (cons (map-id) (and idea (field-url))))
                            (when idea (list (list (getf idea :title))))))
-         (*nav-extra* (html (:span :class "tagline" (getf *map* :compression)))))
+         (*nav-extra* (html (:span :class "tagline" (getf *map* :compression))
+                            (:raw (kinds-legend)))))
     (layout (if idea (str (getf idea :title) " · " (map-title)) (map-title))
       (html (map-warnings)
             (field-view nodes idea)))))
