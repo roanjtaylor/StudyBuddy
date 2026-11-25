@@ -5114,3 +5114,441 @@ function play(){clearInterval(t);render(0);t=setInterval(()=>{if(i>=steps.length
 render(0);
 </script></body></html>"
  :AT "2026-11-18T11:03:39" :VERSION 1)
+(:PINNED T :ID "power-on-to-database-row" :MAP "computers" :NODE "btree-indexes" :TYPE "html"
+ :TITLE "Power-on to database row" :LANGUAGE NIL :CONTENT "<!DOCTYPE html>
+<html lang=\"en\">
+<head>
+<meta charset=\"utf-8\">
+<title>From power-on to a database row</title>
+<style>
+:root{--bg:#f3f5f8;--panel:#ffffff;--ink:#1b2430;--muted:#5b6778;--hot:#ff6a00;--data:#0a7cc2;--pwr:#e0a400;--net:#c2187a;--rd:#d9480f;--line:#d6dce6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;height:100vh;display:grid;grid-template-rows:auto 1fr}
+header{display:flex;gap:10px;align-items:center;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font-size:15px;margin:0;flex:1;min-width:200px}
+button,select{background:#fff;color:var(--ink);border:1px solid #b9c2d0;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:14px}
+button:hover{background:#eef2f7}
+main{display:grid;grid-template-columns:1fr 400px;min-height:0}
+@media (max-width:900px){main{grid-template-columns:1fr;grid-template-rows:55% 45%}}
+#stage{min-height:0;position:relative;background:var(--bg)}
+svg{width:100%;height:100%;display:block}
+aside{background:var(--panel);border-left:1px solid var(--line);padding:14px 16px;overflow:auto}
+aside h2{margin:0 0 4px;font-size:18px}
+.meta{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}
+.tag{font-size:12px;padding:2px 8px;border-radius:10px;background:#eef2f7;color:var(--muted)}
+.tag b{color:var(--ink)}
+aside p{margin:0 0 10px}
+aside code{background:#eef2f7;padding:1px 5px;border-radius:4px;font-size:13px}
+aside ol,aside ul{padding-left:20px;margin:0 0 10px}
+aside li{margin-bottom:4px}
+.key{margin-top:14px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px}
+.key span{display:inline-block;margin-right:12px}
+.key i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:middle}
+#prog{height:4px;background:#e3e8ef;position:absolute;left:0;right:0;top:0}
+#prog div{height:100%;background:var(--hot);transition:width .3s}
+
+/* hardware colours */
+.pcb{fill:#1f7a3a;stroke:#145229;stroke-width:3}          /* green fibreglass board */
+.pcbdark{fill:#0f3d1f;stroke:#0a2a15;stroke-width:2}
+.chip{fill:#23272b;stroke:#4a5056;stroke-width:3}          /* black epoxy package */
+.chipsilver{fill:#c9ced4;stroke:#8a9199;stroke-width:3}    /* metal heat spreader (CPU lid) */
+.gold{fill:#d4a537;stroke:#9c7a22;stroke-width:1.5}        /* gold contacts */
+.silver{fill:#c0c6cc;stroke:#8a9199;stroke-width:2}
+.copper{fill:none;stroke:#b87333;stroke-width:6;stroke-linecap:round}   /* data trace */
+.pwrwire{fill:none;stroke:#e0a400;stroke-width:7;stroke-linecap:round}  /* power rail */
+.netwire{fill:none;stroke:#c2187a;stroke-width:5;stroke-dasharray:14 10}
+.panel{fill:#ffffff;stroke:#b9c2d0;stroke-width:3}
+.cell{fill:#f7f9fc;stroke:#8a9199;stroke-width:1.5}
+.cloud{fill:#e8f1fb;stroke:#6b93c2;stroke-width:3}
+.svc{fill:#fff7e6;stroke:#d79b2d;stroke-width:2}
+.title{fill:#1b2430;font-size:30px;font-weight:600}
+.lbl{fill:#1b2430;font-size:22px;font-weight:600}
+.lblw{fill:#ffffff;font-size:22px;font-weight:600}
+.sub{fill:#5b6778;font-size:17px}
+.subw{fill:#d6dce6;font-size:16px}
+.tiny{fill:#ffffff;font-size:15px}
+.val{fill:#ffd166;font-size:18px;font-family:ui-monospace,monospace}
+.mono{fill:#1b2430;font-size:16px;font-family:ui-monospace,monospace}
+.note{fill:#5b6778;font-size:17px}
+.hot>rect,.hot>path,.hot>circle,rect.hot,path.hot{stroke:#ff6a00!important;stroke-width:7!important}
+.later{opacity:0;transition:opacity .5s}
+.later.on{opacity:1}
+.blk{stroke:#6b7280;stroke-width:1.5}
+.free{fill:#eef2f7}
+.gpt{fill:#b45309}.esp{fill:#2563eb}.boot{fill:#60a5fa}.fs{fill:#15803d}.kern{fill:#6d28d9}.user{fill:#f59e0b}.dirty{fill:#dc2626}.sb{fill:#0e7490}.bmap{fill:#4d7c0f}.inode{fill:#7c3aed}
+.bar{fill:#cfd8e6;stroke:#8a9199;stroke-width:2}
+.barhot{fill:#ff6a00}
+.electron{fill:#0a7cc2}
+.oxide{fill:#cbd5e1}.gate{fill:#64748b}.fg{fill:#d4a537}.si{fill:#94a3b8}.nplus{fill:#0e7490}
+.tree{fill:#ffffff;stroke:#0a7cc2;stroke-width:2.5}
+.treekey{fill:#1b2430;font-size:17px;font-family:ui-monospace,monospace}
+.edge{fill:none;stroke:#6b7280;stroke-width:3}
+</style>
+</head>
+<body>
+<header>
+  <h1>From power-on to a database row — step through</h1>
+  <button id=\"prev\">◀ Prev</button>
+  <select id=\"jump\"></select>
+  <button id=\"next\">Next ▶</button>
+  <button id=\"auto\">▶ Autoplay</button>
+</header>
+<main>
+  <div id=\"stage\">
+    <div id=\"prog\"><div></div></div>
+    <svg id=\"svg\" viewBox=\"0 0 2000 2600\" preserveAspectRatio=\"xMidYMid meet\">
+      <defs>
+        <marker id=\"arr\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto\"><path d=\"M0,0 L10,5 L0,10 z\" fill=\"#5b6778\"/></marker>
+      </defs>
+      <g id=\"wires\"></g>
+      <g id=\"world\"></g>
+      <g id=\"flows\"></g>
+    </svg>
+  </div>
+  <aside>
+    <h2 id=\"t\"></h2>
+    <div class=\"meta\"><span class=\"tag\">Scale: <b id=\"scale\"></b></span><span class=\"tag\">Time: <b id=\"time\"></b></span></div>
+    <div id=\"body\"></div>
+    <div class=\"key\">
+      <span><i style=\"background:#e0a400\"></i>power</span>
+      <span><i style=\"background:#0a7cc2\"></i>data / instructions</span>
+      <span><i style=\"background:#d9480f\"></i>disk block read / write</span>
+      <span><i style=\"background:#c2187a\"></i>network packet</span>
+      <span style=\"color:#ff6a00\">▭ orange outline = active now</span>
+    </div>
+  </aside>
+</main>
+<script>
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('svg'),world=document.getElementById('world'),flows=document.getElementById('flows'),wires=document.getElementById('wires');
+function el(tag,attrs={},parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+function rect(p,x,y,w,h,cls,id,extra={}){const a={x,y,width:w,height:h,class:cls,rx:5};if(id)a.id=id;return el('rect',Object.assign(a,extra),p)}
+function txt(p,x,y,s,cls,anchor='start',extra={}){const t=el('text',Object.assign({x,y,class:cls,'text-anchor':anchor},extra),p);t.textContent=s;return t}
+function para(p,x,y,lines,cls,lh=24){lines.forEach((l,i)=>txt(p,x,y+i*lh,l,cls))}
+function g(id,p=world,cls){const a={id};if(cls)a.class=cls;return el('g',a,p)}
+// A chip: black package, silver label text, optional sub text. Geometry stored for routing.
+const GEO={};
+function box(p,x,y,w,h,label,id,sub,cls='chip',lc='lblw',sc='subw'){const G=g(id,p);rect(G,x,y,w,h,cls);if(label)txt(G,x+w/2,y+h/2+(sub?-2:8),label,lc,'middle');if(sub)txt(G,x+w/2,y+h/2+22,sub,sc,'middle');GEO[id]={x,y,w,h};return G}
+function geo(id){return GEO[id]}
+// Orthogonal route from edge of a to edge of b: never crosses the boxes themselves.
+function route(a,b){const A=geo(a),B=geo(b);const ac={x:A.x+A.w/2,y:A.y+A.h/2},bc={x:B.x+B.w/2,y:B.y+B.h/2};const dx=bc.x-ac.x,dy=bc.y-ac.y;let pts;
+  if(Math.abs(dx)>=Math.abs(dy)){const sx=dx>0?A.x+A.w:A.x,ex=dx>0?B.x:B.x+B.w;const mx=(sx+ex)/2;pts=[[sx,ac.y],[mx,ac.y],[mx,bc.y],[ex,bc.y]]}
+  else{const sy=dy>0?A.y+A.h:A.y,ey=dy>0?B.y:B.y+B.h;const my=(sy+ey)/2;pts=[[ac.x,sy],[ac.x,my],[bc.x,my],[bc.x,ey]]}
+  return 'M'+pts.map(q=>q.join(',')).join(' L')}
+function wire(a,b,cls){el('path',{d:route(a,b),class:cls},wires)}
+
+/* ---------------- Laptop motherboard ---------------- */
+(function(){
+  const L=g('laptop');
+  rect(L,40,40,1160,1420,'pcb','lap-board');GEO['lap-board']={x:40,y:40,w:1160,h:1420};
+  txt(L,70,95,'Laptop motherboard — green fibreglass, copper traces, black chips','title',undefined,{fill:'#fff'});
+  box(L,80,150,130,60,'Power','pwrbtn','button','silver','lbl','sub');
+  box(L,80,260,130,80,'Battery','battery','7.7 V Li-ion');
+  box(L,80,400,240,130,'PMIC + VRM','pmic','voltage regulators');
+  box(L,80,640,180,90,'SPI flash','spiflash','UEFI, 32 MB');
+  box(L,360,640,220,110,'Chipset (PCH)','pch','SPI · USB · PCIe lanes');
+  // CPU: silver lid with dies drawn inside
+  const C=g('cpu',L);rect(C,620,330,440,380,'chipsilver');GEO.cpu={x:620,y:330,w:440,h:380};
+  txt(C,840,365,'CPU (system-on-chip)','lbl','middle');
+  for(let i=0;i<4;i++){rect(C,650+i*95,390,80,80,'chip','core'+i);txt(C,690+i*95,436,'core '+i,'tiny','middle')}
+  rect(C,650,495,380,50,'chip','pcreg');txt(C,662,528,'PC (RIP):','subw');txt(C,760,528,'—','val','start',{id:'pcval'});
+  rect(C,650,565,180,70,'chip','cache');txt(C,740,595,'L1 / L2 / L3','tiny','middle');txt(C,740,617,'cache (SRAM)','tiny','middle');
+  rect(C,850,565,180,70,'chip','memctl');txt(C,940,595,'memory','tiny','middle');txt(C,940,617,'controller','tiny','middle');
+  txt(C,840,690,'4 cores · 3 GHz · ~30 W','sub','middle');
+  // RAM: two SO-DIMMs, green PCB, black DRAM chips, gold edge connector
+  const R=g('ram',L);GEO.ram={x:640,y:780,w:400,h:170};
+  [0,1].forEach(k=>{const y=780+k*90;rect(R,640,y,400,70,'pcbdark');for(let i=0;i<8;i++)rect(R,650+i*48,y+8,40,34,'chip');for(let i=0;i<30;i++)rect(R,648+i*13,y+54,9,14,'gold');});
+  txt(R,840,975,'RAM: 2 × 8 GB DDR5 SO-DIMM (DRAM, volatile)','lblw','middle');
+  // SSD: black M.2 stick
+  const S=g('ssd',L);GEO.ssd={x:80,y:900,w:420,h:130};rect(S,80,900,420,130,'chip');
+  rect(S,100,920,90,90,'chipsilver');txt(S,145,960,'ctrl','lbl','middle');txt(S,145,982,'+ FTL','sub','middle');
+  for(let i=0;i<3;i++){rect(S,210+i*90,920,80,90,'pcbdark');txt(S,250+i*90,970,'NAND','tiny','middle')}
+  for(let i=0;i<14;i++)rect(S,84+i*8,1012,6,14,'gold');
+  txt(S,290,1060,'SSD: 1 TB NVMe M.2 (flash, persistent)','lblw','middle');
+  // Wi-Fi module + antenna
+  const W=g('wifi',L);GEO.wifi={x:80,y:1150,w:200,h:90};rect(W,80,1150,200,90,'chip');txt(W,180,1190,'Wi-Fi','lblw','middle');txt(W,180,1215,'M.2 radio','subw','middle');
+  el('path',{d:'M280,1170 L330,1170 L330,1110',class:'copper'},W);el('circle',{cx:330,cy:1110,r:9,fill:'#c0c6cc'},W);
+  txt(W,60,1300,'Screen, keyboard, trackpad and USB hang off the PCH too; left out to keep the data path visible.','subw');
+  // Wires (power rails gold, data traces copper)
+  wire('battery','pmic','pwrwire');wire('pwrbtn','pmic','pwrwire');wire('pmic','cpu','pwrwire');wire('pmic','ssd','pwrwire');
+  wire('spiflash','pch','copper');wire('pch','cpu','copper');wire('cpu','ram','copper');wire('pch','ssd','copper');wire('pch','wifi','copper');
+  // reset line label
+  txt(L,350,470,'RESET#','subw');
+})();
+
+/* ---------------- Inset: SSD block map ---------------- */
+(function(){
+  const P=g('ssdmap',world,'later');GEO.ssdmap={x:40,y:1520,w:560,h:440};
+  rect(P,40,1520,560,440,'panel');txt(P,60,1560,'SSD as the OS sees it: 4 KB blocks (LBAs)','lbl');
+  txt(P,60,1590,'Zoom of the 1 TB stick. Each square = one block.','sub');
+  const cols=24,rows=10,sz=20,x0=60,y0=1610;
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const i=r*cols+c;rect(P,x0+c*sz,y0+r*sz,sz-2,sz-2,'blk free','lba'+i,{rx:2})}
+  const legend=g('ssdlegend',P);let ly=1830;
+  [['gpt','GPT partition table (LBA 1)'],['esp','EFI system partition'],['boot','bootloader file (PE binary)'],['fs','ext4 / APFS data partition'],['sb','superblock + bitmaps'],['inode','inode table'],['user','your document blocks']].forEach((k,i)=>{const x=60+(i%3)*180,y=ly+Math.floor(i/3)*32;rect(legend,x,y,18,18,'blk '+k[0],null,{rx:2});txt(legend,x+26,y+15,k[1],'note')});
+})();
+
+/* ---------------- Inset: RAM address map ---------------- */
+(function(){
+  const P=g('rammap',world,'later');GEO.rammap={x:640,y:1520,w:560,h:440};
+  rect(P,640,1520,560,440,'panel');txt(P,660,1560,'RAM as the CPU sees it: one address line, 0 → 16 GB','lbl');
+  txt(P,660,1590,'Volatile. Empty at power-on. Filled by DMA from the SSD.','sub');
+  const segs=[['r-fw','firmware tables',0x15803d],['r-boot','bootloader',0x60a5fa],['r-kern','kernel',0x6d28d9],['r-pt','page tables',0x0e7490],['r-pc','page cache',0xf59e0b],['r-app','your app + libc',0xdc7633],['r-free','free',0xeef2f7]];
+  let x=660;const ws=[50,60,110,60,100,70,70];
+  segs.forEach((s,i)=>{rect(P,x,1620,ws[i],70,'blk later',s[0],{fill:'#'+s[2].toString(16).padStart(6,'0')});txt(P,x+ws[i]/2,1715,s[1],'note','middle',{'font-size':14});x+=ws[i]});
+  txt(P,660,1760,'0x0000_0000','mono');txt(P,1180,1760,'0x4_0000_0000','mono','end');
+  para(P,660,1810,['Each box is thousands of 4 KB pages.','The page cache holds copies of disk blocks;','a red page is \"dirty\": changed in RAM, not yet on the SSD.'],'note');
+  rect(P,1040,1620,30,70,'blk later dirty','r-dirty',{});
+})();
+
+/* ---------------- Inset: Flash cell ---------------- */
+(function(){
+  const P=g('flashcell',world,'later');GEO.flashcell={x:1240,y:1520,w:560,h:440};
+  rect(P,1240,1520,560,440,'panel');txt(P,1260,1560,'One NAND flash cell (~15 nm)','lbl');
+  txt(P,1260,1590,'A transistor with an extra, insulated \"floating\" gate.','sub');
+  const cx=1300;rect(P,cx,1800,440,70,'si');txt(P,cx+220,1890,'p-type silicon substrate','note','middle');
+  rect(P,cx,1800,100,40,'nplus');txt(P,cx+50,1826,'source n+','tiny','middle');
+  rect(P,cx+340,1800,100,40,'nplus');txt(P,cx+390,1826,'drain n+','tiny','middle');
+  rect(P,cx+110,1780,220,20,'oxide');txt(P,cx+345,1796,'tunnel oxide','note');
+  rect(P,cx+110,1735,220,45,'fg','fgate');txt(P,cx+220,1764,'floating gate (trapped charge)','tiny','middle',{fill:'#1b2430'});
+  rect(P,cx+110,1715,220,20,'oxide');
+  rect(P,cx+110,1670,220,45,'gate');txt(P,cx+220,1699,'control gate (word line)','tiny','middle');
+  const E=g('electrons',P);for(let i=0;i<6;i++)el('circle',{cx:cx+140+i*35,cy:1757,r:6,class:'electron later','id':'e'+i},E);
+  para(P,1260,1630,['Write: ~20 V on the control gate pulls electrons through','the oxide onto the floating gate. Read: ~1 V, see whether','the transistor conducts; trapped charge shifts the threshold.'],'note',22);
+})();
+
+/* ---------------- Inset: B-tree ---------------- */
+(function(){
+  const P=g('btree',world,'later');GEO.btree={x:40,y:2000,w:1160,h:560};
+  rect(P,40,2000,1160,560,'panel');txt(P,60,2040,'Postgres B-tree index on users(id): 8 KB pages, 3 levels, ~10⁸ rows','lbl');
+  const node=(id,x,y,keys,cls)=>{const G=g(id,P);rect(G,x,y,260,56,'tree');keys.forEach((k,i)=>txt(G,x+22+i*62,y+36,k,'treekey'));GEO[id]={x,y,w:260,h:56};return G};
+  node('root',490,2090,['…','4 M','8 M','12 M'],'');txt(P,760,2124,'root (RAM)','note');
+  node('int1',160,2210,['…','5 M','6 M','7 M'],'');node('int2',490,2210,['8.1 M','8.4 M','8.7 M','…'],'');node('int3',820,2210,['…','…','…','…'],'');txt(P,1090,2244,'internal (RAM)','note');
+  node('leaf1',160,2330,['…','…','…','…'],'');node('leaf2',490,2330,['8.4 M','8.4 M+1','8.4 M+2','…'],'');node('leaf3',820,2330,['…','…','…','…'],'');txt(P,1090,2364,'leaf (one EBS read)','note');
+  [['root','int1'],['root','int2'],['root','int3'],['int2','leaf1'],['int2','leaf2'],['int2','leaf3']].forEach(e=>{const A=geo(e[0]),B=geo(e[1]);el('path',{d:`M${A.x+A.w/2},${A.y+A.h} L${B.x+B.w/2},${B.y}`,class:'edge'},P)});
+  const H=g('heap',P);rect(H,490,2460,260,56,'tree',null,{stroke:'#d9480f'});GEO.heap={x:490,y:2460,w:260,h:56};txt(H,620,2496,'heap page: id 8 400 001 → age 31','treekey','middle');
+  el('path',{d:'M620,2386 L620,2460',class:'edge','marker-end':'url(#arr)'},P);
+  para(P,60,2460,['Looking up id = 8 400 001:','root says 8 M ≤ id < 12 M → middle child;','that says 8.4 M ≤ id < 8.7 M → middle leaf;','leaf holds the row\\'s address (heap page, offset).'],'note',24);
+})();
+
+/* ---------------- Internet + AWS ---------------- */
+(function(){
+  const N=g('net');GEO.net={x:1260,y:40,w:700,h:280};
+  el('path',{d:'M1300,250 C1230,170 1330,70 1430,110 C1480,40 1640,40 1690,110 C1800,60 1940,150 1880,230 C1930,300 1750,330 1660,290 C1540,340 1360,330 1300,250 Z',class:'cloud'},N);
+  txt(N,1610,150,'Internet','lbl','middle');txt(N,1610,180,'Wi-Fi → home router → ISP fibre → undersea / cross-country fibre → AWS edge','sub','middle');
+  box(N,1560,210,100,50,'router','router',null,'cell','lbl');box(N,1760,210,100,50,'ISP','isp',null,'cell','lbl');
+  const A=g('aws');GEO.aws={x:1260,y:380,w:700,h:320};rect(A,1260,380,700,320,'panel');txt(A,1280,420,'AWS region (eu-west-2): Supabase project','lbl');
+  box(A,1290,460,160,60,'Load balancer','lb',null,'svc','lbl');box(A,1480,460,160,60,'PostgREST','pgrest','HTTP → SQL','svc','lbl','sub');box(A,1670,460,160,60,'Pooler','pooler','connection reuse','svc','lbl','sub');
+  box(A,1480,580,160,70,'Postgres','pg','on an EC2 server','svc','lbl','sub');box(A,1700,580,200,70,'EBS volume','ebs','network SSD, other servers','svc','lbl','sub');
+  txt(A,1280,690,'Each box is a process on a server; arrows below are network hops inside the data centre.','note');
+  wire('lb','pgrest','netwire');wire('pgrest','pooler','netwire');wire('pooler','pg','netwire');wire('pg','ebs','netwire');
+})();
+
+/* ---------------- Server board ---------------- */
+(function(){
+  const S=g('server');GEO.server={x:1260,y:760,w:700,h:700};rect(S,1260,760,700,700,'pcb');
+  txt(S,1290,810,'Database server (2U rack unit, no screen)','title',undefined,{fill:'#fff'});
+  // two CPU sockets
+  box(S,1300,860,200,160,'CPU 0','scpu0','64 cores, 350 W','chipsilver','lbl','sub');box(S,1540,860,200,160,'CPU 1','scpu1','64 cores, 350 W','chipsilver','lbl','sub');
+  // DIMMs: 8 per socket, green with gold edge
+  const D=g('sram',S);GEO.sram={x:1300,y:1050,w:440,h:200};
+  for(let i=0;i<16;i++){const x=1300+i*27.5,y=1050;rect(D,x,y,22,170,'pcbdark');for(let k=0;k<4;k++)rect(D,x+5,y+10+k*36,12,26,'chip');rect(D,x+3,y+180,16,10,'gold')}
+  txt(D,1520,1275,'16 × 64 GB DDR5 ECC = 1 TB RAM','lblw','middle');
+  box(S,1770,860,160,100,'NIC','nic','100 GbE, DMA');box(S,1770,1000,160,90,'BMC','bmc','remote console');
+  box(S,1770,1130,160,120,'NVMe / EBS','sdisk','PCIe link');
+  box(S,1300,1310,620,110,'Laptop → server: 4 → 128 cores · 16 GB → 1 TB · Wi-Fi 1 Gb → 100 GbE · no battery, two PSUs · same ISA, same OS kernel, same B-tree','srvnote',null,'cell','sub');
+  wire('nic','scpu1','copper');wire('scpu0','sram','copper');wire('scpu1','sram','copper');wire('scpu1','sdisk','copper');wire('scpu0','scpu1','copper');
+})();
+
+/* ---------------- Ladder of time ---------------- */
+(function(){
+  const P=g('ladder',world,'later');GEO.ladder={x:1260,y:1520,w:700,h:1040};
+  rect(P,1260,1520,700,1040,'panel');txt(P,1280,1560,'Ladder of time (log scale): one bar step = 10×','lbl');
+  const rows=[['CPU clock tick',0.33e-9],['L1 cache hit',1e-9],['RAM access',100e-9],['SSD page read',50e-6],['EBS read (network SSD)',500e-6],['HDD seek + read',8e-3],['London ↔ Dublin fibre',12e-3],['Laptop ↔ AWS round trip',80e-3],['Eye blink',300e-3]];
+  rows.forEach((r,i)=>{const y=1600+i*100;const w=Math.max(10,(Math.log10(r[1])+10)*60);txt(P,1280,y+22,r[0],'note');rect(P,1280,y+34,w,30,'bar','bar'+i);txt(P,1290+w,y+56,fmt(r[1]),'mono')});
+  function fmt(s){return s<1e-6?(s*1e9).toFixed(2)+' ns':s<1e-3?(s*1e6).toFixed(0)+' µs':(s*1e3).toFixed(0)+' ms'}
+  para(P,1280,2520,['A 4-level B-tree with 2 levels cached = 2 disk reads: ~0.1 ms SSD, ~1 ms EBS, ~16 ms HDD.'],'note');
+})();
+
+/* ---------------- Flow animation: dots ride the real routed wires ---------------- */
+function dots(a,b,color,n=4,dur=1.6,rev=false){let d=route(a,b);const p=el('path',{d,fill:'none',stroke:color,'stroke-width':3,opacity:.35},flows);
+  for(let i=0;i<n;i++){const c=el('circle',{r:11,fill:color,stroke:'#fff','stroke-keyed':1,'stroke-width':2},flows);const m=el('animateMotion',{dur:dur+'s',repeatCount:'indefinite',begin:(i*dur/n)+'s',keyPoints:rev?'1;0':'0;1',keyTimes:'0;1',calcMode:'linear'},c);el('mpath',{href:'#'+(p.id||(p.id='fp'+Math.random().toString(36).slice(2)))},m)}}
+function ring(id,color){const G=geo(id);const r=el('rect',{x:G.x-6,y:G.y-6,width:G.w+12,height:G.h+12,rx:8,fill:'none',stroke:color,'stroke-width':6},flows);el('animate',{attributeName:'opacity',values:'1;.2;1',dur:'1.2s',repeatCount:'indefinite'},r)}
+
+/* ---------------- Steps ---------------- */
+const PWR='#e0a400',DAT='#0a7cc2',RD='#d9480f',NET='#c2187a';
+const steps=[
+{t:'1 · Press the power button',scale:'centimetres',time:'~50 ms',view:[40,40,1160,1000],hot:['pwrbtn','battery','pmic'],pc:'—',
+ flow:()=>{dots('battery','pmic',PWR);dots('pwrbtn','pmic',PWR,2);dots('pmic','cpu',PWR);dots('pmic','ssd',PWR,3)},
+ h:`<p>The button is a switch on a sense wire to the <b>PMIC</b>. The PMIC turns on its regulators in a fixed order (memory rail, chipset rail, CPU core rail), each one waiting for the previous to settle.</p><p>While the rails are rising, the CPU's <code>RESET#</code> pin is held low: every flip-flop in the chip is forced to its reset value. Nothing executes yet.</p><ul><li>Battery: 7.7 V</li><li>CPU core rail: ~1.0 V at up to 30 A</li><li>RAM rail: 1.1 V</li></ul>`},
+{t:'2 · Reset vector: the first instruction',scale:'one chip',time:'first ~1 µs',view:[560,300,560,440],hot:['cpu','core0','pcreg'],pc:'0xFFFF_FFF0',
+ flow:()=>{dots('spiflash','pch',DAT);dots('pch','cpu',DAT);ring('spiflash',DAT)},
+ h:`<p>When the rails are stable the PMIC releases <code>RESET#</code>. Core 0 wakes with its program counter hard-wired to <code>0xFFFFFFF0</code>, 16 bytes below 4 GB. There is no RAM configured yet, so the chipset maps that address range onto the <b>SPI flash</b> chip.</p><p>The fetch goes core → chipset → SPI bus → flash, byte by byte at ~50 MB/s. The first instruction is a jump into the firmware proper.</p><p>This is the only thing the hardware \"knows\": where to fetch from. Everything else is software from here.</p>`},
+{t:'3 · Firmware (UEFI) brings up the board',scale:'board',time:'0.5–2 s',view:[40,40,1160,1000],hot:['cpu','ram','pch'],pc:'0xFFF8_1A20',
+ flow:()=>{dots('cpu','ram',DAT);dots('pch','ssd',DAT,3);dots('pch','wifi',DAT,2)},
+ h:`<p>Running from flash and a few KB of cache-as-RAM, the firmware:</p><ol><li><b>Trains the memory controller</b>: sends test patterns to each DIMM and tunes the timing until reads come back clean. Only now does RAM exist as usable addresses.</li><li><b>Enumerates PCIe</b>: asks each lane \"who is there?\" and gets the SSD and the Wi-Fi module back, assigning each an address window.</li><li>Builds tables (ACPI, memory map) describing the board, and leaves them in RAM for the OS.</li></ol><p>Then it looks for something to boot.</p>`},
+{t:'4 · The SSD as a map of blocks',scale:'1 TB → 4 KB blocks',time:'~1 ms',view:[40,1520,560,440],show:['ssdmap'],hot:['ssdmap'],
+ paint:()=>{paintLBA(1,1,'gpt');paintLBA(2,30,'esp');paintLBA(8,4,'boot');paintLBA(40,200,'fs')},
+ flow:()=>{},
+ h:`<p>The firmware reads <b>LBA 1</b>, the GPT partition table: a list of (start block, end block, type) entries. It finds the EFI system partition, which is a small FAT file system, and inside it a file such as <code>EFI/BOOT/BOOTX64.EFI</code>: the <b>bootloader</b>.</p><p>Nothing on the disk is special to the hardware. It is only blocks; the GPT at block 1 is a convention that firmware and OS agree on.</p>`},
+{t:'5 · Bootloader into RAM by DMA',scale:'board → RAM map',time:'~20 ms',view:[40,760,1160,1200],show:['rammap','r-fw','r-boot'],hot:['ssd','ram'],
+ flow:()=>{dots('ssd','pch',RD);dots('pch','cpu',RD);dots('cpu','ram',RD)},
+ h:`<p>The firmware queues a read command to the SSD: \"blocks 8–11, put them at RAM address X\". The SSD controller fetches the data from NAND and writes it <b>straight into RAM</b> (DMA, direct memory access) without the CPU copying bytes, then raises an interrupt.</p><p>The CPU jumps to X. Now it is running code that came from the disk.</p>`},
+{t:'6 · Kernel loaded',scale:'RAM map',time:'~0.3 s',view:[640,1520,560,440],show:['rammap','r-kern'],hot:['r-kern'],
+ flow:()=>{dots('ssd','ram',RD,6,2)},
+ h:`<p>The bootloader understands the real file system (ext4, APFS). It walks its directory tree to <code>/boot/vmlinuz</code>, reads a few MB of blocks into RAM, then jumps into the kernel's entry point with a pointer to the firmware tables.</p><p>From this moment the firmware and bootloader are finished. The kernel owns the machine.</p>`},
+{t:'7 · Kernel init',scale:'chip + RAM',time:'~1 s',view:[560,300,560,700],show:['r-pt'],hot:['cpu','memctl'],pc:'0xFFFF_FFFF_8100_0000',
+ flow:()=>{dots('cpu','ram',DAT,6,1.2)},
+ h:`<p>The kernel builds the structures every later step depends on:</p><ol><li><b>Page tables</b>, and switches the CPU to virtual addressing. From now on every program sees its own private address space.</li><li><b>Interrupt handlers</b>, so the keyboard, NIC and SSD can get its attention.</li><li>Drivers for the SSD and Wi-Fi, found through the PCIe windows the firmware set up.</li><li>Mounts the root file system: reads the superblock to learn where the inode table and bitmaps live.</li><li>Starts the first user process (<code>init</code>), which starts everything else.</li></ol>`},
+{t:'8 · Rewind: formatting a blank drive',scale:'blocks',time:'seconds, once',view:[40,1520,560,440],show:['ssdmap'],hot:['ssdmap'],
+ paint:()=>{paintLBA(40,2,'sb');paintLBA(42,6,'bmap');paintLBA(48,20,'inode')},
+ flow:()=>{},
+ h:`<p>Step 6 assumed a file system was there. How did it get there? The installer ran <code>mkfs</code> once:</p><ul><li><b>Superblock</b>: block size, total blocks, where the other tables are.</li><li><b>Bitmaps</b>: one bit per block and per inode, 0 = free.</li><li><b>Inode table</b>: fixed slots, each describing one file: size, owner, and the list of blocks holding it.</li><li><b>Root directory</b>: an inode whose data is a (name → inode number) table; on many file systems that table is a B-tree.</li></ul><p>A \"formatted\" drive is still just blocks; it now has blocks that describe the other blocks.</p>`},
+{t:'9 · Saving a file: the write() syscall',scale:'RAM map',time:'~5 µs',view:[640,1520,560,440],show:['rammap','r-pc','r-app','r-dirty'],hot:['r-dirty'],
+ flow:()=>{dots('cpu','ram',DAT,3)},
+ h:`<p>Your editor calls <code>write(fd, buf, 4096)</code>. The CPU traps into the kernel, which:</p><ol><li>Finds the file's inode, allocates a free block number from the bitmap.</li><li>Copies your bytes into a <b>page cache</b> page in RAM and marks it <b>dirty</b> (red).</li><li>Returns. <code>write()</code> is done, but the SSD has not been touched.</li></ol><p>Pull the power now and the file is lost. <code>fsync()</code> is how a database forces the next step before reporting success.</p>`},
+{t:'10 · Writeback: RAM → SSD via NVMe',scale:'board',time:'~100 µs',view:[40,600,1100,460],hot:['ram','pch','ssd'],
+ flow:()=>{dots('ram','cpu',RD,3);dots('cpu','pch',RD,3);dots('pch','ssd',RD,3)},
+ h:`<p>Seconds later (or on <code>fsync</code>) the kernel flushes dirty pages:</p><ol><li>Writes a 64-byte command into a <b>submission queue</b> in RAM: \"write 4 KB from RAM address X to LBA 7 231\".</li><li>Rings the SSD's <b>doorbell</b> register over PCIe.</li><li>The SSD controller reads the command, DMAs the page out of RAM, and posts to a completion queue.</li><li>Interrupt; the kernel marks the page clean and updates the inode's block list and the bitmaps (more writes).</li></ol>`},
+{t:'11 · Inside one flash cell',scale:'nanometres',time:'~1 ms per page program',view:[1240,1520,560,440],show:['flashcell','e0','e1','e2','e3','e4','e5'],hot:['fgate'],
+ flow:()=>{},
+ h:`<p>The SSD controller's <b>flash translation layer</b> maps LBA 7 231 to a physical page in one NAND chip. Flash cannot overwrite in place: a cell must be erased (whole 4 MB block, ~ms) before it can be programmed, so the FTL writes to a fresh page and marks the old one stale for later garbage collection.</p><p>Programming: ~20 V on the control gate makes electrons tunnel through the oxide onto the floating gate, where they stay with no power applied. Reading: a small voltage on the gate; the trapped charge shifts the threshold, so the cell conducts or not. Modern cells store 3–4 bits by distinguishing 8–16 charge levels.</p><p>Your bytes are now a pattern of trapped electrons.</p>`},
+{t:'12 · A query leaves your app',scale:'board',time:'~50 µs',view:[40,300,1160,1000],hot:['cpu','pch','wifi'],
+ flow:()=>{dots('cpu','pch',NET,3);dots('pch','wifi',NET,3)},
+ h:`<p>Your app runs <code>supabase.from('users').select('age').eq('id', 8400001)</code>. The library builds an HTTP request, wraps it in TLS, and the kernel wraps that in TCP, IP and Ethernet headers. Each layer adds a header; the payload is still your one line of text.</p><p>The frame is DMA'd to the Wi-Fi module, which modulates it onto a 5 GHz carrier.</p>`},
+{t:'13 · Across the network',scale:'kilometres',time:'~40 ms one way',view:[40,40,1920,700],hot:['wifi','net'],
+ flow:()=>{dots('wifi','router',NET,3,2.5);dots('router','isp',NET,3,1.5);dots('isp','lb',NET,3,1.5)},
+ h:`<p>Router → ISP → fibre backbone → AWS edge. Each hop reads the IP destination, looks it up in its own routing table (a longest-prefix-match tree, a cousin of the B-tree), and forwards. Light in fibre moves at ~200 000 km/s, so ~1 ms per 200 km; most of the latency is distance and queueing, not computation.</p>`},
+{t:'14 · Inside the AWS region',scale:'data centre',time:'~1 ms',view:[1240,360,740,360],hot:['aws','lb','pgrest','pooler','pg'],
+ flow:()=>{dots('lb','pgrest',NET,3);dots('pgrest','pooler',NET,3);dots('pooler','pg',NET,3)},
+ h:`<p>Supabase is a set of processes on AWS servers around a Postgres database:</p><ol><li><b>Load balancer</b> terminates TLS and picks a healthy backend.</li><li><b>PostgREST</b> turns the HTTP request into SQL: <code>SELECT age FROM users WHERE id = 8400001</code>.</li><li><b>Pooler</b> hands it to an already-open Postgres connection.</li><li><b>Postgres</b> runs on an EC2 server whose \"disk\" is an <b>EBS volume</b>: an SSD in another rack, reached over the data-centre network.</li></ol>`},
+{t:'15 · The database server',scale:'rack unit',time:'—',view:[1240,740,740,740],hot:['server','scpu0','scpu1','sram'],
+ flow:()=>{},
+ h:`<p>Same architecture as the laptop, different proportions:</p><ul><li>Two CPU sockets, 128 cores total, no battery, two redundant power supplies.</li><li>16 DIMMs = 1 TB of <b>ECC</b> RAM (extra chip per DIMM detects and corrects bit flips). Most of the hot B-tree pages live here permanently.</li><li>100 GbE NIC instead of Wi-Fi; a <b>BMC</b> chip instead of a screen, so an operator can see the console over the network.</li><li>Same x86 ISA, same Linux kernel, same boot sequence from steps 1–7.</li></ul><p>The client/server difference is the role, not the kind of machine.</p>`},
+{t:'16 · Packet in: NIC → RAM → Postgres wakes',scale:'server board',time:'~20 µs',view:[1240,740,740,740],hot:['nic','scpu1','sram'],
+ flow:()=>{dots('nic','scpu1',NET,3);dots('scpu1','sram',DAT,3)},
+ h:`<p>The NIC DMAs the frame into a ring buffer in RAM and raises an interrupt. The kernel's TCP stack strips the headers and copies the payload into the socket buffer of the Postgres backend process, which was blocked in <code>recv()</code>. The scheduler marks it runnable and a core picks it up.</p><p>Postgres parses the SQL, sees <code>WHERE id = …</code> on a column with an index, and chooses an index scan.</p>`},
+{t:'17 · B-tree lookup',scale:'8 KB pages',time:'~0.5 ms (one EBS read)',view:[40,2000,1160,560],show:['btree'],hot:['root','int2','leaf2','heap'],
+ flow:()=>{dots('root','int2',DAT,2,1);dots('int2','leaf2',DAT,2,1);dots('sdisk','leaf2',RD,3,2);dots('leaf2','heap',RD,2,1)},
+ h:`<p>Each node is one 8 KB page holding ~300 sorted keys, so three levels index ~27 million rows and four index ~8 billion. The cost that matters is <b>pages fetched from disk</b>, not comparisons.</p><ol><li><b>Root</b>: in shared buffers (RAM). Binary search within the page: 8 M ≤ id &lt; 12 M → middle child.</li><li><b>Internal</b>: also cached (every query touches these). → middle leaf.</li><li><b>Leaf</b>: not cached. One read to the EBS volume: ~0.5 ms, the only slow step. The leaf entry holds (heap page, slot).</li><li><b>Heap page</b>: fetch the row, pull out <code>age = 31</code>.</li></ol><p>Without the index: scan 10⁸ rows ≈ 10⁵ pages ≈ seconds.</p>`},
+{t:'18 · The answer returns',scale:'everything',time:'~80 ms round trip',view:[40,40,1920,1420],hot:['pg','cpu'],
+ flow:()=>{dots('pg','lb',NET,3);dots('lb','isp',NET,3);dots('isp','router',NET,3);dots('router','wifi',NET,3,2.5);dots('wifi','pch',NET,3);dots('pch','cpu',NET,3)},
+ h:`<p>Postgres writes <code>{\"age\":31}</code> to its socket; the layers wrap it, the hops forward it, your Wi-Fi module DMAs it into RAM, the kernel wakes your app.</p><p><b>Where the 80 ms went:</b></p><ul><li>Fibre, both ways: ~75 ms</li><li>Load balancer, PostgREST, pooler: ~2 ms</li><li>The EBS disk read: ~0.5 ms</li><li>The B-tree comparisons themselves: &lt; 1 µs</li></ul><p>The index made the one disk read possible; distance made everything else.</p>`},
+{t:'19 · Ladder of time',scale:'log scale',time:'—',view:[1240,1500,740,1080],show:['ladder'],hot:['bar3','bar4','bar5'],
+ flow:()=>{},
+ h:`<p>Every design choice in this chain follows from this ladder. RAM is 10⁵× slower than a clock tick, so caches exist. An SSD is 10³× slower than RAM, so B-trees make nodes a whole page and keep the tree shallow. The network is 10³× slower than the SSD, so the database lives next to the data and only the answer travels.</p><p><b>Check yourself:</b> a 4-level B-tree with the top 2 levels cached. How many disk reads per lookup? Roughly how long on a local SSD, on EBS, on an HDD?</p>`}
+];
+
+function paintLBA(start,n,cls){for(let i=start;i<start+n;i++){const r=document.getElementById('lba'+i);if(r){r.setAttribute('class','blk '+cls)}}}
+
+/* ---------------- Camera + runner ---------------- */
+let cur=0,timer=null,shown=new Set();
+function setView(v){svg.setAttribute('viewBox',v.join(' '))}
+svg.style.transition='none';
+function animView(to){const from=svg.getAttribute('viewBox').split(' ').map(Number);const t0=performance.now(),D=900;function f(now){const k=Math.min(1,(now-t0)/D),e=k<.5?2*k*k:-1+(4-2*k)*k;setView(from.map((a,i)=>a+(to[i]-a)*e));if(k<1)requestAnimationFrame(f)}requestAnimationFrame(f)}
+function show(i){cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  flows.innerHTML='';document.querySelectorAll('.hot').forEach(e=>e.classList.remove('hot'));
+  // insets: show everything revealed so far
+  for(let j=0;j<=cur;j++)(steps[j].show||[]).forEach(id=>{shown.add(id)});
+  document.querySelectorAll('.later').forEach(e=>e.classList.toggle('on',shown.has(e.id)));
+  for(let j=0;j<=cur;j++)if(steps[j].paint)steps[j].paint();
+  (s.hot||[]).forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('hot')});
+  document.getElementById('pcval').textContent=s.pc||document.getElementById('pcval').textContent;
+  animView(s.view);s.flow();
+  document.getElementById('t').textContent=s.t;document.getElementById('scale').textContent=s.scale;document.getElementById('time').textContent=s.time;document.getElementById('body').innerHTML=s.h;
+  document.getElementById('jump').value=cur;document.querySelector('#prog div').style.width=((cur+1)/steps.length*100)+'%';
+  document.getElementById('prev').disabled=cur===0;document.getElementById('next').disabled=cur===steps.length-1}
+const J=document.getElementById('jump');steps.forEach((s,i)=>{const o=document.createElement('option');o.value=i;o.textContent=s.t;J.appendChild(o)});
+J.onchange=()=>show(+J.value);document.getElementById('prev').onclick=()=>show(cur-1);document.getElementById('next').onclick=()=>show(cur+1);
+document.getElementById('auto').onclick=function(){if(timer){clearInterval(timer);timer=null;this.textContent='▶ Autoplay'}else{this.textContent='⏸ Pause';timer=setInterval(()=>{if(cur<steps.length-1)show(cur+1);else{clearInterval(timer);timer=null;document.getElementById('auto').textContent='▶ Autoplay'}},9000)}};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight')show(cur+1);if(e.key==='ArrowLeft')show(cur-1)});
+setView([40,40,1160,1000]);show(0);
+</script>
+</body>
+</html>"
+ :AT "2026-11-19T16:06:47" :VERSION 2)
+(:PINNED T :ID "bst-vs-b-tree-side-by-side-search" :MAP "computers" :NODE "btree-indexes" :TYPE
+ "html" :TITLE "BST vs B-tree: side-by-side search" :LANGUAGE NIL :CONTENT "<!DOCTYPE html>
+<html><head><meta charset=\"utf-8\"><style>
+body{margin:0;font:14px system-ui,sans-serif;background:#f3f5f8;color:#1b2430;padding:10px}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+button,select{padding:6px 12px;border:1px solid #b9c2d0;border-radius:6px;background:#fff;cursor:pointer;font-size:14px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:700px){.row{grid-template-columns:1fr}}
+.card{background:#fff;border:1px solid #d6dce6;border-radius:8px;padding:8px}
+h3{margin:0 0 4px;font-size:15px}
+svg{width:100%;height:auto;display:block}
+.stat{font-size:13px;color:#5b6778;min-height:36px}
+.stat b{color:#d9480f}
+.n{fill:#fff;stroke:#0a7cc2;stroke-width:2}
+.n.vis{fill:#ffe3cc;stroke:#ff6a00;stroke-width:3}
+.n.found{fill:#c8f2d0;stroke:#15803d;stroke-width:3}
+.e{stroke:#8a9199;stroke-width:1.5;fill:none}
+text{font-family:ui-monospace,monospace;font-size:11px;text-anchor:middle;dominant-baseline:middle;fill:#1b2430}
+.k.hit{fill:#d9480f;font-weight:700}
+</style></head><body>
+<div class=\"bar\">
+<b>Search for key:</b><select id=\"key\"></select>
+<button id=\"go\">▶ Search both</button>
+<button id=\"reset\">Reset</button>
+<span style=\"color:#5b6778\">Each highlighted node = one disk block read.</span>
+</div>
+<div class=\"row\">
+<div class=\"card\"><h3>Binary search tree (1 key per node)</h3><svg id=\"a\" viewBox=\"0 0 520 300\"></svg><div class=\"stat\" id=\"sa\"></div></div>
+<div class=\"card\"><h3>B-tree (4 keys per node, 3 levels)</h3><svg id=\"b\" viewBox=\"0 0 520 300\"></svg><div class=\"stat\" id=\"sb\"></div></div>
+</div>
+<script>
+const NS='http://www.w3.org/2000/svg';
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);p&&p.appendChild(e);return e}
+const keys=[];for(let i=1;i<=31;i++)keys.push(i*3);   // 3..93
+// ---- BST: balanced-ish from sorted keys (31 keys => depth 5), inserted in a plain way
+function build(lo,hi){if(lo>hi)return null;const m=(lo+hi)>>1;return{k:keys[m],l:build(lo,m-1),r:build(m+1,hi)}}
+// make it a little lopsided like real BSTs: use unbalanced insertion order
+const order=[48,24,72,12,36,60,84,6,18,30,42,54,66,78,90,3,9,15,21,27,33,39,45,51,57,63,69,75,81,87,93];
+let root=null;function ins(n,k){if(!n)return{k,l:null,r:null};if(k<n.k)n.l=ins(n.l,k);else n.r=ins(n.r,k);return n}
+order.forEach(k=>root=ins(root,k));
+const A=document.getElementById('a'),B=document.getElementById('b');
+const aN={},bN={};
+function layoutBST(n,d,x0,x1){if(!n)return;n.x=(x0+x1)/2;n.y=22+d*56;layoutBST(n.l,d+1,x0,n.x);layoutBST(n.r,d+1,n.x,x1)}
+layoutBST(root,0,0,520);
+function drawBST(n){if(!n)return;[n.l,n.r].forEach(c=>{if(c){el('line',{x1:n.x,y1:n.y,x2:c.x,y2:c.y,class:'e'},A);drawBST(c)}})}
+function drawNodes(n){if(!n)return;aN[n.k]={n};n.c=el('circle',{cx:n.x,cy:n.y,r:12,class:'n'},A);const t=el('text',{x:n.x,y:n.y},A);t.textContent=n.k;drawNodes(n.l);drawNodes(n.r)}
+drawBST(root);drawNodes(root);
+// ---- B-tree: root [27,57], children each with keys, leaves
+const leaves=[[3,6,9,12],[15,18,21,24],[30,33,36,39],[42,45,48,51],[54,60,63,66],[69,72,75,78],[81,84,87,90,93]];
+// 3-level: root [39,66]; mid: m0 [15,27] m1 [45,54] m2 [72,81]; leaves under: need 9 leaves
+const L=[[3,6,9,12],[18,21,24],[30,33,36],[42,48,51],[57,60,63],[69,75,78],[84,87,90,93]];
+// structure: root [39? ...] build explicit:
+const tree={keys:[45],ch:[
+ {keys:[15,27],ch:[{keys:[3,6,9,12]},{keys:[18,21,24]},{keys:[30,33,36,39,42]}]},
+ {keys:[60,78],ch:[{keys:[48,51,54,57]},{keys:[63,66,69,72,75]},{keys:[81,84,87,90,93]}]}]};
+// assign layout
+const NW=[0];function bl(n,d){n.d=d;if(n.ch)n.ch.forEach(c=>bl(c,d+1))}bl(tree,0);
+const leafList=[];(function c(n){if(!n.ch)leafList.push(n);else n.ch.forEach(c)})(tree);
+const lw=520/leafList.length;leafList.forEach((n,i)=>n.x=lw*(i+.5));
+(function p(n){if(n.ch){n.ch.forEach(p);n.x=(n.ch[0].x+n.ch[n.ch.length-1].x)/2}})(tree);
+const cw=15,H=22;
+(function draw(n){n.y=30+n.d*95;n.w=Math.max(n.keys.length*cw*2.0,40);
+ if(n.ch)n.ch.forEach(c=>{draw(c);el('line',{x1:n.x,y1:n.y+H/2,x2:c.x,y2:c.y-H/2,class:'e'},B)});})(tree);
+(function box(n){n.r=el('rect',{x:n.x-n.w/2,y:n.y-H/2,width:n.w,height:H,rx:4,class:'n'},B);
+ n.t=n.keys.map((k,i)=>{const t=el('text',{x:n.x-n.w/2+(i+.5)*n.w/n.keys.length,y:n.y,class:'k'},B);t.textContent=k;return t});
+ if(n.ch)n.ch.forEach(box)})(tree);
+// leaf-level label
+const sel=document.getElementById('key');
+keys.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;sel.appendChild(o)});
+sel.value=93;
+const sa=document.getElementById('sa'),sb=document.getElementById('sb');
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let run=0;
+function clear(){run++;document.querySelectorAll('.n').forEach(e=>e.setAttribute('class','n'));document.querySelectorAll('.k').forEach(e=>e.setAttribute('class','k'));sa.innerHTML=sb.innerHTML=''}
+document.getElementById('reset').onclick=clear;
+async function searchBST(k,id){let n=root,r=0;while(n){r++;n.c.setAttribute('class','n vis');sa.innerHTML=`Block reads: <b>${r}</b> — compare ${k} with ${n.k}`;await sleep(650);if(id!=run)return;
+ if(k==n.k){n.c.setAttribute('class','n found');sa.innerHTML=`Found after <b>${r}</b> block reads (one key per block, depth grows ~log₂ n).`;return}
+ n=k<n.k?n.l:n.r}}
+async function searchB(k,id){let n=tree,r=0;while(n){r++;n.r.setAttribute('class','n vis');sb.innerHTML=`Block reads: <b>${r}</b> — scan sorted keys inside the block`;await sleep(1100);if(id!=run)return;
+ const i=n.keys.indexOf(k);if(i>=0){n.r.setAttribute('class','n found');n.t[i].setAttribute('class','k hit');sb.innerHTML=`Found after <b>${r}</b> block reads (hundreds of keys per block → ~log₅₀₀ n).`;return}
+ let j=0;while(j<n.keys.length&&k>n.keys[j])j++;n=n.ch&&n.ch[j]}}
+document.getElementById('go').onclick=()=>{clear();const id=run,k=+sel.value;searchBST(k,id);searchB(k,id)};
+</script>
+<div style=\"margin-top:8px;color:#5b6778;font-size:13px\">With 31 keys the BST needs up to 6 reads and the B-tree 3. Scale up: for a billion keys a balanced BST needs about 30 levels, a B-tree with ~500 keys per block needs about 4. Pick 93 or 3 to see the difference.</div>
+</body></html>"
+ :AT "2026-11-19T16:14:39" :VERSION 1)

@@ -113,3 +113,6 @@
  "What is a Kernel?" :CHANNEL "Techquickie" :AT "2026-11-18T10:50:48")
 (:ID "computers/linking-loading/4daUujBgQQ8" :MAP "computers" :NODE "linking-loading" :VIDEO
  "4daUujBgQQ8" :TITLE "What Are DLLs?" :CHANNEL "Techquickie" :AT "2026-11-18T11:04:02")
+(:ID "computers/btree-indexes/K1a2Bk8NrYQ" :MAP "computers" :NODE "btree-indexes" :VIDEO
+ "K1a2Bk8NrYQ" :TITLE "Understanding B-Trees: The Data Structure Behind Modern Databases" :CHANNEL
+ "Spanning Tree" :AT "2026-11-19T15:42:00")
